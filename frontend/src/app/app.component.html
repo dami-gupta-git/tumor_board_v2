@@ -1,0 +1,224 @@
+<div class="container">
+  <!-- Header -->
+  <div class="card">
+    <h1 style="color: #667eea; margin-bottom: 8px;">{{ title }}</h1>
+    <p style="color: #666;">AI-powered precision oncology variant assessment tool</p>
+    <div style="margin-top: 12px;">
+      <span
+        [style.color]="apiHealthy ? '#28a745' : '#dc3545'"
+        style="font-size: 14px; font-weight: 600;">
+        {{ apiHealthy ? '● API Connected' : '● API Disconnected' }}
+      </span>
+    </div>
+  </div>
+
+  <!-- Input Form -->
+  <div class="card">
+    <h2 style="margin-bottom: 20px; color: #333;">Variant Assessment</h2>
+
+    <form (ngSubmit)="onSubmit()">
+      <div class="form-group">
+        <label for="gene">Gene Symbol *</label>
+        <input
+          type="text"
+          id="gene"
+          name="gene"
+          [(ngModel)]="variantInput.gene"
+          placeholder="e.g., BRAF"
+          required
+          [disabled]="isLoading">
+      </div>
+
+      <div class="form-group">
+        <label for="variant">Variant *</label>
+        <input
+          type="text"
+          id="variant"
+          name="variant"
+          [(ngModel)]="variantInput.variant"
+          placeholder="e.g., V600E"
+          required
+          [disabled]="isLoading">
+      </div>
+
+      <div class="form-group">
+        <label for="tumor_type">Tumor Type (Optional)</label>
+        <input
+          type="text"
+          id="tumor_type"
+          name="tumor_type"
+          [(ngModel)]="variantInput.tumor_type"
+          placeholder="e.g., Melanoma"
+          [disabled]="isLoading">
+      </div>
+
+      <div style="display: flex; gap: 12px;">
+        <button type="submit" [disabled]="isLoading || !apiHealthy">
+          {{ isLoading ? 'Assessing...' : 'Assess Variant' }}
+        </button>
+        <button type="button" (click)="reset()" [disabled]="isLoading"
+          style="background: #6c757d;">
+          Reset
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Error Display -->
+  <div class="error" *ngIf="error">
+    <strong>Error:</strong> {{ error }}
+  </div>
+
+  <!-- Loading Indicator -->
+  <div class="loading" *ngIf="isLoading">
+    <h3>Analyzing variant...</h3>
+    <p>This may take a few moments as we query multiple databases and analyze the evidence.</p>
+  </div>
+
+  <!-- Results -->
+  <div *ngIf="assessment && !isLoading">
+    <!-- Assessment Summary -->
+    <div class="card">
+      <h2 style="margin-bottom: 20px; color: #333;">Assessment Results</h2>
+
+      <div style="margin-bottom: 24px;">
+        <h3 style="color: #667eea; margin-bottom: 12px;">
+          {{ assessment.variant.gene }} {{ assessment.variant.variant }}
+          <span *ngIf="assessment.variant.tumor_type"> in {{ assessment.variant.tumor_type }}</span>
+        </h3>
+
+        <div style="display: flex; gap: 16px; align-items: center; margin-bottom: 16px;">
+          <span [class]="getTierClass(assessment.assessment.tier)">
+            {{ assessment.assessment.tier }}
+          </span>
+          <span style="font-weight: 600; color: #333;">
+            Confidence: {{ assessment.assessment.confidence }}%
+          </span>
+        </div>
+
+        <div style="background: #f8f9fa; padding: 16px; border-radius: 6px; border-left: 4px solid #667eea;">
+          <strong style="color: #667eea;">Rationale:</strong>
+          <p style="margin-top: 8px; color: #333; line-height: 1.6;">
+            {{ assessment.assessment.rationale }}
+          </p>
+        </div>
+      </div>
+
+      <!-- Evidence Strength -->
+      <div *ngIf="assessment.assessment.evidence_strength" style="margin-bottom: 24px;">
+        <div class="annotation-item">
+          <div class="label">Evidence Strength</div>
+          <div class="value">{{ assessment.assessment.evidence_strength }}</div>
+        </div>
+      </div>
+
+      <!-- Recommended Therapies -->
+      <div *ngIf="assessment.recommended_therapies && assessment.recommended_therapies.length > 0" style="margin-bottom: 24px;">
+        <h3 style="color: #667eea; margin-bottom: 12px;">Recommended Therapies</h3>
+        <div *ngFor="let therapy of assessment.recommended_therapies" style="background: #f8f9fa; padding: 12px; border-radius: 6px; margin-bottom: 8px;">
+          <div style="font-weight: 600; color: #333;">{{ therapy.drug_name }}</div>
+          <div style="display: flex; gap: 16px; margin-top: 8px; font-size: 14px; color: #666;">
+            <span *ngIf="therapy.evidence_level">Evidence: {{ therapy.evidence_level }}</span>
+            <span *ngIf="therapy.approval_status">Status: {{ therapy.approval_status }}</span>
+            <span *ngIf="therapy.clinical_context">Context: {{ therapy.clinical_context }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Database Identifiers -->
+    <div class="card">
+      <h3 style="color: #667eea; margin-bottom: 16px;">Database Identifiers</h3>
+      <div class="info-grid">
+        <div class="info-item" *ngIf="assessment.identifiers.cosmic_id">
+          <h4>COSMIC ID</h4>
+          <p>{{ assessment.identifiers.cosmic_id }}</p>
+        </div>
+        <div class="info-item" *ngIf="assessment.identifiers.ncbi_gene_id">
+          <h4>NCBI Gene ID</h4>
+          <p>{{ assessment.identifiers.ncbi_gene_id }}</p>
+        </div>
+        <div class="info-item" *ngIf="assessment.identifiers.dbsnp_id">
+          <h4>dbSNP ID</h4>
+          <p>{{ assessment.identifiers.dbsnp_id }}</p>
+        </div>
+        <div class="info-item" *ngIf="assessment.identifiers.clinvar_id">
+          <h4>ClinVar ID</h4>
+          <p>{{ assessment.identifiers.clinvar_id }}</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- HGVS Notations -->
+    <div class="card" *ngIf="assessment.hgvs.genomic || assessment.hgvs.protein || assessment.hgvs.transcript">
+      <h3 style="color: #667eea; margin-bottom: 16px;">HGVS Notations</h3>
+      <div class="info-grid">
+        <div class="info-item" *ngIf="assessment.hgvs.genomic">
+          <h4>Genomic</h4>
+          <p>{{ assessment.hgvs.genomic }}</p>
+        </div>
+        <div class="info-item" *ngIf="assessment.hgvs.protein">
+          <h4>Protein</h4>
+          <p>{{ assessment.hgvs.protein }}</p>
+        </div>
+        <div class="info-item" *ngIf="assessment.hgvs.transcript">
+          <h4>Transcript</h4>
+          <p>{{ assessment.hgvs.transcript }}</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ClinVar Information -->
+    <div class="card" *ngIf="assessment.clinvar.clinical_significance || assessment.clinvar.accession">
+      <h3 style="color: #667eea; margin-bottom: 16px;">ClinVar Information</h3>
+      <div class="annotation-grid">
+        <div class="annotation-item" *ngIf="assessment.clinvar.clinical_significance">
+          <div class="label">Clinical Significance</div>
+          <div class="value">{{ assessment.clinvar.clinical_significance }}</div>
+        </div>
+        <div class="annotation-item" *ngIf="assessment.clinvar.accession">
+          <div class="label">Accession</div>
+          <div class="value">{{ assessment.clinvar.accession }}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Functional Annotations -->
+    <div class="card">
+      <h3 style="color: #667eea; margin-bottom: 16px;">Functional Annotations</h3>
+      <div class="annotation-grid">
+        <div class="annotation-item" *ngIf="assessment.annotations.snpeff_effect">
+          <div class="label">SnpEff Effect</div>
+          <div class="value">{{ assessment.annotations.snpeff_effect }}</div>
+        </div>
+        <div class="annotation-item" *ngIf="assessment.annotations.polyphen2_prediction">
+          <div class="label">PolyPhen2</div>
+          <div class="value">{{ getPolyPhen2Interpretation(assessment.annotations.polyphen2_prediction) }}</div>
+        </div>
+        <div class="annotation-item" *ngIf="assessment.annotations.cadd_score">
+          <div class="label">CADD Score</div>
+          <div class="value">{{ formatCaddScore(assessment.annotations.cadd_score) }}</div>
+        </div>
+        <div class="annotation-item" *ngIf="assessment.annotations.gnomad_exome_af">
+          <div class="label">gnomAD Exome AF</div>
+          <div class="value">{{ formatAlleleFrequency(assessment.annotations.gnomad_exome_af) }}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Transcript Information -->
+    <div class="card" *ngIf="assessment.transcript.id || assessment.transcript.consequence">
+      <h3 style="color: #667eea; margin-bottom: 16px;">Transcript Information</h3>
+      <div class="annotation-grid">
+        <div class="annotation-item" *ngIf="assessment.transcript.id">
+          <div class="label">Transcript ID</div>
+          <div class="value">{{ assessment.transcript.id }}</div>
+        </div>
+        <div class="annotation-item" *ngIf="assessment.transcript.consequence">
+          <div class="label">Consequence</div>
+          <div class="value">{{ assessment.transcript.consequence }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

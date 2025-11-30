@@ -1,0 +1,22 @@
+[
+  {
+    "gene": "BRAF",
+    "variant": "V600E",
+    "tumor_type": "Melanoma"
+  },
+  {
+    "gene": "EGFR",
+    "variant": "L858R",
+    "tumor_type": "Lung Adenocarcinoma"
+  },
+  {
+    "gene": "KRAS",
+    "variant": "G12C",
+    "tumor_type": "Non-Small Cell Lung Cancer"
+  },
+  {
+    "gene": "PIK3CA",
+    "variant": "H1047R",
+    "tumor_type": "Breast Cancer"
+  }
+]
