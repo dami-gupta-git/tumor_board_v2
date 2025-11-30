@@ -73,31 +73,40 @@ class Evidence(VariantAnnotations):
         lines = [f"Evidence for {self.gene} {self.variant}:\n"]
 
         if self.civic:
+            # Helper function to sort by evidence level (A > B > C > D > E > None)
+            def evidence_level_key(ev):
+                level_priority = {'A': 0, 'B': 1, 'C': 2, 'D': 3, 'E': 4}
+                return level_priority.get(ev.evidence_level, 99)
+
             # Filter and prioritize CIViC evidence
             civic_evidence = list(self.civic)
 
-            # Prioritize PREDICTIVE evidence with drugs
+            # Prioritize PREDICTIVE evidence with drugs, sorted by evidence level
             predictive_with_drugs = [e for e in civic_evidence
                                       if e.evidence_type == "PREDICTIVE" and e.drugs]
+            predictive_with_drugs = sorted(predictive_with_drugs, key=evidence_level_key)
 
-            # Then tumor-type-specific evidence if tumor type provided
+            # Then tumor-type-specific evidence if tumor type provided, sorted by evidence level
             tumor_specific = []
             if tumor_type:
                 tumor_specific = [e for e in civic_evidence
                                   if e.disease and tumor_type.lower() in e.disease.lower()
                                   and e not in predictive_with_drugs]
+                tumor_specific = sorted(tumor_specific, key=evidence_level_key)
 
-            # Then other predictive evidence
+            # Then other predictive evidence, sorted by evidence level
             other_predictive = [e for e in civic_evidence
                                 if e.evidence_type == "PREDICTIVE"
                                 and e not in predictive_with_drugs
                                 and e not in tumor_specific]
+            other_predictive = sorted(other_predictive, key=evidence_level_key)
 
-            # Then rest
+            # Then rest, sorted by evidence level
             remaining = [e for e in civic_evidence
                          if e not in predictive_with_drugs
                          and e not in tumor_specific
                          and e not in other_predictive]
+            remaining = sorted(remaining, key=evidence_level_key)
 
             # Combine in priority order
             prioritized = predictive_with_drugs + tumor_specific + other_predictive + remaining

@@ -39,13 +39,17 @@ class MyVariantAPIError(Exception):
 
 
 class MyVariantClient:
-    """Client for MyVariant.info API.
+    """Client for MyVariant.info API with CIViC fallback.
 
     MyVariant.info aggregates variant annotations from multiple sources
     including CIViC, ClinVar, COSMIC, and more.
+
+    When MyVariant returns no evidence, falls back to direct CIViC API
+    queries to handle fusions, amplifications, and poorly-indexed variants.
     """
 
     BASE_URL = "https://myvariant.info/v1"
+    CIVIC_API = "https://civicdb.org/api"
     DEFAULT_TIMEOUT = 30.0
 
     def __init__(
@@ -463,6 +467,121 @@ class MyVariantClient:
             raw_data=hit.model_dump(by_alias=True),
         )
 
+    async def _fetch_civic_fallback(
+        self, gene: str, variant: str
+    ) -> list[CIViCEvidence]:
+        """
+        Fallback to direct CIViC GraphQL API when MyVariant returns no evidence.
+
+        Handles fusions, amplifications, and poorly-indexed variants using CIViC V2 GraphQL API.
+
+        Args:
+            gene: Gene symbol (e.g., "ERBB2", "ALK")
+            variant: Variant notation (e.g., "amplification", "fusion", "R132H")
+
+        Returns:
+            List of CIViC evidence objects
+        """
+        gene = gene.upper()
+        variant_clean = variant.strip().upper()
+
+        # Detect variant type and construct molecular profile name
+        if any(kw in variant_clean for kw in ["FUSION", "FUS", "REARRANGEMENT"]):
+            mp_name = f"{gene} FUSION"
+        elif any(kw in variant_clean for kw in ["AMP", "AMPLIFICATION", "OVEREXPRESSION"]):
+            mp_name = f"{gene} AMPLIFICATION"
+        elif variant_clean.endswith(("DEL", "FS", "STOP", "NONSENSE")) or "DELAG" in variant_clean:
+            mp_name = f"{gene} {variant_clean}"  # Try with gene prefix
+        else:
+            mp_name = f"{gene} {variant_clean}"  # regular SNV/indel
+
+        client = self._get_client()
+
+        try:
+            # GraphQL query for molecular profiles and evidence
+            query = """
+            query($name: String!) {
+              molecularProfiles(name: $name) {
+                nodes {
+                  id
+                  name
+                  evidenceItems {
+                    nodes {
+                      id
+                      evidenceType
+                      evidenceLevel
+                      evidenceDirection
+                      significance
+                      description
+                      disease {
+                        name
+                      }
+                      therapies {
+                        id
+                        name
+                      }
+                      source {
+                        sourceType
+                      }
+                    }
+                  }
+                }
+              }
+            }
+            """
+
+            # Query CIViC GraphQL API
+            response = await client.post(
+                f"{self.CIVIC_API}/graphql",
+                json={"query": query, "variables": {"name": mp_name}},
+            )
+
+            if response.status_code != 200:
+                return []
+
+            data = response.json()
+            profiles = data.get("data", {}).get("molecularProfiles", {}).get("nodes", [])
+
+            if not profiles:
+                return []
+
+            # Parse evidence items from first matching profile
+            civic_evidence = []
+            profile = profiles[0]
+            evidence_items = profile.get("evidenceItems", {}).get("nodes", [])
+
+            for item in evidence_items:
+                # Extract disease name
+                disease_data = item.get("disease", {})
+                disease = disease_data.get("name") if disease_data else None
+
+                # Extract therapies
+                therapies = item.get("therapies", [])
+                drugs = [t.get("name", "") for t in therapies if isinstance(t, dict)]
+
+                # Map GraphQL field names to Evidence model fields
+                civic_evidence.append(
+                    CIViCEvidence(
+                        evidence_type=item.get("evidenceType"),  # camelCase in GraphQL
+                        evidence_level=item.get("evidenceLevel"),
+                        evidence_direction=item.get("evidenceDirection"),
+                        clinical_significance=item.get("significance"),
+                        disease=disease,
+                        drugs=drugs,
+                        description=item.get("description"),
+                        source=item.get("source", {}).get("sourceType")
+                        if isinstance(item.get("source"), dict)
+                        else None,
+                        rating=None,  # Rating not in V2 API
+                    )
+                )
+
+            return civic_evidence
+
+        except Exception as e:
+            # Log error but don't fail - return empty evidence
+            return []
+
     async def fetch_evidence(self, gene: str, variant: str) -> Evidence:
         """Fetch evidence for a variant from multiple sources.
 
@@ -519,9 +638,12 @@ class MyVariantClient:
             parsed_response = MyVariantResponse(**result)
 
             if not parsed_response.hits:
-                # No data found, return empty evidence
+                # No data found in MyVariant - try CIViC fallback
+                civic_fallback = await self._fetch_civic_fallback(gene, variant)
+
+                # Return evidence with CIViC fallback data
                 return Evidence(
-                    variant_id=query,
+                    variant_id=f"{gene}:{variant}",
                     gene=gene,
                     variant=variant,
                     cosmic_id=None,
@@ -539,12 +661,24 @@ class MyVariantClient:
                     gnomad_exome_af=None,
                     transcript_id=None,
                     transcript_consequence=None,
+                    civic=civic_fallback,  # Use CIViC fallback evidence
+                    clinvar=[],
+                    cosmic=[],
                     raw_data=result,
                 )
 
             # Use the first hit (most relevant) and extract using Pydantic models
             first_hit = parsed_response.hits[0]
-            return self._extract_from_hit(first_hit, gene, variant)
+            evidence = self._extract_from_hit(first_hit, gene, variant)
+
+            # If MyVariant returned no CIViC evidence, try CIViC fallback
+            if not evidence.civic:
+                civic_fallback = await self._fetch_civic_fallback(gene, variant)
+                if civic_fallback:
+                    # Update evidence with CIViC fallback data
+                    evidence.civic = civic_fallback
+
+            return evidence
 
         except MyVariantAPIError:
             raise
