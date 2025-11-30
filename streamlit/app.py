@@ -11,10 +11,9 @@ st.title("🧬 TumorBoard: Variant Actionability Assessment")
 MODELS = {
     "OpenAI GPT-4o-mini": "gpt-4o-mini",
     "OpenAI GPT-4o": "gpt-4o",
-    "Anthropic Claude Sonnet": "claude-3-5-sonnet-20241022",
-    "Anthropic Claude Haiku": "claude-3-5-haiku-20241022",
-    "Google Gemini Pro": "gemini/gemini-1.5-pro",
-    "Groq Llama 3.1": "groq/llama-3.1-70b-versatile"
+    "Anthropic Claude 3 Haiku": "claude-3-haiku-20240307",
+    "Google Gemini 1.5 Pro": "gemini/gemini-1.5-pro",
+    "Groq Llama 3.1 70B": "groq/llama-3.1-70b-versatile"
 }
 
 tab1, tab2, tab3 = st.tabs(["🔬 Single Variant", "📊 Batch Upload", "✅ Validation"])
