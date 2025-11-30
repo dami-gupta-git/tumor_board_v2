@@ -1,49 +1,65 @@
-# TumorBoard v1
+# TumorBoard v2
 An LLM-powered cancer variant actionability assessment tool with a built-in validation framework.
 
 **TL;DR**:
-Molecular tumor boards manually review cancer variants to assign clinical actionability—a time-consuming process  
-requiring expert panels. This research tool automates that workflow by fetching variant evidence from genomic databases   
-(CIViC, ClinVar, COSMIC) and using LLMs to assign AMP/ASCO/CAP tier classifications, mimicking expert judgment.   
-Includes a validation framework to benchmark LLM accuracy against gold-standard classifications.  
+Molecular tumor boards manually review cancer variants to assign clinical actionability—a time-consuming process
+requiring expert panels. This research tool automates that workflow by fetching variant evidence from genomic databases
+(CIViC, ClinVar, COSMIC) and using LLMs to assign AMP/ASCO/CAP tier classifications, mimicking expert judgment.
+Includes a validation framework to benchmark LLM accuracy against gold-standard classifications.
 This is a research prototype exploring whether LLMs can approximate clinical decision-making; not for actual clinical use.
 
 ## 🌐 Web Application Available!
 
-**NEW**: TumorBoard now includes a modern web interface built with Angular and Flask!
+**NEW**: TumorBoard now includes a clean, modern Streamlit interface!
 
-- **Interactive UI**: User-friendly form for variant assessment
-- **Real-time Results**: See comprehensive annotations and LLM analysis
-- **REST API**: Flask backend with async support
-- **Modern Stack**: Angular 17 + Flask with CORS enabled
+- **Single Container**: No separate frontend/backend - one Docker command starts everything
+- **Interactive UI**: Three-tab interface for single variants, batch processing, and validation
+- **Multiple LLM Providers**: OpenAI, Anthropic (Claude), Google (Gemini), Groq via LiteLLM
+- **Real-time Results**: See comprehensive annotations and LLM analysis with confidence scores
+- **Batch Processing**: Upload CSV files for concurrent variant assessment
+- **Validation Framework**: Built-in gold standard validation with per-tier metrics
 - **🐳 Docker Ready**: One-command deployment with Docker Compose
 
-### Quick Start with Docker
+### Quick Start with Streamlit (Recommended)
 
 ```bash
-# 1. Set your API key
-echo "OPENAI_API_KEY=your-key" > .env
+# 1. Set your API keys
+cd streamlit
+cp .env.example .env
+# Edit .env with your API keys
 
-# 2. Start everything
-docker compose up -d
+# 2. Start the app
+docker compose up --build
 
 # 3. Open in browser
-open http://localhost
+open http://localhost:8501
 ```
 
-**Access:**
-- **Frontend**: http://localhost
-- **Backend API**: http://localhost:5000
+**Features:**
+- **Single Variant Tab**: Assess individual variants with full evidence and therapy recommendations
+- **Batch Upload Tab**: Process CSV files with multiple variants
+- **Validation Tab**: Run gold standard benchmarking
 
-👉 **[Docker Guide](DOCKER.md)** | **[Web Application Details](README_WEBAPP.md)**
+👉 **[Streamlit App Guide](streamlit/README.md)**
+
+### Alternative: Angular + Flask (Legacy)
+
+The original Angular/Flask implementation is still available in the `frontend/` and `backend/` directories.
+
+```bash
+# Use root docker-compose.yml for Angular version
+docker compose -f docker-compose.yml up -d
+# Access at http://localhost (frontend) and http://localhost:5000 (API)
+```
 
 ## Overview
 
 TumorBoard combines clinical evidence from multiple genomic databases (CIViC, ClinVar, COSMIC). It then uses large language models to approximate expert application of the **AMP/ASCO/CAP 4-tier classification system**.
 
-Available as both:
-- **Web Application**: Angular frontend + Flask REST API
-- **Command-Line Interface**: Python CLI tool
+Available in three interfaces:
+- **Streamlit Web App**: Modern single-container web interface (recommended)
+- **Angular + Flask**: Original multi-container web application (legacy)
+- **Command-Line Interface**: Python CLI tool for batch processing and automation
 
 ### Key Features
 
@@ -55,7 +71,8 @@ Available as both:
 - **Multiple LLM Support**: Works with OpenAI, Anthropic, and other providers via litellm
 - **Async Throughout**: Fast, concurrent processing for batch assessments
 - **Rich CLI**: Command-line interface with progress indicators
-- **Web Interface**: Modern Angular application with REST API backend
+- **Streamlit Interface**: Modern single-container web app with three-tab interface (recommended)
+- **Angular/Flask Interface**: Original multi-container web application (legacy)
 
 ## Why This Tool Exists
 
