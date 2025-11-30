@@ -60,14 +60,51 @@ class Evidence(VariantAnnotations):
         """Check if any evidence was found."""
         return bool(self.civic or self.clinvar or self.cosmic)
 
-    def summary(self) -> str:
-        """Generate a text summary of all evidence."""
+    def summary(self, tumor_type: str | None = None, max_items: int = 15) -> str:
+        """Generate a text summary of all evidence.
+
+        Args:
+            tumor_type: Optional tumor type to filter and prioritize evidence
+            max_items: Maximum number of evidence items to include (default: 15)
+
+        Returns:
+            Formatted evidence summary
+        """
         lines = [f"Evidence for {self.gene} {self.variant}:\n"]
 
         if self.civic:
-            lines.append(f"CIViC Evidence ({len(self.civic)} entries):")
-            for idx, ev in enumerate(self.civic[:5], 1):  # Limit to top 5
-                lines.append(f"  {idx}. {ev.evidence_type or 'Unknown type'}")
+            # Filter and prioritize CIViC evidence
+            civic_evidence = list(self.civic)
+
+            # Prioritize PREDICTIVE evidence with drugs
+            predictive_with_drugs = [e for e in civic_evidence
+                                      if e.evidence_type == "PREDICTIVE" and e.drugs]
+
+            # Then tumor-type-specific evidence if tumor type provided
+            tumor_specific = []
+            if tumor_type:
+                tumor_specific = [e for e in civic_evidence
+                                  if e.disease and tumor_type.lower() in e.disease.lower()
+                                  and e not in predictive_with_drugs]
+
+            # Then other predictive evidence
+            other_predictive = [e for e in civic_evidence
+                                if e.evidence_type == "PREDICTIVE"
+                                and e not in predictive_with_drugs
+                                and e not in tumor_specific]
+
+            # Then rest
+            remaining = [e for e in civic_evidence
+                         if e not in predictive_with_drugs
+                         and e not in tumor_specific
+                         and e not in other_predictive]
+
+            # Combine in priority order
+            prioritized = predictive_with_drugs + tumor_specific + other_predictive + remaining
+
+            lines.append(f"CIViC Evidence ({len(self.civic)} entries, showing top {min(len(prioritized), max_items)}):")
+            for idx, ev in enumerate(prioritized[:max_items], 1):
+                lines.append(f"  {idx}. Type: {ev.evidence_type or 'Unknown'} | Level: {ev.evidence_level or 'N/A'}")
                 if ev.disease:
                     lines.append(f"     Disease: {ev.disease}")
                 if ev.drugs:
@@ -75,7 +112,9 @@ class Evidence(VariantAnnotations):
                 if ev.clinical_significance:
                     lines.append(f"     Significance: {ev.clinical_significance}")
                 if ev.description:
-                    lines.append(f"     Description: {ev.description[:200]}...")
+                    # Include more of the description
+                    desc = ev.description[:300] if len(ev.description) > 300 else ev.description
+                    lines.append(f"     Description: {desc}...")
             lines.append("")
 
         if self.clinvar:

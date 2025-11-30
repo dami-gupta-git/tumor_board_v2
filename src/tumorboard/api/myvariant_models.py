@@ -54,7 +54,7 @@ class SnpEffData(BaseModel):
 class PolyPhen2Hdiv(BaseModel):
     """PolyPhen2 HDIV data structure."""
 
-    pred: str | None = None
+    pred: str | list[str] | None = None
 
 
 class PolyPhen2Data(BaseModel):

@@ -43,8 +43,8 @@ class LLMService:
     ) -> ActionabilityAssessment:
         """Assess variant using LLM."""
 
-        # Create prompt
-        evidence_summary = evidence.summary()
+        # Create prompt with tumor-type-specific evidence prioritization
+        evidence_summary = evidence.summary(tumor_type=tumor_type, max_items=15)
         user_prompt = create_assessment_prompt(gene, variant, tumor_type, evidence_summary)
 
         messages = [

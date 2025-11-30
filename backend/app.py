@@ -13,6 +13,7 @@ from tumorboard.api.myvariant import MyVariantClient
 from tumorboard.engine import AssessmentEngine
 from tumorboard.models.variant import VariantInput
 
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,

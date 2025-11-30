@@ -130,6 +130,8 @@ class MyVariantClient:
     def _parse_civic_evidence(self, civic_data: dict[str, Any] | list[Any]) -> list[CIViCEvidence]:
         """Parse CIViC data into evidence objects.
 
+        Supports both old API format (evidence_items) and new API format (molecularProfiles).
+
         Args:
             civic_data: Raw CIViC data from API
 
@@ -145,8 +147,37 @@ class MyVariantClient:
             if not isinstance(item, dict):
                 continue
 
-            # CIViC can have nested evidence items
-            if "evidence_items" in item:
+            # NEW API FORMAT: molecularProfiles with nested evidenceItems
+            if "molecularProfiles" in item:
+                for mp in item.get("molecularProfiles", []):
+                    if not isinstance(mp, dict):
+                        continue
+                    for ev_item in mp.get("evidenceItems", []):
+                        # Extract disease name
+                        disease_data = ev_item.get("disease", {})
+                        disease = disease_data.get("name") if isinstance(disease_data, dict) else None
+
+                        # Extract therapies (new API uses "therapies" instead of "drugs")
+                        therapies = ev_item.get("therapies", [])
+                        drugs = [t.get("name", "") for t in therapies if isinstance(t, dict)]
+
+                        evidence_list.append(
+                            CIViCEvidence(
+                                evidence_type=ev_item.get("evidenceType"),  # camelCase in new API
+                                evidence_level=ev_item.get("evidenceLevel"),  # camelCase in new API
+                                evidence_direction=ev_item.get("evidenceDirection"),
+                                clinical_significance=ev_item.get("significance"),  # "significance" in new API
+                                disease=disease,
+                                drugs=drugs,
+                                description=ev_item.get("description"),
+                                source=ev_item.get("source", {}).get("name")
+                                if isinstance(ev_item.get("source"), dict)
+                                else None,
+                                rating=ev_item.get("rating"),
+                            )
+                        )
+            # OLD API FORMAT: evidence_items
+            elif "evidence_items" in item:
                 for ev_item in item.get("evidence_items", []):
                     evidence_list.append(
                         CIViCEvidence(
@@ -170,7 +201,7 @@ class MyVariantClient:
                         )
                     )
             else:
-                # Direct evidence object
+                # Direct evidence object (legacy format)
                 evidence_list.append(
                     CIViCEvidence(
                         evidence_type=item.get("evidence_type"),
@@ -271,7 +302,9 @@ class MyVariantClient:
 
         return evidence_list
 
-    def _extract_from_hit(self, hit: MyVariantHit, gene: str, variant: str) -> Evidence:
+    def _extract_from_hit(
+        self, hit: MyVariantHit, gene: str, variant: str
+    ) -> Evidence:
         """Extract Evidence fields from a parsed MyVariantHit using Pydantic models.
 
         This method uses Pydantic's automatic parsing instead of manual nested
@@ -355,7 +388,12 @@ class MyVariantClient:
 
         polyphen2_prediction = None
         if hit.dbnsfp and hit.dbnsfp.polyphen2 and hit.dbnsfp.polyphen2.hdiv:
-            polyphen2_prediction = hit.dbnsfp.polyphen2.hdiv.pred
+            pred = hit.dbnsfp.polyphen2.hdiv.pred
+            # Handle both string and list[str] from API
+            if isinstance(pred, list):
+                polyphen2_prediction = pred[0] if pred else None
+            else:
+                polyphen2_prediction = pred
 
         cadd_score = None
         # Try dbnsfp first, then top-level cadd
