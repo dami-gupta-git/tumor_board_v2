@@ -538,6 +538,75 @@ class MyVariantClient:
             # Silently return empty list on error
             return []
 
+    async def _fetch_clinvar_fallback(self, gene: str, variant: str) -> dict[str, Any] | None:
+        """
+        Fallback to fetch ClinVar data directly from NCBI E-utilities when MyVariant doesn't have it.
+
+        Uses NCBI's E-utilities API to search ClinVar for the variant.
+
+        Args:
+            gene: Gene symbol (e.g., "EGFR")
+            variant: Variant notation (e.g., "L858R")
+
+        Returns:
+            ClinVar data dict with variant_id, clinical_significance, and accession if found
+        """
+        try:
+            client = self._get_client()
+
+            # Search ClinVar using NCBI E-utilities
+            # Use [gene] field and simple text search for variant
+            search_term = f"{gene}[gene] AND {variant}"
+            search_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
+            search_params = {
+                "db": "clinvar",
+                "term": search_term,
+                "retmode": "json",
+                "retmax": 1
+            }
+
+            search_response = await client.get(search_url, params=search_params)
+            if search_response.status_code != 200:
+                return None
+
+            search_data = search_response.json()
+            id_list = search_data.get("esearchresult", {}).get("idlist", [])
+
+            if not id_list:
+                return None
+
+            # Fetch summary for the variant
+            variant_id = id_list[0]
+            summary_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi"
+            summary_params = {
+                "db": "clinvar",
+                "id": variant_id,
+                "retmode": "json"
+            }
+
+            summary_response = await client.get(summary_url, params=summary_params)
+            if summary_response.status_code != 200:
+                return None
+
+            summary_data = summary_response.json()
+            result = summary_data.get("result", {}).get(variant_id, {})
+
+            # Extract relevant fields
+            clinical_significance = result.get("clinical_significance", {}).get("description")
+            accession = result.get("accession")
+
+            if clinical_significance or accession:
+                return {
+                    "variant_id": variant_id,
+                    "clinical_significance": clinical_significance,
+                    "accession": accession
+                }
+
+            return None
+
+        except Exception:
+            return None
+
     async def _fetch_civic_fallback(
         self, gene: str, variant: str
     ) -> list[CIViCEvidence]:
@@ -709,10 +778,20 @@ class MyVariantClient:
             parsed_response = MyVariantResponse(**result)
 
             if not parsed_response.hits:
-                # No data found in MyVariant - try CIViC fallback
+                # No data found in MyVariant - try CIViC and ClinVar fallbacks
                 civic_fallback = await self._fetch_civic_fallback(gene, variant)
+                clinvar_fallback = await self._fetch_clinvar_fallback(gene, variant)
 
-                # Return evidence with CIViC fallback data
+                # Extract ClinVar data from fallback
+                clinvar_id = None
+                clinvar_significance = None
+                clinvar_accession = None
+                if clinvar_fallback:
+                    clinvar_id = clinvar_fallback.get("variant_id")
+                    clinvar_significance = clinvar_fallback.get("clinical_significance")
+                    clinvar_accession = clinvar_fallback.get("accession")
+
+                # Return evidence with fallback data
                 return Evidence(
                     variant_id=f"{gene}:{variant}",
                     gene=gene,
@@ -720,9 +799,9 @@ class MyVariantClient:
                     cosmic_id=None,
                     ncbi_gene_id=None,
                     dbsnp_id=None,
-                    clinvar_id=None,
-                    clinvar_clinical_significance=None,
-                    clinvar_accession=None,
+                    clinvar_id=clinvar_id,
+                    clinvar_clinical_significance=clinvar_significance,
+                    clinvar_accession=clinvar_accession,
                     hgvs_genomic=None,
                     hgvs_protein=None,
                     hgvs_transcript=None,
@@ -748,6 +827,15 @@ class MyVariantClient:
                 if civic_fallback:
                     # Update evidence with CIViC fallback data
                     evidence.civic = civic_fallback
+
+            # If MyVariant returned no ClinVar data, try ClinVar fallback
+            if not evidence.clinvar_id and not evidence.clinvar_clinical_significance:
+                clinvar_fallback = await self._fetch_clinvar_fallback(gene, variant)
+                if clinvar_fallback:
+                    # Update evidence with ClinVar fallback data
+                    evidence.clinvar_id = clinvar_fallback.get("variant_id")
+                    evidence.clinvar_clinical_significance = clinvar_fallback.get("clinical_significance")
+                    evidence.clinvar_accession = clinvar_fallback.get("accession")
 
             return evidence
 

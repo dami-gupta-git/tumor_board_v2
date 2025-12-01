@@ -23,8 +23,17 @@ with tab1:
     col1, col2 = st.columns([1, 2])
     with col1:
         st.subheader("Input")
-        gene = st.text_input("Gene Symbol", value="BRAF", help="e.g., BRAF, EGFR, TP53")
-        variant = st.text_input("Variant", value="V600E", help="e.g., V600E, L858R")
+
+        # Initialize session state for form fields if not exists
+        if 'input_gene' not in st.session_state:
+            st.session_state['input_gene'] = "BRAF"
+        if 'input_variant' not in st.session_state:
+            st.session_state['input_variant'] = "V600E"
+        if 'input_tumor' not in st.session_state:
+            st.session_state['input_tumor'] = "Melanoma"
+
+        gene = st.text_input("Gene Symbol", value=st.session_state['input_gene'], help="e.g., BRAF, EGFR, TP53", key="gene_input")
+        variant = st.text_input("Variant", value=st.session_state['input_variant'], help="e.g., V600E, L858R", key="variant_input")
 
         # Fetch tumor type suggestions when gene and variant are provided
         tumor_suggestions = []
@@ -43,10 +52,11 @@ with tab1:
             tumor = st.selectbox(
                 "Tumor Type (optional)",
                 options=[""] + tumor_suggestions,
-                help="Select from CIViC evidence or leave blank"
+                help="Select from CIViC evidence or leave blank",
+                key="tumor_select"
             )
         else:
-            tumor = st.text_input("Tumor Type (optional)", value="Melanoma", help="e.g., Melanoma, Lung Adenocarcinoma")
+            tumor = st.text_input("Tumor Type (optional)", value=st.session_state['input_tumor'], help="e.g., Melanoma, Lung Adenocarcinoma", key="tumor_input")
 
         model_name = st.selectbox("LLM Model", list(MODELS.keys()))
         temperature = st.slider("Temperature", 0.0, 1.0, 0.1, 0.05)
@@ -58,10 +68,16 @@ with tab1:
             clear_btn = st.button("🔄 Clear/Reset", use_container_width=True)
 
         if clear_btn:
-            # Clear session state
+            # Reset all input fields to default values
+            st.session_state['input_gene'] = "BRAF"
+            st.session_state['input_variant'] = "V600E"
+            st.session_state['input_tumor'] = "Melanoma"
+
+            # Clear cache
             for key in ['tumor_suggestions', 'last_gene', 'last_variant']:
                 if key in st.session_state:
                     del st.session_state[key]
+
             st.rerun()
 
     with col2:
