@@ -3,7 +3,7 @@ import streamlit as st
 import pandas as pd
 import asyncio
 import json
-from backend import assess_variant, batch_assess_variants, validate_gold_standard
+from backend import assess_variant, batch_assess_variants, validate_gold_standard, fetch_tumor_type_suggestions
 
 st.set_page_config(page_title="TumorBoard", page_icon="🧬", layout="wide")
 st.title("🧬 TumorBoard: Variant Actionability Assessment")
@@ -25,17 +25,51 @@ with tab1:
         st.subheader("Input")
         gene = st.text_input("Gene Symbol", value="BRAF", help="e.g., BRAF, EGFR, TP53")
         variant = st.text_input("Variant", value="V600E", help="e.g., V600E, L858R")
-        tumor = st.text_input("Tumor Type (optional)", value="Melanoma")
+
+        # Fetch tumor type suggestions when gene and variant are provided
+        tumor_suggestions = []
+        if gene and variant and (gene != st.session_state.get('last_gene') or variant != st.session_state.get('last_variant')):
+            with st.spinner("Fetching tumor types..."):
+                tumor_suggestions = asyncio.run(fetch_tumor_type_suggestions(gene, variant))
+                st.session_state['tumor_suggestions'] = tumor_suggestions
+                st.session_state['last_gene'] = gene
+                st.session_state['last_variant'] = variant
+        elif 'tumor_suggestions' in st.session_state:
+            tumor_suggestions = st.session_state['tumor_suggestions']
+
+        # Show tumor type input with suggestions
+        if tumor_suggestions:
+            st.info(f"💡 Found {len(tumor_suggestions)} associated tumor types in CIViC")
+            tumor = st.selectbox(
+                "Tumor Type (optional)",
+                options=[""] + tumor_suggestions,
+                help="Select from CIViC evidence or leave blank"
+            )
+        else:
+            tumor = st.text_input("Tumor Type (optional)", value="Melanoma", help="e.g., Melanoma, Lung Adenocarcinoma")
+
         model_name = st.selectbox("LLM Model", list(MODELS.keys()))
         temperature = st.slider("Temperature", 0.0, 1.0, 0.1, 0.05)
-        assess_btn = st.button("🔍 Assess Variant", type="primary", use_container_width=True)
+
+        col_btn1, col_btn2 = st.columns(2)
+        with col_btn1:
+            assess_btn = st.button("🔍 Assess Variant", type="primary", use_container_width=True)
+        with col_btn2:
+            clear_btn = st.button("🔄 Clear/Reset", use_container_width=True)
+
+        if clear_btn:
+            # Clear session state
+            for key in ['tumor_suggestions', 'last_gene', 'last_variant']:
+                if key in st.session_state:
+                    del st.session_state[key]
+            st.rerun()
 
     with col2:
         if assess_btn:
             if not gene or not variant:
                 st.error("Gene and variant are required")
             else:
-                with st.spinner(f"Assessing {gene} {variant}..."):
+                with st.spinner(f"🔬 Analyzing {gene} {variant}... Fetching evidence from CIViC, ClinVar, and COSMIC databases"):
                     result = asyncio.run(assess_variant(gene, variant, tumor or None, MODELS[model_name], temperature))
                     if "error" in result:
                         st.error(result["error"])

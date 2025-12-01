@@ -288,6 +288,30 @@ async def predict_splice_impact(
     raise NotImplementedError("SpliceAI integration coming soon")
 
 
+async def fetch_tumor_type_suggestions(gene: str, variant: str) -> List[str]:
+    """
+    Fetch tumor type suggestions from CIViC for gene+variant autocomplete.
+
+    Args:
+        gene: Gene symbol (e.g., "BRAF")
+        variant: Variant notation (e.g., "V600E")
+
+    Returns:
+        List of tumor/disease types associated with this variant in CIViC
+    """
+    try:
+        if not gene or not variant:
+            return []
+
+        async with MyVariantClient() as client:
+            tumor_types = await client.fetch_tumor_types(gene, variant)
+            return tumor_types
+
+    except Exception:
+        # Return empty list on error
+        return []
+
+
 async def run_agent_workflow(
     gene: str,
     variant: str,

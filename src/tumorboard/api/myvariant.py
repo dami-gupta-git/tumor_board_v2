@@ -467,6 +467,77 @@ class MyVariantClient:
             raw_data=hit.model_dump(by_alias=True),
         )
 
+    async def fetch_tumor_types(self, gene: str, variant: str) -> list[str]:
+        """
+        Fetch associated tumor types from CIViC for a given gene and variant.
+
+        This is useful for UI autocomplete/typeahead features to suggest
+        relevant tumor types based on available evidence.
+
+        Args:
+            gene: Gene symbol (e.g., "BRAF", "EGFR")
+            variant: Variant notation (e.g., "V600E", "L858R")
+
+        Returns:
+            List of unique tumor/disease names from CIViC evidence
+        """
+        gene = gene.upper()
+        variant_clean = variant.strip().upper()
+
+        # Construct molecular profile name
+        if any(kw in variant_clean for kw in ["FUSION", "FUS", "REARRANGEMENT"]):
+            mp_name = f"{gene} FUSION"
+        elif any(kw in variant_clean for kw in ["AMP", "AMPLIFICATION", "OVEREXPRESSION"]):
+            mp_name = f"{gene} AMPLIFICATION"
+        else:
+            mp_name = f"{gene} {variant_clean}"
+
+        client = self._get_client()
+
+        try:
+            # GraphQL query to fetch disease names
+            query = """
+            query($name: String!) {
+              molecularProfiles(name: $name) {
+                nodes {
+                  evidenceItems {
+                    nodes {
+                      disease {
+                        name
+                      }
+                    }
+                  }
+                }
+              }
+            }
+            """
+
+            response = await client.post(
+                f"{self.CIVIC_API}/graphql",
+                json={"query": query, "variables": {"name": mp_name}},
+            )
+
+            if response.status_code != 200:
+                return []
+
+            data = response.json()
+            profiles = data.get("data", {}).get("molecularProfiles", {}).get("nodes", [])
+
+            # Extract unique disease names
+            tumor_types = set()
+            for profile in profiles:
+                evidence_items = profile.get("evidenceItems", {}).get("nodes", [])
+                for item in evidence_items:
+                    disease = item.get("disease", {})
+                    if disease and disease.get("name"):
+                        tumor_types.add(disease["name"])
+
+            return sorted(list(tumor_types))
+
+        except Exception:
+            # Silently return empty list on error
+            return []
+
     async def _fetch_civic_fallback(
         self, gene: str, variant: str
     ) -> list[CIViCEvidence]:
