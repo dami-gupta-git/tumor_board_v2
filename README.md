@@ -10,9 +10,7 @@ requiring expert panels. This research tool automates that workflow by fetching 
 Includes a validation framework to benchmark LLM accuracy against gold-standard classifications.
 This is a research prototype exploring whether LLMs can approximate clinical decision-making; not for actual clinical use.
 
-## 🌐 Web Application Available!
-
-**NEW**: TumorBoard now includes a clean, modern Streamlit interface!
+TumorBoard includes a clean, modern Streamlit web interface:
 
 - **Single Container**: No separate frontend/backend - one Docker command starts everything
 - **Interactive UI**: Three-tab interface for single variants, batch processing, and validation
@@ -22,7 +20,7 @@ This is a research prototype exploring whether LLMs can approximate clinical dec
 - **Validation Framework**: Built-in gold standard validation with per-tier metrics
 - **🐳 Docker Ready**: One-command deployment with Docker Compose
 
-### Quick Start with Streamlit (Recommended)
+### Quick Start with Streamlit
 
 ```bash
 # 1. Set your API keys
@@ -44,23 +42,12 @@ open http://localhost:8501
 
 👉 **[Streamlit App Guide](streamlit/README.md)**
 
-### Alternative: Angular + Flask (Legacy)
-
-The original Angular/Flask implementation is still available in the `frontend/` and `backend/` directories.
-
-```bash
-# Use root docker-compose.yml for Angular version
-docker compose -f docker-compose.yml up -d
-# Access at http://localhost (frontend) and http://localhost:5000 (API)
-```
-
 ## Overview
 
 TumorBoard combines clinical evidence from multiple genomic databases (CIViC, ClinVar, COSMIC). It then uses large language models to approximate expert application of the **AMP/ASCO/CAP 4-tier classification system**.
 
-Available in three interfaces:
+Available in two interfaces:
 - **Streamlit Web App**: Modern single-container web interface (recommended)
-- **Angular + Flask**: Original multi-container web application (legacy)
 - **Command-Line Interface**: Python CLI tool for batch processing and automation
 
 ### Key Features
@@ -76,8 +63,7 @@ Available in three interfaces:
 - **Multiple LLM Support**: Works with OpenAI, Anthropic, Google, Groq via litellm
 - **Async Throughout**: Fast, concurrent processing for batch assessments
 - **Rich CLI**: Command-line interface with progress indicators
-- **Streamlit Interface**: Modern single-container web app with three-tab interface (recommended)
-- **Angular/Flask Interface**: Original multi-container web application (legacy)
+- **Streamlit Interface**: Modern single-container web app with three-tab interface
 
 ## Why This Tool Exists
 
@@ -109,8 +95,6 @@ TumorBoard's accuracy is the result of three key improvements:
    system prompt. This was the most impactful change—the LLM had the evidence but needed explicit
    domain knowledge to interpret it correctly.
 
-**Key Insight**: Adding more data sources (like OncoKB) was less effective than improving how
-the LLM interprets existing evidence. Domain knowledge in the prompt > additional APIs.
 
 ## Disclaimer
 
@@ -122,25 +106,51 @@ the LLM interprets existing evidence. Domain knowledge in the prompt > additiona
 - Novel variants: Limited data for rare variants
 - Context windows: Very long evidence may be truncated
 
-**This tool is for research purposes only.** Clinical decisions should always 
+**This tool is for research purposes only.** Clinical decisions should always
 be made by qualified healthcare professionals.
+
+## Coming Soon
+
+We're actively working on enhancing TumorBoard with additional features:
+
+### 📊 Enhanced Evidence Sources
+
+- **AlphaMissense Integration**: Pathogenicity predictions for missense variants using Google DeepMind's AlphaMissense scores
+- **SpliceAI Annotations**: Splice variant impact predictions to better assess variants affecting RNA splicing
+- **LLM-Powered Literature Search**: Automated PubMed searches with LLM-based evidence synthesis for real-time literature review
+- **Clinical Trials Matching**: Integration with ClinicalTrials.gov API to identify relevant ongoing trials for specific variant-tumor combinations
+
+### 🤖 Agentic AI Architecture
+
+Moving beyond single-LLM assessments to a **collaborative multi-agent system**:
+
+- **Systematic Review Agent**: Automated literature review following PRISMA guidelines with citation network analysis
+- **Mechanistic Reasoning Agent**: Deep analysis of biological mechanisms, pathway interactions, and molecular consequences
+- **Citation Graph Agent**: Network analysis of scientific evidence, identifying consensus patterns and research frontiers
+- **Consensus Orchestrator**: Synthesizes insights from specialized agents, resolving conflicts and producing unified assessments
+- **Ensemble LLM**: Multi-model consensus approach using different LLMs (GPT-4, Claude, Gemini) to cross-validate findings and reduce hallucination
+
+This agentic approach mimics real tumor board dynamics where multiple specialists contribute domain expertise.
+
 
 ## Getting Started
 
 ### Pick Your Interface
 
-**Option 1: Web Application (Docker - No Install Required)**
+**Option 1: Web Application (Docker - Recommended)**
 
-Use the web interface with zero local setup:
+Use the Streamlit web interface with zero local setup:
 
 ```bash
-# 1. Set API key
-echo "OPENAI_API_KEY=your-key" > .env
+# 1. Set API keys
+cd streamlit
+cp .env.example .env
+# Edit .env with your API keys
 
-# 2. Start
-docker compose up -d
+# 2. Start the app
+docker compose up --build
 
-# 3. Open http://localhost
+# 3. Open http://localhost:8501
 ```
 
 **That's it!** No pip install, no dependencies. Docker handles everything.
