@@ -65,6 +65,7 @@ Available in three interfaces:
 
 ### Key Features
 
+- **Variant Normalization**: Automatically standardizes variant notations (Val600Glu → V600E, p.V600E → V600E) for better API matching
 - **Evidence Aggregation**: Automatically fetches variant evidence from MyVariant.info API
 - **Database Identifiers**: Extracts COSMIC, dbSNP, ClinVar, NCBI Gene IDs, and HGVS notations
 - **Functional Annotations**: SnpEff effects, PolyPhen2 predictions, CADD scores, gnomAD frequencies
@@ -271,6 +272,77 @@ Gold standard format: `{"entries": [{"gene": "BRAF", "variant": "V600E", "tumor_
   - Known benign polymorphisms
   - No oncogenic evidence
 
+
+## Variant Normalization
+
+TumorBoard automatically normalizes variant notations to improve evidence matching across databases. This preprocessing step happens before fetching evidence from MyVariant.info.
+
+### Supported Formats
+
+The system handles multiple variant notation formats:
+
+**Protein Changes (Missense/Nonsense):**
+- One-letter amino acid codes: `V600E`, `L858R`, `G12C`
+- Three-letter amino acid codes: `Val600Glu`, `Leu858Arg`, `Gly12Cys`
+- HGVS protein notation: `p.V600E`, `p.Val600Glu`
+- Case-insensitive: `v600e`, `V600E`, `val600glu` all normalize to `V600E`
+
+**Structural Variants:**
+- Fusions: `fusion`, `ALK fusion`, `EML4-ALK rearrangement`
+- Amplifications: `amplification`, `amp`, `overexpression`
+- Deletions: `exon 19 deletion`, `185delAG`, `6174delT`
+- Splice variants: `exon 14 skipping`, `splice site`
+- Truncations: `truncating mutation`, `truncation`
+
+**Frameshift/Nonsense:**
+- Frameshift: `L747fs`, `Q61fs*5`
+- Nonsense: `R248*`, `Q61*`
+
+### How It Works
+
+```python
+# Example: Different formats normalize to the same canonical form
+BRAF Val600Glu  → V600E (normalized)
+BRAF p.V600E    → V600E (normalized)
+EGFR Leu858Arg  → L858R (normalized)
+ALK fusion      → fusion (type: fusion)
+ERBB2 amp       → amplification (type: amplification)
+```
+
+The normalization logs appear during assessment:
+
+```bash
+$ tumorboard assess BRAF Val600Glu --tumor Melanoma
+
+Assessing BRAF Val600Glu in Melanoma...
+  Normalized Val600Glu → V600E (type: missense)
+```
+
+### Benefits
+
+- **Better Evidence Matching**: MyVariant.info and CIViC searches work better with canonical forms
+- **Flexible Input**: Accept variants from reports in any notation format
+- **Type Classification**: Automatically detects missense, fusion, amplification, etc.
+- **Position Extraction**: Extracts protein positions for coordinate-based lookups
+- **HGVS Conversion**: Converts to standard HGVS protein notation when possible
+
+### Programmatic Usage
+
+```python
+from tumorboard.utils import normalize_variant, is_missense_variant, get_protein_position
+
+# Full normalization
+result = normalize_variant("BRAF", "Val600Glu")
+# {'gene': 'BRAF', 'variant_normalized': 'V600E', 'variant_type': 'missense', ...}
+
+# Check if missense
+is_missense = is_missense_variant("BRAF", "V600E")  # True
+is_missense = is_missense_variant("ALK", "fusion")  # False
+
+# Extract position
+position = get_protein_position("Val600Glu")  # 600
+position = get_protein_position("p.L858R")    # 858
+```
 
 ## Variant Annotations
 

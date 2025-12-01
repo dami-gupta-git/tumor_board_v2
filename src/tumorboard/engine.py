@@ -1,7 +1,7 @@
 """Core assessment engine combining API and LLM services.
 
 ARCHITECTURE:
-    VariantInput → MyVariantClient → Evidence → LLMService → Assessment
+    VariantInput → Normalize → MyVariantClient → Evidence → LLMService → Assessment
 
 Orchestrates the pipeline with async concurrency for single and batch processing.
 
@@ -10,6 +10,7 @@ Key Design:
 - Sequential per-variant, parallel across variants (asyncio.gather)
 - Batch exceptions captured, not raised
 - Stateless with no shared state
+- Variant normalization before API calls for better evidence matching
 """
 
 import asyncio
@@ -17,6 +18,7 @@ from tumorboard.api.myvariant import MyVariantClient
 from tumorboard.llm.service import LLMService
 from tumorboard.models.assessment import ActionabilityAssessment
 from tumorboard.models.variant import VariantInput
+from tumorboard.utils import normalize_variant
 
 
 class AssessmentEngine:
@@ -47,22 +49,33 @@ class AssessmentEngine:
     async def assess_variant(self, variant_input: VariantInput) -> ActionabilityAssessment:
         """Assess a single variant.
 
-        Chains two async operations sequentially:
-        1. Fetch evidence from MyVariant API
-        2. Send evidence to LLM for assessment
+        Chains three async operations sequentially:
+        1. Normalize variant notation (V600E, Val600Glu, p.V600E → V600E)
+        2. Fetch evidence from MyVariant API using normalized variant
+        3. Send evidence to LLM for assessment
 
         The 'await' keyword yields control during I/O, allowing other tasks to run.
         """
-        # Fetch evidence from MyVariant API
+        # Step 1: Normalize variant notation for better API matching
+        # Converts formats like Val600Glu or p.V600E to canonical V600E
+        normalized = normalize_variant(variant_input.gene, variant_input.variant)
+        normalized_variant = normalized['variant_normalized']
+
+        # Log normalization if variant was transformed
+        if normalized_variant != variant_input.variant:
+            print(f"  Normalized {variant_input.variant} → {normalized_variant} (type: {normalized['variant_type']})")
+
+        # Step 2: Fetch evidence from MyVariant API using normalized variant
         evidence = await self.myvariant_client.fetch_evidence(
             gene=variant_input.gene,
-            variant=variant_input.variant,
+            variant=normalized_variant,  # Use normalized variant for API query
         )
 
-        # Assess with LLM (must run sequentially since it depends on evidence)
+        # Step 3: Assess with LLM (must run sequentially since it depends on evidence)
+        # Use original variant notation for display/reporting
         assessment = await self.llm_service.assess_variant(
             gene=variant_input.gene,
-            variant=variant_input.variant,
+            variant=variant_input.variant,  # Keep original for display
             tumor_type=variant_input.tumor_type,
             evidence=evidence,
         )
