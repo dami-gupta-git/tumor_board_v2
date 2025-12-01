@@ -133,6 +133,15 @@ Moving beyond single-LLM assessments to a **collaborative multi-agent system**:
 
 This agentic approach mimics real tumor board dynamics where multiple specialists contribute domain expertise.
 
+### 🧬 Patient-Level Genomic Analysis
+
+- **VCF File Upload & Processing**: Direct import of patient VCF (Variant Call Format) files for comprehensive multi-variant analysis
+- **Whole-Exome/Genome Support**: Process entire patient genomic profiles, not just individual variants
+- **Variant Prioritization Engine**: Automatic ranking of variants by clinical actionability, filtering germline/somatic, and pathogenicity scores
+- **Patient Report Generation**: Comprehensive clinical reports summarizing all actionable findings, therapy recommendations, and clinical trial eligibility
+- **Cohort Analysis**: Compare variant profiles across multiple patients to identify patterns and treatment response correlations
+
+Transform from single-variant lookups to full patient-level precision oncology workflows.
 
 ## Getting Started
 
