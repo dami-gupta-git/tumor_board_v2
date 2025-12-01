@@ -164,7 +164,7 @@ Use the command-line interface for batch processing and validation:
 ```bash
 # 1. Clone and install
 git clone <repository-url>
-cd tumor_board_v0
+cd tumor_board_v2
 pip install -e .
 
 # 2. Set API key
@@ -424,7 +424,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, testing, and code 
   author = {Gupta, Dami},
   title = {TumorBoard: LLM-Powered Cancer Variant Actionability Assessment},
   year = {2025},
-  url = {https://github.com/dami-gupta-git/tumor_board_v0}
+  url = {https://github.com/dami-gupta-git/tumor_board_v2}
 }
 ```
 
