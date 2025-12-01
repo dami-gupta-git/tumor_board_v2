@@ -118,6 +118,7 @@ We're actively working on enhancing TumorBoard with additional features:
 - **AlphaMissense Integration**: Pathogenicity predictions for missense variants using Google DeepMind's AlphaMissense scores
 - **SpliceAI Annotations**: Splice variant impact predictions to better assess variants affecting RNA splicing
 - **LLM-Powered Literature Search**: Automated PubMed searches with LLM-based evidence synthesis for real-time literature review
+- **ESMFold Integration**: Protein Structure predictions and visualization
 - **Clinical Trials Matching**: Integration with ClinicalTrials.gov API to identify relevant ongoing trials for specific variant-tumor combinations
 
 ### 🤖 Agentic AI Architecture
