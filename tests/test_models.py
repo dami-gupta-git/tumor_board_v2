@@ -39,6 +39,36 @@ class TestVariantInput:
         assert variant.variant == "G12C"
         assert variant.tumor_type is None
 
+    def test_variant_input_validates_snp_indel_only(self):
+        """Test that only SNPs and small indels are allowed."""
+        # These should succeed
+        VariantInput(gene="BRAF", variant="V600E")  # Missense
+        VariantInput(gene="TP53", variant="R248*")  # Nonsense
+        VariantInput(gene="BRCA1", variant="185delAG")  # Deletion
+        VariantInput(gene="EGFR", variant="L747fs")  # Frameshift
+
+        # These should fail
+        with pytest.raises(ValidationError, match="fusion.*not supported"):
+            VariantInput(gene="ALK", variant="fusion")
+
+        with pytest.raises(ValidationError, match="amplification.*not supported"):
+            VariantInput(gene="ERBB2", variant="amplification")
+
+        with pytest.raises(ValidationError, match="splice.*not supported"):
+            VariantInput(gene="MET", variant="exon 14 skipping")
+
+    def test_variant_input_deletion_allowed(self):
+        """Test that small deletions are allowed."""
+        variant = VariantInput(gene="BRCA1", variant="185delAG")
+        assert variant.gene == "BRCA1"
+        assert variant.variant == "185delAG"
+
+    def test_variant_input_insertion_allowed(self):
+        """Test that small insertions are allowed."""
+        # Using a variant with 'ins' keyword
+        variant = VariantInput(gene="EGFR", variant="L747_P753delinsS")
+        assert variant.gene == "EGFR"
+
 
 class TestEvidence:
     """Tests for Evidence models."""

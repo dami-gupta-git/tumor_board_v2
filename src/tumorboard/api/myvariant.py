@@ -615,6 +615,9 @@ class MyVariantClient:
 
         Handles fusions, amplifications, and poorly-indexed variants using CIViC V2 GraphQL API.
 
+        Queries both specific variant profiles (e.g., "BRAF V600E") and gene-level profiles
+        (e.g., "BRAF MUTATION") to capture broader therapeutic evidence.
+
         Args:
             gene: Gene symbol (e.g., "ERBB2", "ALK")
             variant: Variant notation (e.g., "amplification", "fusion", "R132H")
@@ -625,98 +628,105 @@ class MyVariantClient:
         gene = gene.upper()
         variant_clean = variant.strip().upper()
 
-        # Detect variant type and construct molecular profile name
+        # Detect variant type and construct molecular profile names to query
+        # We'll query both specific variant and gene-level MUTATION profiles
+        mp_names = []
+
         if any(kw in variant_clean for kw in ["FUSION", "FUS", "REARRANGEMENT"]):
-            mp_name = f"{gene} FUSION"
+            mp_names = [f"{gene} FUSION"]
         elif any(kw in variant_clean for kw in ["AMP", "AMPLIFICATION", "OVEREXPRESSION"]):
-            mp_name = f"{gene} AMPLIFICATION"
-        elif variant_clean.endswith(("DEL", "FS", "STOP", "NONSENSE")) or "DELAG" in variant_clean:
-            mp_name = f"{gene} {variant_clean}"  # Try with gene prefix
+            mp_names = [f"{gene} AMPLIFICATION"]
         else:
-            mp_name = f"{gene} {variant_clean}"  # regular SNV/indel
+            # For SNPs/indels: query both specific variant AND gene-level MUTATION
+            # Example: ["IDH1 R132H", "IDH1 MUTATION"] or ["BRAF V600E", "BRAF MUTATION"]
+            mp_names = [
+                f"{gene} {variant_clean}",  # Specific variant
+                f"{gene} MUTATION"          # Gene-level profile (often has FDA approvals)
+            ]
 
         client = self._get_client()
+        all_civic_evidence = []
 
-        try:
-            # GraphQL query for molecular profiles and evidence
-            query = """
-            query($name: String!) {
-              molecularProfiles(name: $name) {
+        # GraphQL query for molecular profiles and evidence
+        query = """
+        query($name: String!) {
+          molecularProfiles(name: $name) {
+            nodes {
+              id
+              name
+              evidenceItems {
                 nodes {
                   id
-                  name
-                  evidenceItems {
-                    nodes {
-                      id
-                      evidenceType
-                      evidenceLevel
-                      evidenceDirection
-                      significance
-                      description
-                      disease {
-                        name
-                      }
-                      therapies {
-                        id
-                        name
-                      }
-                      source {
-                        sourceType
-                      }
-                    }
+                  evidenceType
+                  evidenceLevel
+                  evidenceDirection
+                  significance
+                  description
+                  disease {
+                    name
+                  }
+                  therapies {
+                    id
+                    name
+                  }
+                  source {
+                    sourceType
                   }
                 }
               }
             }
-            """
+          }
+        }
+        """
 
-            # Query CIViC GraphQL API
-            response = await client.post(
-                f"{self.CIVIC_API}/graphql",
-                json={"query": query, "variables": {"name": mp_name}},
-            )
-
-            if response.status_code != 200:
-                return []
-
-            data = response.json()
-            profiles = data.get("data", {}).get("molecularProfiles", {}).get("nodes", [])
-
-            if not profiles:
-                return []
-
-            # Parse evidence items from first matching profile
-            civic_evidence = []
-            profile = profiles[0]
-            evidence_items = profile.get("evidenceItems", {}).get("nodes", [])
-
-            for item in evidence_items:
-                # Extract disease name
-                disease_data = item.get("disease", {})
-                disease = disease_data.get("name") if disease_data else None
-
-                # Extract therapies
-                therapies = item.get("therapies", [])
-                drugs = [t.get("name", "") for t in therapies if isinstance(t, dict)]
-
-                # Map GraphQL field names to Evidence model fields
-                civic_evidence.append(
-                    CIViCEvidence(
-                        evidence_type=item.get("evidenceType"),  # camelCase in GraphQL
-                        evidence_level=item.get("evidenceLevel"),
-                        evidence_direction=item.get("evidenceDirection"),
-                        clinical_significance=item.get("significance"),
-                        disease=disease,
-                        drugs=drugs,
-                        description=item.get("description"),
-                        source=item.get("source", {}).get("sourceType")
-                        if isinstance(item.get("source"), dict)
-                        else None,
-                        rating=None,  # Rating not in V2 API
-                    )
+        try:
+            # Query all molecular profile names (specific + gene-level)
+            for mp_name in mp_names:
+                response = await client.post(
+                    f"{self.CIVIC_API}/graphql",
+                    json={"query": query, "variables": {"name": mp_name}},
                 )
 
-            return civic_evidence
+                if response.status_code != 200:
+                    continue
+
+                data = response.json()
+                profiles = data.get("data", {}).get("molecularProfiles", {}).get("nodes", [])
+
+                if not profiles:
+                    continue
+
+                # Parse evidence items from all matching profiles
+                for profile in profiles:
+                    evidence_items = profile.get("evidenceItems", {}).get("nodes", [])
+
+                    for item in evidence_items:
+                        # Extract disease name
+                        disease_data = item.get("disease", {})
+                        disease = disease_data.get("name") if disease_data else None
+
+                        # Extract therapies
+                        therapies = item.get("therapies", [])
+                        drugs = [t.get("name", "") for t in therapies if isinstance(t, dict)]
+
+                        # Map GraphQL field names to Evidence model fields
+                        all_civic_evidence.append(
+                            CIViCEvidence(
+                                evidence_type=item.get("evidenceType"),  # camelCase in GraphQL
+                                evidence_level=item.get("evidenceLevel"),
+                                evidence_direction=item.get("evidenceDirection"),
+                                clinical_significance=item.get("significance"),
+                                disease=disease,
+                                drugs=drugs,
+                                description=item.get("description"),
+                                source=item.get("source", {}).get("sourceType")
+                                if isinstance(item.get("source"), dict)
+                                else None,
+                                rating=None,  # Rating not in V2 API
+                            )
+                        )
+
+            return all_civic_evidence
 
         except Exception as e:
             # Log error but don't fail - return empty evidence

@@ -1,7 +1,9 @@
 # TumorBoard v2
 An LLM-powered cancer variant actionability assessment tool with a built-in validation framework.
 
-**Current Validation Performance: 73.33% accuracy | 79.25% Tier I F1 score**
+**⚠️ Important: This tool currently only supports SNPs and small indels (missense, nonsense, insertions, deletions, frameshifts). Fusions, amplifications, and other structural variants are not supported.**
+
+**Current Validation Performance: 70% accuracy | 87% Tier I F1 score** *(on SNP/indel variants only)*
 
 **TL;DR**:
 Molecular tumor boards manually review cancer variants to assign clinical actionability—a time-consuming process
@@ -9,6 +11,8 @@ requiring expert panels. This research tool automates that workflow by fetching 
 (CIViC, ClinVar, COSMIC) and using LLMs to assign AMP/ASCO/CAP tier classifications, mimicking expert judgment.
 Includes a validation framework to benchmark LLM accuracy against gold-standard classifications.
 This is a research prototype exploring whether LLMs can approximate clinical decision-making; not for actual clinical use.
+
+**Note**: This tool is specifically designed for SNPs and small indels. Other variant types (fusions, amplifications, splice variants, etc.) are intentionally excluded to maintain focus and accuracy on point mutations.
 
 TumorBoard includes a clean, modern Streamlit web interface:
 
@@ -52,13 +56,15 @@ Available in two interfaces:
 
 ### Key Features
 
+- **SNP/Small Indel Focus**: Specialized support for point mutations, small insertions, deletions, and frameshifts
+- **Variant Type Validation**: Automatically validates and rejects unsupported variant types (fusions, amplifications, etc.)
 - **Variant Normalization**: Automatically standardizes variant notations (Val600Glu → V600E, p.V600E → V600E) for better API matching
 - **Evidence Aggregation**: Automatically fetches variant evidence from MyVariant.info API
 - **Database Identifiers**: Extracts COSMIC, dbSNP, ClinVar, NCBI Gene IDs, and HGVS notations
 - **Functional Annotations**: SnpEff effects, PolyPhen2 predictions, CADD scores, gnomAD frequencies
 - **LLM Assessment**: Uses LLMs to interpret evidence and assign actionability tiers
 - **Evidence Prioritization**: Intelligent ranking of PREDICTIVE evidence with tumor-type-specific filtering
-- **Validated Performance**: 73.33% overall accuracy, 95.24% Tier I F1 score on gold standard dataset
+- **Validated Performance**: 73.33% overall accuracy on SNP/indel gold standard dataset
 - **Validation Framework**: Built-in benchmarking against gold standard datasets with per-tier metrics
 - **Multiple LLM Support**: Works with OpenAI, Anthropic, Google, Groq via litellm
 - **Async Throughout**: Fast, concurrent processing for batch assessments
@@ -78,18 +84,7 @@ Molecular tumor boards face significant challenges:
 4. **Rapid Evolution**: New trials and approvals constantly change variant
    actionability.
 
-## How We Achieved 73% Accuracy
 
-TumorBoard's accuracy is the result of three key improvements:
-
-1. **Fixed CIViC API Parser (30%)**: Updated to handle CIViC v2 API's new `molecularProfiles`
-   structure, enabling proper evidence extraction (previously returned 0 evidence items).
-
-2. **Evidence Prioritization (20%)**: Intelligent ranking that shows the most relevant evidence first:
-   - PREDICTIVE evidence with drugs
-   - Tumor-type-specific matches
-   - Other predictive evidence
-   - Remaining evidence types
 
 3. **Prompt Engineering (50%)**: Embedded explicit FDA-approved variant rules directly in the LLM
    system prompt. This was the most impactful change—the LLM had the evidence but needed explicit
@@ -120,6 +115,9 @@ We're actively working on enhancing TumorBoard with additional features:
 - **LLM-Powered Literature Search**: Automated PubMed searches with LLM-based evidence synthesis for real-time literature review
 - **ESMFold Integration**: Protein Structure predictions and visualization
 - **Clinical Trials Matching**: Integration with ClinicalTrials.gov API to identify relevant ongoing trials for specific variant-tumor combinations
+- **gnomAD Integration**: Filter out population noise
+- **TCGA Data**: Real somatic mutation frequency and cancer-type prevalence across 11,000+ tumors to confirm driver status
+
 
 ### 🤖 Agentic AI Architecture
 
@@ -299,34 +297,39 @@ TumorBoard automatically normalizes variant notations to improve evidence matchi
 
 ### Supported Formats
 
-The system handles multiple variant notation formats:
+The system handles multiple variant notation formats for **SNPs and small indels only**:
 
-**Protein Changes (Missense/Nonsense):**
+**✅ Supported - Protein Changes (Missense/Nonsense):**
 - One-letter amino acid codes: `V600E`, `L858R`, `G12C`
 - Three-letter amino acid codes: `Val600Glu`, `Leu858Arg`, `Gly12Cys`
 - HGVS protein notation: `p.V600E`, `p.Val600Glu`
 - Case-insensitive: `v600e`, `V600E`, `val600glu` all normalize to `V600E`
 
-**Structural Variants:**
-- Fusions: `fusion`, `ALK fusion`, `EML4-ALK rearrangement`
-- Amplifications: `amplification`, `amp`, `overexpression`
-- Deletions: `exon 19 deletion`, `185delAG`, `6174delT`
-- Splice variants: `exon 14 skipping`, `splice site`
-- Truncations: `truncating mutation`, `truncation`
-
-**Frameshift/Nonsense:**
+**✅ Supported - Small Indels:**
+- Small deletions: `185delAG`, `6174delT`, `del19`
+- Small insertions: variants containing `ins`
 - Frameshift: `L747fs`, `Q61fs*5`
 - Nonsense: `R248*`, `Q61*`
+
+**❌ Not Supported - Structural Variants:**
+- Fusions: `fusion`, `ALK fusion`, `EML4-ALK rearrangement` (will be rejected)
+- Amplifications: `amplification`, `amp`, `overexpression` (will be rejected)
+- Large deletions: `exon 19 deletion` (will be rejected)
+- Splice variants: `exon 14 skipping`, `splice site` (will be rejected)
+- Truncations: `truncating mutation`, `truncation` (will be rejected)
 
 ### How It Works
 
 ```python
 # Example: Different formats normalize to the same canonical form
-BRAF Val600Glu  → V600E (normalized)
-BRAF p.V600E    → V600E (normalized)
-EGFR Leu858Arg  → L858R (normalized)
-ALK fusion      → fusion (type: fusion)
-ERBB2 amp       → amplification (type: amplification)
+BRAF Val600Glu  → V600E (normalized, type: missense) ✅
+BRAF p.V600E    → V600E (normalized, type: missense) ✅
+EGFR Leu858Arg  → L858R (normalized, type: missense) ✅
+BRCA1 185delAG  → 185delAG (type: deletion) ✅
+
+# Unsupported variants are rejected
+ALK fusion      → ❌ ValidationError: Variant type 'fusion' is not supported
+ERBB2 amp       → ❌ ValidationError: Variant type 'amplification' is not supported
 ```
 
 The normalization logs appear during assessment:
@@ -336,6 +339,11 @@ $ tumorboard assess BRAF Val600Glu --tumor Melanoma
 
 Assessing BRAF Val600Glu in Melanoma...
   Normalized Val600Glu → V600E (type: missense)
+
+# Unsupported variants show clear error messages
+$ tumorboard assess ALK fusion
+ValidationError: Variant type 'fusion' is not supported.
+Only SNPs and small indels are allowed (missense, nonsense, insertion, deletion, frameshift).
 ```
 
 ### Benefits
@@ -349,11 +357,16 @@ Assessing BRAF Val600Glu in Melanoma...
 ### Programmatic Usage
 
 ```python
-from tumorboard.utils import normalize_variant, is_missense_variant, get_protein_position
+from tumorboard.utils import normalize_variant, is_missense_variant, is_snp_or_small_indel, get_protein_position
 
 # Full normalization
 result = normalize_variant("BRAF", "Val600Glu")
 # {'gene': 'BRAF', 'variant_normalized': 'V600E', 'variant_type': 'missense', ...}
+
+# Check if supported variant type
+is_supported = is_snp_or_small_indel("BRAF", "V600E")  # True
+is_supported = is_snp_or_small_indel("ALK", "fusion")  # False
+is_supported = is_snp_or_small_indel("BRCA1", "185delAG")  # True
 
 # Check if missense
 is_missense = is_missense_variant("BRAF", "V600E")  # True

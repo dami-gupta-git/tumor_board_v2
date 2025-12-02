@@ -85,26 +85,43 @@ with tab1:
             if not gene or not variant:
                 st.error("Gene and variant are required")
             else:
-                with st.spinner(f"🔬 Analyzing {gene} {variant}... Fetching evidence from CIViC, ClinVar, and COSMIC databases"):
-                    result = asyncio.run(assess_variant(gene, variant, tumor or None, MODELS[model_name], temperature))
-                    if "error" in result:
-                        st.error(result["error"])
-                    else:
-                        st.success(f"✅ Assessment Complete: {result['assessment']['tier']}")
-                        metrics_col = st.columns(4)
-                        metrics_col[0].metric("Tier", result['assessment']['tier'])
-                        metrics_col[1].metric("Confidence", f"{result['assessment']['confidence']:.1%}")
-                        metrics_col[2].metric("Evidence", result['assessment'].get('evidence_strength', 'N/A'))
-                        metrics_col[3].metric("Therapies", len(result.get('recommended_therapies', [])))
-                        st.subheader("Complete Assessment")
-                        st.json(result)
-                        st.download_button("📥 Download JSON", json.dumps(result, indent=2),
-                                         f"{gene}_{variant}_assessment.json", "application/json")
-                        # Future features placeholders
-                        with st.expander("🧬 Protein Structure (Coming Soon)"):
-                            st.info("ESMFold visualization will be added here")
-                        with st.expander("🤖 Agent Workflow (Coming Soon)"):
-                            st.info("Multi-agent analysis pipeline will be added here")
+                # Validate variant type before processing
+                from tumorboard.utils.variant_normalization import normalize_variant, VariantNormalizer
+                normalized = normalize_variant(gene, variant)
+                variant_type = normalized['variant_type']
+
+                if variant_type not in VariantNormalizer.ALLOWED_VARIANT_TYPES:
+                    st.error(
+                        f"❌ Unsupported variant type: **{variant_type}**\n\n"
+                        f"Only **SNPs and small indels** are supported:\n"
+                        f"- Missense mutations (e.g., V600E)\n"
+                        f"- Nonsense mutations (e.g., R172*)\n"
+                        f"- Small insertions (e.g., ins)\n"
+                        f"- Small deletions (e.g., del)\n"
+                        f"- Frameshift mutations (e.g., fs)\n\n"
+                        f"Your variant '{variant}' is classified as '{variant_type}'."
+                    )
+                else:
+                    with st.spinner(f"🔬 Analyzing {gene} {variant}... Fetching evidence from CIViC, ClinVar, and COSMIC databases"):
+                        result = asyncio.run(assess_variant(gene, variant, tumor or None, MODELS[model_name], temperature))
+                        if "error" in result:
+                            st.error(result["error"])
+                        else:
+                            st.success(f"✅ Assessment Complete: {result['assessment']['tier']}")
+                            metrics_col = st.columns(4)
+                            metrics_col[0].metric("Tier", result['assessment']['tier'])
+                            metrics_col[1].metric("Confidence", f"{result['assessment']['confidence']:.1%}")
+                            metrics_col[2].metric("Evidence", result['assessment'].get('evidence_strength', 'N/A'))
+                            metrics_col[3].metric("Therapies", len(result.get('recommended_therapies', [])))
+                            st.subheader("Complete Assessment")
+                            st.json(result)
+                            st.download_button("📥 Download JSON", json.dumps(result, indent=2),
+                                             f"{gene}_{variant}_assessment.json", "application/json")
+                            # Future features placeholders
+                            with st.expander("🧬 Protein Structure (Coming Soon)"):
+                                st.info("ESMFold visualization will be added here")
+                            with st.expander("🤖 Agent Workflow (Coming Soon)"):
+                                st.info("Multi-agent analysis pipeline will be added here")
 
 # TAB 2: Batch Upload
 with tab2:

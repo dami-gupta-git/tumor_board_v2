@@ -5,6 +5,7 @@ from tumorboard.utils.variant_normalization import (
     VariantNormalizer,
     normalize_variant,
     is_missense_variant,
+    is_snp_or_small_indel,
     get_protein_position,
     to_hgvs_protein,
 )
@@ -166,6 +167,26 @@ class TestConvenienceFunctions:
         assert is_missense_variant("ALK", "fusion") is False
         assert is_missense_variant("ERBB2", "amplification") is False
         assert is_missense_variant("TP53", "R248*") is False  # Nonsense, not missense
+
+    def test_is_snp_or_small_indel_function(self):
+        """Test is_snp_or_small_indel convenience function."""
+        # Allowed types
+        assert is_snp_or_small_indel("BRAF", "V600E") is True  # Missense
+        assert is_snp_or_small_indel("TP53", "R248*") is True  # Nonsense
+        assert is_snp_or_small_indel("BRCA1", "185delAG") is True  # Deletion
+        assert is_snp_or_small_indel("EGFR", "L747fs") is True  # Frameshift
+        assert is_snp_or_small_indel("EGFR", "L747_P753delinsS") is True  # Insertion
+
+        # Not allowed types
+        assert is_snp_or_small_indel("ALK", "fusion") is False
+        assert is_snp_or_small_indel("ERBB2", "amplification") is False
+        assert is_snp_or_small_indel("MET", "exon 14 skipping") is False
+        assert is_snp_or_small_indel("RET", "rearrangement") is False
+
+    def test_allowed_variant_types_constant(self):
+        """Test that ALLOWED_VARIANT_TYPES contains the expected types."""
+        expected_types = {'missense', 'nonsense', 'insertion', 'deletion', 'frameshift'}
+        assert VariantNormalizer.ALLOWED_VARIANT_TYPES == expected_types
 
     def test_get_protein_position_function(self):
         """Test get_protein_position convenience function."""

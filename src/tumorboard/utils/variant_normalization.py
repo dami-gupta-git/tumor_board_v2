@@ -6,6 +6,7 @@ This module provides tools to normalize variant notations across different forma
 - HGVS protein notation (p.V600E, p.Val600Glu)
 - HGVS cDNA notation (c.1799T>A)
 - Legacy notations (185delAG)
+
 """
 
 import re
@@ -14,6 +15,9 @@ from typing import Dict, Optional
 
 class VariantNormalizer:
     """Normalizes variant representations to standard formats."""
+
+    # Allowed variant types for SNPs and small indels
+    ALLOWED_VARIANT_TYPES = {'missense', 'nonsense', 'insertion', 'deletion', 'frameshift'}
 
     # Amino acid conversion dictionaries
     AA_3TO1 = {
@@ -52,6 +56,10 @@ class VariantNormalizer:
             - ref_aa: Reference amino acid one-letter (V)
             - alt_aa: Alternate amino acid one-letter (E)
             - is_missense: Boolean indicating if this is a missense variant
+
+        e.g.
+        p.V600E - >
+        {'alt_aa': 'E', 'hgvs_protein': 'p.V600E', 'is_missense': True, 'long_form': 'VAL600GLU', 'position': 600, 'ref_aa': 'V', 'short_form': 'V600E'}
         """
         variant = variant.strip()
 
@@ -271,3 +279,30 @@ def to_hgvs_protein(variant: str) -> Optional[str]:
     """
     protein_norm = VariantNormalizer.normalize_protein_change(variant)
     return protein_norm.get('hgvs_protein')
+
+
+def is_snp_or_small_indel(gene: str, variant: str) -> bool:
+    """Check if a variant is a SNP or small indel (allowed variant type).
+
+    Args:
+        gene: Gene symbol
+        variant: Variant string
+
+    Returns:
+        True if the variant is a SNP or small indel, False otherwise
+
+    Examples:
+        >>> is_snp_or_small_indel('BRAF', 'V600E')
+        True
+
+        >>> is_snp_or_small_indel('EGFR', 'L747_P753delinsS')
+        True
+
+        >>> is_snp_or_small_indel('ALK', 'fusion')
+        False
+
+        >>> is_snp_or_small_indel('ERBB2', 'amplification')
+        False
+    """
+    norm = VariantNormalizer.normalize_variant(gene, variant)
+    return norm['variant_type'] in VariantNormalizer.ALLOWED_VARIANT_TYPES

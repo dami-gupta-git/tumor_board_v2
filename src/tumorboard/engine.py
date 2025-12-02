@@ -51,8 +51,9 @@ class AssessmentEngine:
 
         Chains three async operations sequentially:
         1. Normalize variant notation (V600E, Val600Glu, p.V600E → V600E)
-        2. Fetch evidence from MyVariant API using normalized variant
-        3. Send evidence to LLM for assessment
+        2. Validate variant type (only SNPs and small indels allowed)
+        3. Fetch evidence from MyVariant API using normalized variant
+        4. Send evidence to LLM for assessment
 
         The 'await' keyword yields control during I/O, allowing other tasks to run.
         """
@@ -60,10 +61,20 @@ class AssessmentEngine:
         # Converts formats like Val600Glu or p.V600E to canonical V600E
         normalized = normalize_variant(variant_input.gene, variant_input.variant)
         normalized_variant = normalized['variant_normalized']
+        variant_type = normalized['variant_type']
+
+        # Step 2: Validate variant type - only SNPs and small indels allowed
+        from tumorboard.utils.variant_normalization import VariantNormalizer
+        if variant_type not in VariantNormalizer.ALLOWED_VARIANT_TYPES:
+            raise ValueError(
+                f"Variant type '{variant_type}' is not supported. "
+                f"Only SNPs and small indels are allowed (missense, nonsense, insertion, deletion, frameshift). "
+                f"Got variant: {variant_input.variant}"
+            )
 
         # Log normalization if variant was transformed
         if normalized_variant != variant_input.variant:
-            print(f"  Normalized {variant_input.variant} → {normalized_variant} (type: {normalized['variant_type']})")
+            print(f"  Normalized {variant_input.variant} → {normalized_variant} (type: {variant_type})")
 
         # Step 2: Fetch evidence from MyVariant API using normalized variant
         evidence = await self.myvariant_client.fetch_evidence(

@@ -223,7 +223,7 @@ tumorboard assess BRAF V600E --tumor "Melanoma" --model gpt-4o
 ## Next Steps
 
 - Read the full [README.md](README.md) for detailed documentation
-- Explore the [gold_standard.json](benchmarks/gold_standard.json) to understand the benchmark dataset
+- Explore the [gold_standard.json](benchmarks/bak/gold_standard.json) to understand the benchmark dataset
 - Try the [sample_batch.json](benchmarks/sample_batch.json) for more examples
 - Run the test suite: `pytest`
 - Experiment with different prompts by modifying [src/tumorboard/llm/prompts.py](src/tumorboard/llm/prompts.py)

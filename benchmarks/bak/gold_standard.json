@@ -1,6 +1,7 @@
 {
-  "description": "Gold standard dataset for validating variant actionability assessment",
-  "version": "1.0",
+  "description": "Gold standard dataset for validating variant actionability assessment - SNPs and small indels only",
+  "version": "2.1",
+  "note": "Updated to only include somatic SNPs and small indels. Fusion, amplification, and germline variants removed. BRCA1 185delAG removed as it is a germline pathogenic variant, not a somatic tumor mutation.",
   "entries": [
     {
       "gene": "BRAF",
@@ -34,16 +35,6 @@
       ]
     },
     {
-      "gene": "ERBB2",
-      "variant": "amplification",
-      "tumor_type": "Breast Cancer",
-      "expected_tier": "Tier I",
-      "notes": "FDA-approved HER2-targeted therapies (trastuzumab, pertuzumab, T-DM1)",
-      "references": [
-        "Slamon DJ et al. N Engl J Med 2001"
-      ]
-    },
-    {
       "gene": "KIT",
       "variant": "D816V",
       "tumor_type": "Gastrointestinal Stromal Tumor",
@@ -51,16 +42,6 @@
       "notes": "FDA-approved imatinib for KIT-mutant GIST",
       "references": [
         "Demetri GD et al. N Engl J Med 2002"
-      ]
-    },
-    {
-      "gene": "ALK",
-      "variant": "fusion",
-      "tumor_type": "Non-Small Cell Lung Cancer",
-      "expected_tier": "Tier I",
-      "notes": "FDA-approved ALK inhibitors (crizotinib, alectinib, ceritinib, brigatinib)",
-      "references": [
-        "Solomon BJ et al. N Engl J Med 2014"
       ]
     },
     {
@@ -104,16 +85,6 @@
       ]
     },
     {
-      "gene": "BRCA1",
-      "variant": "185delAG",
-      "tumor_type": "Ovarian Cancer",
-      "expected_tier": "Tier I",
-      "notes": "FDA-approved PARP inhibitors (olaparib, rucaparib, niraparib)",
-      "references": [
-        "Moore K et al. N Engl J Med 2018"
-      ]
-    },
-    {
       "gene": "IDH1",
       "variant": "R132H",
       "tumor_type": "Acute Myeloid Leukemia",
@@ -124,33 +95,23 @@
       ]
     },
     {
-      "gene": "FGFR3",
-      "variant": "fusion",
-      "tumor_type": "Urothelial Carcinoma",
-      "expected_tier": "Tier I",
-      "notes": "FDA-approved erdafitinib for FGFR-altered urothelial cancer",
+      "gene": "KRAS",
+      "variant": "G12D",
+      "tumor_type": "Pancreatic Cancer",
+      "expected_tier": "Tier III",
+      "notes": "No approved targeted therapies; KRAS G12D inhibitors in clinical trials",
       "references": [
-        "Loriot Y et al. Lancet Oncol 2019"
+        "Waters AM et al. Cold Spring Harb Perspect Med 2018"
       ]
     },
     {
-      "gene": "RET",
-      "variant": "fusion",
-      "tumor_type": "Non-Small Cell Lung Cancer",
+      "gene": "EGFR",
+      "variant": "T790M",
+      "tumor_type": "Lung Adenocarcinoma",
       "expected_tier": "Tier I",
-      "notes": "FDA-approved selpercatinib and pralsetinib for RET fusion-positive NSCLC",
+      "notes": "FDA-approved osimertinib for EGFR T790M-positive NSCLC after progression on first/second-gen TKIs",
       "references": [
-        "Drilon A et al. N Engl J Med 2020"
-      ]
-    },
-    {
-      "gene": "NTRK1",
-      "variant": "fusion",
-      "tumor_type": "Solid Tumors",
-      "expected_tier": "Tier I",
-      "notes": "FDA-approved larotrectinib and entrectinib for NTRK fusion-positive tumors",
-      "references": [
-        "Drilon A et al. N Engl J Med 2018"
+        "Mok TS et al. N Engl J Med 2017"
       ]
     }
   ]
