@@ -9,6 +9,7 @@ An LLM-powered cancer variant actionability assessment tool with a built-in vali
 Molecular tumor boards manually review cancer variants to assign clinical actionability—a time-consuming process
 requiring expert panels. This research tool automates that workflow by fetching variant evidence from genomic databases
 (CIViC, ClinVar, COSMIC) and using LLMs to assign AMP/ASCO/CAP tier classifications, mimicking expert judgment.
+Planned: a two-phase agentic architecture—collaborative agents gather evidence, then adversarial agents (Advocate vs Skeptic) debate before an Arbiter assigns the final tier.
 Includes a validation framework to benchmark LLM accuracy against gold-standard classifications.
 This is a research prototype exploring whether LLMs can approximate clinical decision-making; not for actual clinical use.
 
@@ -120,17 +121,25 @@ We're actively working on enhancing TumorBoard with additional features:
 - **TCGA Data**: Real somatic mutation frequency and cancer-type prevalence across 11,000+ tumors to confirm driver status
 
 
+### 🔍 RAG (Retrieval-Augmented Generation)
+
+Enhance evidence gathering with semantic search over domain-specific knowledge:
+
+- **Literature Retrieval**: Vector-indexed PubMed abstracts for rare variants with limited database coverage
+- **Clinical Trial Matching**: Semantic search over ClinicalTrials.gov to surface relevant ongoing trials
+- **Guideline Integration**: Retrieve relevant NCCN/ESMO guideline sections dynamically based on variant context
+- **Similar Variant Lookup**: Find structurally similar variants with known actionability for novel mutations
+
+**Proposed Stack**: ChromaDB/Pinecone + sentence-transformers for embeddings, integrated before LLM assessment
+
 ### 🤖 Agentic AI Architecture
 
-Moving beyond single-LLM assessments to a **collaborative multi-agent system**:
+Two-phase multi-agent system mimicking real tumor board dynamics:
 
-- **Systematic Review Agent**: Automated literature review following PRISMA guidelines with citation network analysis
-- **Mechanistic Reasoning Agent**: Deep analysis of biological mechanisms, pathway interactions, and molecular consequences
-- **Citation Graph Agent**: Network analysis of scientific evidence, identifying consensus patterns and research frontiers
-- **Consensus Orchestrator**: Synthesizes insights from specialized agents, resolving conflicts and producing unified assessments
-- **Ensemble LLM**: Multi-model consensus approach using different LLMs (GPT-4, Claude, Gemini) to cross-validate findings and reduce hallucination
+- **Collaborative Phase**: Specialized agents (Literature, Trials, Pathways) gather evidence in parallel into a shared pool
+- **Adversarial Phase**: Advocate argues for actionability, Skeptic challenges weak evidence, Arbiter assigns final tier
 
-This agentic approach mimics real tumor board dynamics where multiple specialists contribute domain expertise.
+This debate-based approach reduces LLM overconfidence and provides explainable reasoning. 
 
 ### 🧬 Patient-Level Genomic Analysis
 
