@@ -3,7 +3,7 @@ An LLM-powered cancer variant actionability assessment tool with a built-in vali
 
 **⚠️ Important: This tool currently only supports SNPs and small indels (missense, nonsense, insertions, deletions, frameshifts). Fusions, amplifications, and other structural variants are not supported.**
 
-**Current Validation Performance: 70% accuracy | 87% Tier I F1 score** *(on SNP/indel variants only)*
+**Current Validation Performance: 78% accuracy | 92% Tier I F1 score** *(on SNP/indel variants only)*
 
 **TL;DR**:
 Molecular tumor boards manually review cancer variants to assign clinical actionability—a time-consuming process

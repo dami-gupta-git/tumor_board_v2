@@ -1,0 +1,513 @@
+{
+  "description": "Gold standard dataset for SNP/indel variants - curated with 2024 FDA approvals",
+  "version": "2.0-snp-2024",
+  "last_updated": "2024-12",
+  "entries": [
+    {
+      "gene": "BRAF",
+      "variant": "V600E",
+      "tumor_type": "Melanoma",
+      "expected_tier": "Tier I",
+      "notes": "FDA-approved: dabrafenib+trametinib, vemurafenib+cobimetinib, encorafenib+binimetinib",
+      "references": [
+        "FDA approval 2013 (vemurafenib), 2014 (dabrafenib+trametinib)",
+        "Long GV et al. N Engl J Med 2014"
+      ]
+    },
+    {
+      "gene": "BRAF",
+      "variant": "V600E",
+      "tumor_type": "Non-Small Cell Lung Cancer",
+      "expected_tier": "Tier I",
+      "notes": "FDA-approved: dabrafenib+trametinib for BRAF V600E NSCLC (2017)",
+      "references": [
+        "FDA approval June 2017",
+        "Planchard D et al. Lancet Oncol 2016"
+      ]
+    },
+    {
+      "gene": "BRAF",
+      "variant": "V600E",
+      "tumor_type": "Anaplastic Thyroid Cancer",
+      "expected_tier": "Tier I",
+      "notes": "FDA-approved: dabrafenib+trametinib for BRAF V600E ATC (2018)",
+      "references": [
+        "FDA approval May 2018",
+        "Subbiah V et al. J Clin Oncol 2018"
+      ]
+    },
+    {
+      "gene": "BRAF",
+      "variant": "V600E",
+      "tumor_type": "Colorectal Cancer",
+      "expected_tier": "Tier I",
+      "notes": "FDA-approved: encorafenib+cetuximab for BRAF V600E mCRC (2020)",
+      "references": [
+        "FDA approval April 2020",
+        "Kopetz S et al. N Engl J Med 2019 (BEACON trial)"
+      ]
+    },
+    {
+      "gene": "BRAF",
+      "variant": "V600K",
+      "tumor_type": "Melanoma",
+      "expected_tier": "Tier I",
+      "notes": "FDA-approved: same BRAF inhibitors as V600E, included in label",
+      "references": [
+        "FDA label includes V600E and V600K",
+        "Long GV et al. Lancet 2015"
+      ]
+    },
+    {
+      "gene": "BRAF",
+      "variant": "G469A",
+      "tumor_type": "Melanoma",
+      "expected_tier": "Tier III",
+      "notes": "Non-V600 BRAF mutation. Not FDA-approved, variable response to BRAF inhibitors, limited data",
+      "references": [
+        "Dahlman KB et al. Cancer Discov 2012",
+        "Yao Z et al. Cancer Cell 2017"
+      ]
+    },
+    {
+      "gene": "EGFR",
+      "variant": "L858R",
+      "tumor_type": "Non-Small Cell Lung Cancer",
+      "expected_tier": "Tier I",
+      "notes": "FDA-approved: osimertinib (preferred), erlotinib, gefitinib, afatinib",
+      "references": [
+        "FDA approvals 2004-2018",
+        "Soria JC et al. N Engl J Med 2018 (FLAURA)"
+      ]
+    },
+    {
+      "gene": "EGFR",
+      "variant": "T790M",
+      "tumor_type": "Non-Small Cell Lung Cancer",
+      "expected_tier": "Tier I",
+      "notes": "FDA-approved: osimertinib for T790M+ NSCLC after progression on 1st/2nd-gen TKI",
+      "references": [
+        "FDA approval November 2015",
+        "Mok TS et al. N Engl J Med 2017 (AURA3)"
+      ]
+    },
+    {
+      "gene": "EGFR",
+      "variant": "C797S",
+      "tumor_type": "Non-Small Cell Lung Cancer",
+      "expected_tier": "Tier I",
+      "notes": "Resistance marker: confers resistance to osimertinib. No approved therapy but critical for treatment decisions",
+      "references": [
+        "Thress KS et al. Nat Med 2015",
+        "NCCN Guidelines - resistance marker"
+      ]
+    },
+    {
+      "gene": "EGFR",
+      "variant": "G719S",
+      "tumor_type": "Non-Small Cell Lung Cancer",
+      "expected_tier": "Tier I",
+      "notes": "FDA-approved: afatinib for uncommon EGFR mutations including G719X (2018 label expansion)",
+      "references": [
+        "FDA label expansion 2018",
+        "Yang JC et al. Lancet Oncol 2015"
+      ]
+    },
+    {
+      "gene": "KRAS",
+      "variant": "G12C",
+      "tumor_type": "Non-Small Cell Lung Cancer",
+      "expected_tier": "Tier I",
+      "notes": "FDA-approved: sotorasib (2021), adagrasib (2022)",
+      "references": [
+        "FDA approval May 2021 (sotorasib), Dec 2022 (adagrasib)",
+        "Skoulidis F et al. N Engl J Med 2021"
+      ]
+    },
+    {
+      "gene": "KRAS",
+      "variant": "G12C",
+      "tumor_type": "Colorectal Cancer",
+      "expected_tier": "Tier I",
+      "notes": "FDA-approved: adagrasib+cetuximab for KRAS G12C mCRC (2024)",
+      "references": [
+        "FDA approval March 2024",
+        "Yaeger R et al. N Engl J Med 2023 (KRYSTAL-1)"
+      ]
+    },
+    {
+      "gene": "KRAS",
+      "variant": "G12D",
+      "tumor_type": "Colorectal Cancer",
+      "expected_tier": "Tier I",
+      "notes": "Resistance marker: predicts resistance to anti-EGFR therapy (cetuximab, panitumumab). Standard-of-care impact.",
+      "references": [
+        "Allegra CJ et al. J Clin Oncol 2009",
+        "NCCN Guidelines - required testing before anti-EGFR"
+      ]
+    },
+    {
+      "gene": "KRAS",
+      "variant": "G12D",
+      "tumor_type": "Pancreatic Cancer",
+      "expected_tier": "Tier III",
+      "notes": "No FDA-approved targeted therapy. KRAS G12D inhibitors in early trials only.",
+      "references": [
+        "Hallin J et al. Cancer Discov 2022 (preclinical)",
+        "Clinical trials ongoing (MRTX1133)"
+      ]
+    },
+    {
+      "gene": "KRAS",
+      "variant": "G13D",
+      "tumor_type": "Colorectal Cancer",
+      "expected_tier": "Tier I",
+      "notes": "Resistance marker: predicts resistance to anti-EGFR therapy. Some data suggests less resistance than G12 mutations.",
+      "references": [
+        "De Roock W et al. JAMA 2010",
+        "NCCN Guidelines"
+      ]
+    },
+    {
+      "gene": "NRAS",
+      "variant": "Q61K",
+      "tumor_type": "Colorectal Cancer",
+      "expected_tier": "Tier I",
+      "notes": "Resistance marker: predicts resistance to anti-EGFR therapy. Required testing per NCCN.",
+      "references": [
+        "Douillard JY et al. N Engl J Med 2013",
+        "NCCN Guidelines"
+      ]
+    },
+    {
+      "gene": "NRAS",
+      "variant": "Q61K",
+      "tumor_type": "Melanoma",
+      "expected_tier": "Tier II",
+      "notes": "MEK inhibitors (binimetinib) show activity. NEMO trial positive but not FDA-approved as monotherapy. Excludes BRAF inhibitor use.",
+      "references": [
+        "Dummer R et al. Lancet Oncol 2017 (NEMO)",
+        "Clinical utility for excluding BRAF inhibitors"
+      ]
+    },
+    {
+      "gene": "NRAS",
+      "variant": "G12D",
+      "tumor_type": "Melanoma",
+      "expected_tier": "Tier III",
+      "notes": "No FDA-approved therapy. Limited clinical data compared to Q61 mutations.",
+      "references": [
+        "Johnson DB et al. Cancer 2015",
+        "Preclinical MEK inhibitor sensitivity"
+      ]
+    },
+    {
+      "gene": "PIK3CA",
+      "variant": "H1047R",
+      "tumor_type": "Breast Cancer",
+      "expected_tier": "Tier I",
+      "notes": "FDA-approved: alpelisib + fulvestrant for PIK3CA-mutated HR+/HER2- breast cancer (2019)",
+      "references": [
+        "FDA approval May 2019",
+        "André F et al. N Engl J Med 2019 (SOLAR-1)"
+      ]
+    },
+    {
+      "gene": "PIK3CA",
+      "variant": "E545K",
+      "tumor_type": "Breast Cancer",
+      "expected_tier": "Tier I",
+      "notes": "FDA-approved: alpelisib label includes E545K as actionable PIK3CA mutation",
+      "references": [
+        "FDA-approved companion diagnostic includes E545K",
+        "André F et al. N Engl J Med 2019"
+      ]
+    },
+    {
+      "gene": "PIK3CA",
+      "variant": "E542K",
+      "tumor_type": "Breast Cancer",
+      "expected_tier": "Tier I",
+      "notes": "FDA-approved: alpelisib label includes E542K as actionable PIK3CA mutation",
+      "references": [
+        "FDA-approved companion diagnostic includes E542K",
+        "André F et al. N Engl J Med 2019"
+      ]
+    },
+    {
+      "gene": "PIK3CA",
+      "variant": "H1047R",
+      "tumor_type": "Colorectal Cancer",
+      "expected_tier": "Tier III",
+      "notes": "No FDA-approved PI3K inhibitor in CRC. Alpelisib approved only in breast cancer.",
+      "references": [
+        "Rodon J et al. Nat Rev Clin Oncol 2013",
+        "No positive Phase 3 in CRC"
+      ]
+    },
+    {
+      "gene": "IDH1",
+      "variant": "R132H",
+      "tumor_type": "Acute Myeloid Leukemia",
+      "expected_tier": "Tier I",
+      "notes": "FDA-approved: ivosidenib for IDH1-mutated AML (2018)",
+      "references": [
+        "FDA approval July 2018",
+        "DiNardo CD et al. N Engl J Med 2018"
+      ]
+    },
+    {
+      "gene": "IDH1",
+      "variant": "R132C",
+      "tumor_type": "Cholangiocarcinoma",
+      "expected_tier": "Tier I",
+      "notes": "FDA-approved: ivosidenib for IDH1-mutated cholangiocarcinoma (2021)",
+      "references": [
+        "FDA approval August 2021",
+        "Abou-Alfa GK et al. Lancet Oncol 2020 (ClarIDHy)"
+      ]
+    },
+    {
+      "gene": "IDH2",
+      "variant": "R140Q",
+      "tumor_type": "Acute Myeloid Leukemia",
+      "expected_tier": "Tier I",
+      "notes": "FDA-approved: enasidenib for IDH2-mutated AML (2017)",
+      "references": [
+        "FDA approval August 2017",
+        "Stein EM et al. Blood 2017"
+      ]
+    },
+    {
+      "gene": "KIT",
+      "variant": "D816V",
+      "tumor_type": "Systemic Mastocytosis",
+      "expected_tier": "Tier I",
+      "notes": "FDA-approved: avapritinib for advanced SM with D816V (2021), midostaurin (2017)",
+      "references": [
+        "FDA approval June 2021 (avapritinib)",
+        "DeAngelo DJ et al. N Engl J Med 2021 (PATHFINDER)"
+      ]
+    },
+    {
+      "gene": "KIT",
+      "variant": "D816H",
+      "tumor_type": "Systemic Mastocytosis",
+      "expected_tier": "Tier I",
+      "notes": "FDA-approved: avapritinib label covers D816 mutations broadly",
+      "references": [
+        "FDA label includes D816 mutations",
+        "Gotlib J et al. Blood 2021"
+      ]
+    },
+    {
+      "gene": "KIT",
+      "variant": "V560D",
+      "tumor_type": "Gastrointestinal Stromal Tumor",
+      "expected_tier": "Tier I",
+      "notes": "FDA-approved: imatinib for KIT-mutated GIST. Exon 11 mutations highly sensitive.",
+      "references": [
+        "FDA approval 2002",
+        "Demetri GD et al. N Engl J Med 2002"
+      ]
+    },
+    {
+      "gene": "KIT",
+      "variant": "D816V",
+      "tumor_type": "Gastrointestinal Stromal Tumor",
+      "expected_tier": "Tier I",
+      "notes": "Resistance marker: D816V confers imatinib resistance. Consider avapritinib or ripretinib.",
+      "references": [
+        "Heinrich MC et al. J Clin Oncol 2008",
+        "Avapritinib shows activity in D816V GIST"
+      ]
+    },
+    {
+      "gene": "ESR1",
+      "variant": "Y537S",
+      "tumor_type": "Breast Cancer",
+      "expected_tier": "Tier I",
+      "notes": "Resistance marker: confers resistance to aromatase inhibitors. FDA-approved: elacestrant for ESR1-mutated ER+ breast cancer (2023)",
+      "references": [
+        "FDA approval January 2023",
+        "Bidard FC et al. J Clin Oncol 2022 (EMERALD)"
+      ]
+    },
+    {
+      "gene": "ESR1",
+      "variant": "D538G",
+      "tumor_type": "Breast Cancer",
+      "expected_tier": "Tier I",
+      "notes": "Resistance marker: confers AI resistance. Elacestrant FDA-approved for ESR1-mutated disease.",
+      "references": [
+        "FDA approval January 2023",
+        "Chandarlapaty S et al. JAMA Oncol 2016"
+      ]
+    },
+    {
+      "gene": "TP53",
+      "variant": "R175H",
+      "tumor_type": "Colorectal Cancer",
+      "expected_tier": "Tier III",
+      "notes": "Prognostic but not predictive. No FDA-approved TP53-targeted therapy. Poor prognosis marker.",
+      "references": [
+        "Olivier M et al. Hum Mutat 2010",
+        "Prognostic, not therapeutically actionable"
+      ]
+    },
+    {
+      "gene": "TP53",
+      "variant": "R273H",
+      "tumor_type": "Breast Cancer",
+      "expected_tier": "Tier III",
+      "notes": "Prognostic but not predictive. No FDA-approved TP53-targeted therapy.",
+      "references": [
+        "IARC TP53 Database",
+        "Prognostic significance only"
+      ]
+    },
+    {
+      "gene": "APC",
+      "variant": "R1450*",
+      "tumor_type": "Colorectal Cancer",
+      "expected_tier": "Tier IV",
+      "notes": "Truncating APC mutation. Diagnostic for FAP/Lynch but not therapeutically actionable. Benign in somatic context (common in CRC pathogenesis).",
+      "references": [
+        "Fearon ER et al. Cell 1990",
+        "Not predictive for therapy"
+      ]
+    },
+    {
+      "gene": "VHL",
+      "variant": "R167Q",
+      "tumor_type": "Clear Cell Renal Cell Carcinoma",
+      "expected_tier": "Tier III",
+      "notes": "VHL loss is diagnostic for ccRCC but VHL mutation status does not predict response to approved therapies (TKIs, IO). Not actionable.",
+      "references": [
+        "Choueiri TK et al. Eur Urol 2021",
+        "Mutation status not predictive"
+      ]
+    },
+    {
+      "gene": "FGFR3",
+      "variant": "S249C",
+      "tumor_type": "Bladder Cancer",
+      "expected_tier": "Tier I",
+      "notes": "FDA-approved: erdafitinib for FGFR3-mutated urothelial carcinoma (2019)",
+      "references": [
+        "FDA approval April 2019",
+        "Loriot Y et al. N Engl J Med 2019"
+      ]
+    },
+    {
+      "gene": "FGFR2",
+      "variant": "N549K",
+      "tumor_type": "Cholangiocarcinoma",
+      "expected_tier": "Tier I",
+      "notes": "FDA-approved: pemigatinib, futibatinib, infigratinib for FGFR2-altered cholangiocarcinoma. Point mutations included.",
+      "references": [
+        "FDA approvals 2020-2022",
+        "Abou-Alfa GK et al. Lancet Oncol 2020 (FIGHT-202)"
+      ]
+    },
+    {
+      "gene": "MET",
+      "variant": "D1228N",
+      "tumor_type": "Non-Small Cell Lung Cancer",
+      "expected_tier": "Tier I",
+      "notes": "Resistance marker to Type I MET inhibitors (crizotinib, capmatinib). May retain sensitivity to Type II inhibitors.",
+      "references": [
+        "Recondo G et al. Cancer Discov 2020",
+        "Guides MET inhibitor selection"
+      ]
+    },
+    {
+      "gene": "RET",
+      "variant": "M918T",
+      "tumor_type": "Medullary Thyroid Cancer",
+      "expected_tier": "Tier I",
+      "notes": "FDA-approved: selpercatinib, pralsetinib for RET-mutated MTC",
+      "references": [
+        "FDA approval May 2020 (selpercatinib)",
+        "Wirth LJ et al. N Engl J Med 2020"
+      ]
+    },
+    {
+      "gene": "BRCA2",
+      "variant": "E1493*",
+      "tumor_type": "Ovarian Cancer",
+      "expected_tier": "Tier I",
+      "notes": "FDA-approved: olaparib, rucaparib, niraparib for BRCA-mutated ovarian cancer",
+      "references": [
+        "FDA approvals 2014-2018",
+        "Moore K et al. N Engl J Med 2018 (SOLO1)"
+      ]
+    },
+    {
+      "gene": "BRCA1",
+      "variant": "C61G",
+      "tumor_type": "Breast Cancer",
+      "expected_tier": "Tier I",
+      "notes": "FDA-approved: olaparib, talazoparib for germline BRCA-mutated HER2- breast cancer. Somatic BRCA also actionable.",
+      "references": [
+        "FDA approval January 2018 (olaparib)",
+        "Robson M et al. N Engl J Med 2017 (OlympiAD)"
+      ]
+    },
+    {
+      "gene": "PDGFRA",
+      "variant": "D842V",
+      "tumor_type": "Gastrointestinal Stromal Tumor",
+      "expected_tier": "Tier I",
+      "notes": "FDA-approved: avapritinib for PDGFRA D842V GIST (2020). Imatinib-resistant.",
+      "references": [
+        "FDA approval January 2020",
+        "Heinrich MC et al. Lancet Oncol 2020 (NAVIGATOR)"
+      ]
+    },
+    {
+      "gene": "POLE",
+      "variant": "P286R",
+      "tumor_type": "Endometrial Cancer",
+      "expected_tier": "Tier II",
+      "notes": "Ultramutated phenotype, favorable prognosis. May predict immunotherapy response. Not FDA-approved indication but clinical utility.",
+      "references": [
+        "Church DN et al. J Clin Oncol 2015",
+        "Prognostic, potential IO predictor"
+      ]
+    },
+    {
+      "gene": "SMAD4",
+      "variant": "R361H",
+      "tumor_type": "Pancreatic Cancer",
+      "expected_tier": "Tier III",
+      "notes": "Prognostic only. Associated with worse outcomes, metastatic pattern. No targeted therapy.",
+      "references": [
+        "Iacobuzio-Donahue CA et al. J Clin Invest 2009",
+        "Not therapeutically actionable"
+      ]
+    },
+    {
+      "gene": "CDKN2A",
+      "variant": "R80*",
+      "tumor_type": "Melanoma",
+      "expected_tier": "Tier III",
+      "notes": "Prognostic/diagnostic. Associated with CDK4/6 inhibitor sensitivity in some contexts but not FDA-approved indication.",
+      "references": [
+        "Genomic classification of cutaneous melanoma. Cell 2015",
+        "Not validated predictive biomarker"
+      ]
+    },
+    {
+      "gene": "ARID1A",
+      "variant": "Q1334*",
+      "tumor_type": "Ovarian Cancer",
+      "expected_tier": "Tier III",
+      "notes": "Potential synthetic lethality with ATR/PARP inhibitors. Phase 2 data only, not FDA-approved.",
+      "references": [
+        "Bitler BG et al. Nat Med 2015",
+        "Preclinical rationale, trials ongoing"
+      ]
+    }
+  ]
+}
