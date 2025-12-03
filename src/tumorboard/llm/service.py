@@ -5,15 +5,18 @@ from litellm import acompletion
 from tumorboard.llm.prompts import create_assessment_prompt  # ← now returns messages list!
 from tumorboard.models.assessment import ActionabilityAssessment, ActionabilityTier
 from tumorboard.models.evidence import Evidence
+from tumorboard.utils.logging_config import get_logger
 
 
 class LLMService:
     """High-accuracy LLM service for somatic variant actionability (88–92% agreement)."""
 
-    def __init__(self, model: str = "gpt-4o-mini", temperature: float = 0.0):
+    def __init__(self, model: str = "gpt-4o-mini", temperature: float = 0.0, enable_logging: bool = True):
         self.model = model
         # ↓↓↓ CRITICAL: temperature=0.0 → deterministic, no hallucinations
         self.temperature = temperature
+        self.enable_logging = enable_logging
+        self.logger = get_logger() if enable_logging else None
 
     async def assess_variant(
         self,
@@ -26,6 +29,18 @@ class LLMService:
 
         # Rich evidence summary (your existing logic is perfect)
         evidence_summary = evidence.summary(tumor_type=tumor_type, max_items=15)
+
+        # Log the request
+        request_id = None
+        if self.logger:
+            request_id = self.logger.log_llm_request(
+                gene=gene,
+                variant=variant,
+                tumor_type=tumor_type,
+                evidence_summary=evidence_summary,
+                model=self.model,
+                temperature=self.temperature,
+            )
 
         # ← THIS IS THE KEY CHANGE:
         # New create_assessment_prompt returns full messages list with system + user roles
@@ -50,38 +65,89 @@ class LLMService:
                 # Fallback to prompt-based JSON if model doesn't support response_format
                 pass
 
-        response = await acompletion(**completion_kwargs)
+        try:
+            response = await acompletion(**completion_kwargs)
 
-        raw_content = response.choices[0].message.content.strip()
+            raw_content = response.choices[0].message.content.strip()
 
-        # Robust markdown/code-block handling (your code was already great)
-        content = raw_content
-        if content.startswith("```"):
-            parts = content.split("```")
-            content = parts[1] if len(parts) > 1 else parts[0]
-            if content.lower().startswith("json"):
-                content = content[4:].lstrip()
+            # Robust markdown/code-block handling (your code was already great)
+            content = raw_content
+            if content.startswith("```"):
+                parts = content.split("```")
+                content = parts[1] if len(parts) > 1 else parts[0]
+                if content.lower().startswith("json"):
+                    content = content[4:].lstrip()
 
-        data = json.loads(content)
+            data = json.loads(content)
 
-        # Build final assessment — unchanged from your excellent version
-        return ActionabilityAssessment(
-            gene=gene,
-            variant=variant,
-            tumor_type=tumor_type,
-            tier=ActionabilityTier(data.get("tier", "Unknown")),
-            confidence_score=float(data.get("confidence_score", 0.5)),
-            summary=data.get("summary", "No summary provided."),
-            rationale=data.get("rationale", "No rationale provided."),
-            evidence_strength=data.get("evidence_strength"),
-            clinical_trials_available=bool(data.get("clinical_trials_available", False)),
-            recommended_therapies=data.get("recommended_therapies", []),
-            references=data.get("references", []),
-            **evidence.model_dump(include={
-                'cosmic_id', 'ncbi_gene_id', 'dbsnp_id', 'clinvar_id',
-                'clinvar_clinical_significance', 'clinvar_accession',
-                'hgvs_genomic', 'hgvs_protein', 'hgvs_transcript',
-                'snpeff_effect', 'polyphen2_prediction', 'cadd_score', 'gnomad_exome_af',
-                'transcript_id', 'transcript_consequence'
-            })
-        )
+            # Build final assessment — unchanged from your excellent version
+            assessment = ActionabilityAssessment(
+                gene=gene,
+                variant=variant,
+                tumor_type=tumor_type,
+                tier=ActionabilityTier(data.get("tier", "Unknown")),
+                confidence_score=float(data.get("confidence_score", 0.5)),
+                summary=data.get("summary", "No summary provided."),
+                rationale=data.get("rationale", "No rationale provided."),
+                evidence_strength=data.get("evidence_strength"),
+                clinical_trials_available=bool(data.get("clinical_trials_available", False)),
+                recommended_therapies=data.get("recommended_therapies", []),
+                references=data.get("references", []),
+                **evidence.model_dump(include={
+                    'cosmic_id', 'ncbi_gene_id', 'dbsnp_id', 'clinvar_id',
+                    'clinvar_clinical_significance', 'clinvar_accession',
+                    'hgvs_genomic', 'hgvs_protein', 'hgvs_transcript',
+                    'snpeff_effect', 'polyphen2_prediction', 'cadd_score', 'gnomad_exome_af',
+                    'transcript_id', 'transcript_consequence'
+                })
+            )
+
+            # Log the successful response
+            if self.logger:
+                self.logger.log_llm_response(
+                    request_id=request_id or "unknown",
+                    gene=gene,
+                    variant=variant,
+                    tumor_type=tumor_type,
+                    tier=assessment.tier.value,
+                    confidence_score=assessment.confidence_score,
+                    summary=assessment.summary,
+                    rationale=assessment.rationale,
+                    evidence_strength=assessment.evidence_strength,
+                    recommended_therapies=[
+                        {
+                            "drug_name": therapy.drug_name,
+                            "evidence_level": therapy.evidence_level,
+                            "approval_status": therapy.approval_status,
+                            "clinical_context": therapy.clinical_context,
+                        }
+                        for therapy in assessment.recommended_therapies
+                    ],
+                    references=assessment.references,
+                    raw_response=raw_content[:500],  # Log first 500 chars of raw response
+                )
+
+                # Log a human-readable decision summary
+                self.logger.log_decision_summary(
+                    gene=gene,
+                    variant=variant,
+                    tumor_type=tumor_type,
+                    tier=assessment.tier.value,
+                    confidence_score=assessment.confidence_score,
+                    key_evidence=assessment.references[:5],  # Top 5 references
+                    decision_rationale=assessment.rationale,
+                )
+
+            return assessment
+
+        except Exception as e:
+            # Log the error
+            if self.logger:
+                self.logger.log_llm_error(
+                    request_id=request_id or "unknown",
+                    gene=gene,
+                    variant=variant,
+                    error=e,
+                )
+            # Re-raise the exception
+            raise

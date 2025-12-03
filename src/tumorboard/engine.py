@@ -1,7 +1,7 @@
 """Core assessment engine combining API and LLM services.
 
 ARCHITECTURE:
-    VariantInput → Normalize → MyVariantClient → Evidence → LLMService → Assessment
+    VariantInput → Normalize → MyVariantClient + FDAClient → Evidence → LLMService → Assessment
 
 Orchestrates the pipeline with async concurrency for single and batch processing.
 
@@ -11,13 +11,17 @@ Key Design:
 - Batch exceptions captured, not raised
 - Stateless with no shared state
 - Variant normalization before API calls for better evidence matching
+- FDA drug approval data fetched in parallel with MyVariant data
 """
 
 import asyncio
 from tumorboard.api.myvariant import MyVariantClient
+from tumorboard.api.fda import FDAClient
+from tumorboard.api.oncotree import OncoTreeClient
 from tumorboard.llm.service import LLMService
 from tumorboard.models.assessment import ActionabilityAssessment
 from tumorboard.models.variant import VariantInput
+from tumorboard.models.evidence import FDAApproval
 from tumorboard.utils import normalize_variant
 
 
@@ -29,9 +33,11 @@ class AssessmentEngine:
     significantly improving performance for batch assessments.
     """
 
-    def __init__(self, llm_model: str = "gpt-4o-mini", llm_temperature: float = 0.1):
+    def __init__(self, llm_model: str = "gpt-4o-mini", llm_temperature: float = 0.1, enable_logging: bool = True):
         self.myvariant_client = MyVariantClient()
-        self.llm_service = LLMService(model=llm_model, temperature=llm_temperature)
+        self.fda_client = FDAClient()
+        self.oncotree_client = OncoTreeClient()
+        self.llm_service = LLMService(model=llm_model, temperature=llm_temperature, enable_logging=enable_logging)
 
     async def __aenter__(self):
         """
@@ -40,20 +46,24 @@ class AssessmentEngine:
         Use with 'async with' syntax to ensure proper resource cleanup.
         """
         await self.myvariant_client.__aenter__()
+        await self.fda_client.__aenter__()
+        await self.oncotree_client.__aenter__()
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         """Close HTTP client session to prevent resource leaks."""
         await self.myvariant_client.__aexit__(exc_type, exc_val, exc_tb)
+        await self.fda_client.__aexit__(exc_type, exc_val, exc_tb)
+        await self.oncotree_client.__aexit__(exc_type, exc_val, exc_tb)
 
     async def assess_variant(self, variant_input: VariantInput) -> ActionabilityAssessment:
         """Assess a single variant.
 
-        Chains three async operations sequentially:
+        Chains multiple async operations:
         1. Normalize variant notation (V600E, Val600Glu, p.V600E → V600E)
         2. Validate variant type (only SNPs and small indels allowed)
-        3. Fetch evidence from MyVariant API using normalized variant
-        4. Send evidence to LLM for assessment
+        3. Fetch evidence from MyVariant API and FDA API in parallel
+        4. Send combined evidence to LLM for assessment
 
         The 'await' keyword yields control during I/O, allowing other tasks to run.
         """
@@ -76,18 +86,64 @@ class AssessmentEngine:
         if normalized_variant != variant_input.variant:
             print(f"  Normalized {variant_input.variant} → {normalized_variant} (type: {variant_type})")
 
-        # Step 2: Fetch evidence from MyVariant API using normalized variant
-        evidence = await self.myvariant_client.fetch_evidence(
-            gene=variant_input.gene,
-            variant=normalized_variant,  # Use normalized variant for API query
+        # Step 2.5: Resolve tumor type using OncoTree (e.g., NSCLC → Non-Small Cell Lung Cancer)
+        # This helps match user input to FDA indication text and CIViC evidence
+        resolved_tumor_type = variant_input.tumor_type
+        if variant_input.tumor_type:
+            try:
+                resolved = await self.oncotree_client.resolve_tumor_type(variant_input.tumor_type)
+                if resolved != variant_input.tumor_type:
+                    print(f"  Resolved tumor type: {variant_input.tumor_type} → {resolved}")
+                    resolved_tumor_type = resolved
+            except Exception as e:
+                print(f"  Warning: OncoTree resolution failed: {str(e)}")
+                resolved_tumor_type = variant_input.tumor_type
+
+        # Step 3: Fetch evidence from MyVariant and FDA APIs in parallel
+        # This improves performance by running both API calls concurrently
+        evidence, fda_approvals_raw = await asyncio.gather(
+            self.myvariant_client.fetch_evidence(
+                gene=variant_input.gene,
+                variant=normalized_variant,  # Use normalized variant for API query
+            ),
+            self.fda_client.fetch_drug_approvals(
+                gene=variant_input.gene,
+                variant=normalized_variant,
+            ),
+            return_exceptions=True
         )
 
-        # Step 3: Assess with LLM (must run sequentially since it depends on evidence)
+        # Handle exceptions from parallel calls
+        if isinstance(evidence, Exception):
+            print(f"  Warning: MyVariant API failed: {str(evidence)}")
+            # Create empty evidence object
+            from tumorboard.models.evidence import Evidence
+            evidence = Evidence(
+                variant_id=f"{variant_input.gene}:{normalized_variant}",
+                gene=variant_input.gene,
+                variant=normalized_variant,
+            )
+
+        if isinstance(fda_approvals_raw, Exception):
+            print(f"  Warning: FDA API failed: {str(fda_approvals_raw)}")
+            fda_approvals_raw = []
+
+        # Parse FDA approval data and add to evidence
+        if fda_approvals_raw:
+            fda_approvals = []
+            for approval_record in fda_approvals_raw:
+                parsed = self.fda_client.parse_approval_data(approval_record, variant_input.gene)
+                if parsed:
+                    fda_approvals.append(FDAApproval(**parsed))
+            evidence.fda_approvals = fda_approvals
+
+        # Step 4: Assess with LLM (must run sequentially since it depends on evidence)
         # Use original variant notation for display/reporting
+        # Use resolved tumor type for evidence filtering and FDA matching
         assessment = await self.llm_service.assess_variant(
             gene=variant_input.gene,
             variant=variant_input.variant,  # Keep original for display
-            tumor_type=variant_input.tumor_type,
+            tumor_type=resolved_tumor_type,  # Use resolved tumor type
             evidence=evidence,
         )
 

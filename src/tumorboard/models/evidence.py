@@ -43,6 +43,18 @@ class COSMICEvidence(BaseModel):
     mutation_somatic_status: str | None = None
 
 
+class FDAApproval(BaseModel):
+    """FDA drug approval information."""
+
+    drug_name: str | None = None
+    brand_name: str | None = None
+    generic_name: str | None = None
+    indication: str | None = None
+    approval_date: str | None = None
+    marketing_status: str | None = None
+    gene: str | None = None
+
+
 class Evidence(VariantAnnotations):
     """Aggregated evidence from multiple sources."""
 
@@ -54,11 +66,12 @@ class Evidence(VariantAnnotations):
     civic: list[CIViCEvidence] = Field(default_factory=list)
     clinvar: list[ClinVarEvidence] = Field(default_factory=list)
     cosmic: list[COSMICEvidence] = Field(default_factory=list)
+    fda_approvals: list[FDAApproval] = Field(default_factory=list)
     raw_data: dict[str, Any] = Field(default_factory=dict)
 
     def has_evidence(self) -> bool:
         """Check if any evidence was found."""
-        return bool(self.civic or self.clinvar or self.cosmic)
+        return bool(self.civic or self.clinvar or self.cosmic or self.fda_approvals)
 
     def summary(self, tumor_type: str | None = None, max_items: int = 15) -> str:
         """Generate a text summary of all evidence.
@@ -144,6 +157,21 @@ class Evidence(VariantAnnotations):
                     lines.append(f"     Histology: {ev.primary_histology}")
                 if ev.sample_count:
                     lines.append(f"     Sample Count: {ev.sample_count}")
+            lines.append("")
+
+        if self.fda_approvals:
+            lines.append(f"FDA Approved Drugs ({len(self.fda_approvals)} entries):")
+            for idx, approval in enumerate(self.fda_approvals[:10], 1):
+                drug_display = approval.brand_name or approval.generic_name or approval.drug_name
+                lines.append(f"  {idx}. Drug: {drug_display}")
+                if approval.approval_date:
+                    lines.append(f"     Approval Date: {approval.approval_date}")
+                if approval.marketing_status:
+                    lines.append(f"     Status: {approval.marketing_status}")
+                if approval.indication:
+                    # Truncate long indications
+                    indication = approval.indication[:200] if len(approval.indication) > 200 else approval.indication
+                    lines.append(f"     Indication: {indication}...")
             lines.append("")
 
         return "\n".join(lines) if len(lines) > 1 else "No evidence found."

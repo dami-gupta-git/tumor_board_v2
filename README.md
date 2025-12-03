@@ -48,7 +48,7 @@ open http://localhost:8501
 
 ## Overview
 
-TumorBoard combines clinical evidence from multiple genomic databases (CIViC, ClinVar, COSMIC). It then uses large language models to approximate expert application of the **AMP/ASCO/CAP 4-tier classification system**.
+TumorBoard combines clinical evidence from multiple genomic databases (CIViC, ClinVar, COSMIC) and FDA drug approval data. It then uses large language models to approximate expert application of the **AMP/ASCO/CAP 4-tier classification system**.
 
 Available in two interfaces:
 - **Streamlit Web App**: Modern single-container web interface (recommended)
@@ -59,7 +59,8 @@ Available in two interfaces:
 - **SNP/Small Indel Focus**: Specialized support for point mutations, small insertions, deletions, and frameshifts
 - **Variant Type Validation**: Automatically validates and rejects unsupported variant types (fusions, amplifications, etc.)
 - **Variant Normalization**: Automatically standardizes variant notations (Val600Glu → V600E, p.V600E → V600E) for better API matching
-- **Evidence Aggregation**: Automatically fetches variant evidence from MyVariant.info API
+- **Evidence Aggregation**: Automatically fetches variant evidence from MyVariant.info API and FDA drug approval data
+- **FDA Drug Approvals**: Fetches FDA-approved oncology drugs with companion diagnostics and biomarker-based indications
 - **Database Identifiers**: Extracts COSMIC, dbSNP, ClinVar, NCBI Gene IDs, and HGVS notations
 - **Functional Annotations**: SnpEff effects, PolyPhen2 predictions, CADD scores, gnomAD frequencies
 - **LLM Assessment**: Uses LLMs to interpret evidence and assign actionability tiers
@@ -200,6 +201,66 @@ tumorboard assess BRAF V600E --model groq/llama-3.1-70b-versatile
 ```
 
 **Note:** Claude 3 Opus and Sonnet models require higher-tier Anthropic API access. Claude 3 Haiku is available on all API tiers.
+
+## LLM Decision Logging
+
+TumorBoard includes comprehensive logging of all LLM decisions to help you track, audit, and analyze variant assessments. Logging is **enabled by default** and captures structured data about every assessment.
+
+### Quick Start
+
+```bash
+# Logging is enabled by default
+tumorboard assess BRAF V600E --tumor melanoma
+
+# Disable logging if needed
+tumorboard assess BRAF V600E --tumor melanoma --no-log
+
+# View logs (JSON Lines format)
+cat logs/llm_decisions_20251203.jsonl
+head -1 logs/llm_decisions_20251203.jsonl | python3 -m json.tool
+```
+
+### What Gets Logged
+
+- **Request details**: Gene, variant, tumor type, model, temperature, evidence summary length
+- **Response details**: Tier decision, confidence score, summary, rationale, recommended therapies, references
+- **Error tracking**: Full context for any failures with error type and message
+
+### Log File Location
+
+Logs are saved to: `./logs/llm_decisions_YYYYMMDD.jsonl`
+
+Each line is a complete JSON object capturing either:
+- `llm_request`: Input parameters before LLM call
+- `llm_response`: LLM decision with full assessment details
+- `llm_error`: Any failures with error context
+
+**Example log entry:**
+```json
+{
+  "timestamp": "2025-12-03T01:15:41.616794",
+  "event_type": "llm_response",
+  "request_id": "EGFR_L858R_20251203_011531_329465",
+  "output": {
+    "gene": "EGFR",
+    "variant": "L858R",
+    "tier": "Tier I",
+    "confidence_score": 0.95,
+    "summary": "The EGFR L858R mutation is a well-established actionable variant...",
+    "recommended_therapies": [...],
+    "references": ["OncoKB Level A", "CIViC EID:1", "FDA approval 2023"]
+  }
+}
+```
+
+### Use Cases
+
+- **Auditing**: Track all assessments for regulatory compliance
+- **Quality Assurance**: Monitor confidence scores and identify low-confidence decisions
+- **Research**: Analyze LLM performance patterns and accuracy trends over time
+- **Validation**: Compare decisions against gold standards for benchmarking
+
+**📖 Full Documentation:** See [logging.md](logging.md) for complete details on log format, analysis examples with Python/jq, and best practices.
 
 ## CLI Reference
 
@@ -379,7 +440,7 @@ position = get_protein_position("p.L858R")    # 858
 
 ## Variant Annotations
 
-TumorBoard automatically extracts comprehensive variant annotations from MyVariant.info:
+TumorBoard automatically extracts comprehensive variant annotations from MyVariant.info and FDA drug approval data:
 
 ### Database Identifiers
 - **COSMIC ID**: Catalogue of Somatic Mutations in Cancer identifier (e.g., COSM476)
@@ -404,6 +465,12 @@ TumorBoard automatically extracts comprehensive variant annotations from MyVaria
 - **Transcript ID**: Reference transcript identifier (e.g., NM_004333.4)
 - **Consequence**: Effect on transcript (e.g., missense_variant, frameshift_variant)
 
+### FDA Drug Approvals
+- **Drug Names**: FDA-approved brand and generic drug names
+- **Indications**: Specific cancer indications and biomarker requirements
+- **Approval Dates**: When drugs were approved by FDA
+- **Marketing Status**: Current prescription status
+
 All annotations are included in:
 - Console output (via the assessment report)
 - JSON output files (when using `--output` flag)
@@ -421,6 +488,7 @@ All annotations are included in:
 
 **Data Sources:**
 - MyVariant.info API (aggregates CIViC, ClinVar, COSMIC)
+- FDA openFDA API (drug approvals with biomarker indications)
 - Evidence prioritization with tumor-type filtering
 - 73.33% validation accuracy on gold standard dataset
 
@@ -455,6 +523,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, testing, and code 
 
 - [AMP/ASCO/CAP Guidelines](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5707196/)
 - [MyVariant.info](https://myvariant.info/) | [CIViC](https://civicdb.org/) | [ClinVar](https://www.ncbi.nlm.nih.gov/clinvar/) | [COSMIC](https://cancer.sanger.ac.uk/cosmic)
+- [FDA openFDA API](https://open.fda.gov/) | [Drugs@FDA](https://www.fda.gov/drugs/drug-approvals-and-databases/drugsfda-data-files)
 
 ---
 

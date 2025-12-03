@@ -18,13 +18,19 @@ TIERING RULES (never deviate):
 - Tier IV: Benign/likely benign
 
 EVIDENCE HIERARCHY (highest → lowest):
-1. FDA-approved therapy for this exact variant + tumor type → Tier I
+1. FDA-approved therapy for this exact variant + tumor type (check FDA Approved Drugs section) → Tier I
 2. Resistance variant that blocks standard-of-care targeted therapy in this tumor type → Tier I
-3. FDA-approved therapy for this exact alteration in a different tumor type → Tier I (Level A) or high Tier II (Level B)
+3. FDA-approved therapy for this exact alteration in a different tumor type (check FDA Approved Drugs section) → Tier I (Level A) or high Tier II (Level B)
 4. NCCN Category 1 → Tier I | Category 2A → Tier II
 5. Positive Phase 3 or large Phase 2 trials → Tier II
 6. Preclinical, case reports, small series → Tier III
 7. No oncogenic or therapeutic relevance → Tier IV
+
+IMPORTANT: The evidence summary now includes FDA Approved Drugs data. Pay special attention to:
+- Drugs listed in the FDA Approved Drugs section with their approval dates and marketing status
+- The specific indications mentioned in FDA approval text
+- FDA approvals provide the strongest evidence for Tier I classification
+- Cross-reference FDA approvals with CIViC evidence for comprehensive assessment
 
 WELL-ESTABLISHED POINT MUTATION RESISTANCE MARKERS (Tier I when applicable):
 - RAS mutations (KRAS/NRAS G12/13/61 etc.) in colorectal cancer → anti-EGFR resistance

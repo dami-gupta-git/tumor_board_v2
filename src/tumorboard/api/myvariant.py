@@ -476,7 +476,7 @@ class MyVariantClient:
 
         Args:
             gene: Gene symbol (e.g., "BRAF", "EGFR")
-            variant: Variant notation (e.g., "V600E", "L858R")
+            variant: Variant notation (e.g., "V600_E", "L858R")
 
         Returns:
             List of unique tumor/disease names from CIViC evidence

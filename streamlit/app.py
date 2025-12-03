@@ -3,6 +3,7 @@ import streamlit as st
 import pandas as pd
 import asyncio
 import json
+from streamlit_searchbox import st_searchbox
 from backend import assess_variant, batch_assess_variants, validate_gold_standard, fetch_tumor_type_suggestions
 
 st.set_page_config(page_title="TumorBoard", page_icon="🧬", layout="wide")
@@ -46,14 +47,31 @@ with tab1:
         elif 'tumor_suggestions' in st.session_state:
             tumor_suggestions = st.session_state['tumor_suggestions']
 
-        # Show tumor type input with suggestions
+        # Show tumor type input with typeahead search
         if tumor_suggestions:
-            st.info(f"💡 Found {len(tumor_suggestions)} associated tumor types in CIViC")
-            tumor = st.selectbox(
-                "Tumor Type (optional)",
-                options=[""] + tumor_suggestions,
-                help="Select from CIViC evidence or leave blank",
-                key="tumor_select"
+            st.info(f"💡 Found {len(tumor_suggestions)} tumor types. Start typing to search.")
+
+            # Define search function that has access to tumor_suggestions
+            def search_tumor_types(searchterm: str):
+                """Search function for typeahead widget."""
+                if not searchterm:
+                    # Show top 20 suggestions when no query
+                    return tumor_suggestions[:20]
+
+                # Filter suggestions that match the search term (case-insensitive)
+                searchterm_upper = searchterm.upper()
+                matches = [
+                    item for item in tumor_suggestions
+                    if searchterm_upper in item.upper()
+                ]
+                return matches[:20]  # Limit to 20 results
+
+            tumor = st_searchbox(
+                search_tumor_types,
+                label="Tumor Type (optional)",
+                placeholder="Type to search (e.g., NSCLC, Melanoma)...",
+                key="tumor_searchbox",
+                clear_on_submit=False
             )
         else:
             tumor = st.text_input("Tumor Type (optional)", value=st.session_state['input_tumor'], help="e.g., Melanoma, Lung Adenocarcinoma", key="tumor_input")
