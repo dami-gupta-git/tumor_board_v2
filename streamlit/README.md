@@ -59,23 +59,6 @@ KRAS,G12D,Colorectal Cancer
 - Required columns: `gene`, `variant`
 - Optional column: `tumor_type`
 
-## Architecture
-
-```
-streamlit/
-├── app.py              # Streamlit UI (< 150 lines)
-├── backend.py          # Integration with tumorboard package
-├── Dockerfile          # Single container build
-├── docker-compose.yml  # One-command deployment
-└── requirements.txt    # Streamlit dependencies
-```
-
-## Future Features (Placeholders Added)
-
-- 🧬 **ESMFold Integration**: Protein structure visualization
-- 🧪 **SpliceAI**: Splice site prediction analysis
-- 🤖 **Agentic Workflow**: Multi-agent analysis pipeline with LangGraph/CrewAI
-
 ## Development
 
 To run locally without Docker:

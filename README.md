@@ -1,58 +1,39 @@
 # TumorBoard v2
-An LLM-powered cancer variant actionability assessment tool with a built-in validation framework.
+An LLM-powered cancer variant actionability assessment tool with a built-in validation framework. 
 
-**⚠️ Important: This tool currently only supports SNPs and small indels (missense, nonsense, insertions, deletions, frameshifts). Fusions, amplifications, and other structural variants are not supported.**
+This tool currently only support SNPs and small indels.
 
 **Current Validation Performance: 78% accuracy | 92% Tier I F1 score** *(on SNP/indel variants only)*
 
-**TL;DR**:
+**TL;DR**:  
 Molecular tumor boards manually review cancer variants to assign clinical actionability—a time-consuming process
 requiring expert panels. This research tool automates that workflow by fetching variant evidence from genomic databases
-(CIViC, ClinVar, COSMIC) and using LLMs to assign AMP/ASCO/CAP tier classifications, mimicking expert judgment.
+(CIViC, ClinVar, COSMIC) and using LLMs to assign AMP/ASCO/CAP tier classifications, mimicking expert judgment.  
 Planned: a two-phase agentic architecture—collaborative agents gather evidence, then adversarial agents (Advocate vs Skeptic) debate before an Arbiter assigns the final tier.
 Includes a validation framework to benchmark LLM accuracy against gold-standard classifications.
 This is a research prototype exploring whether LLMs can approximate clinical decision-making; not for actual clinical use.
 
-**Note**: This tool is specifically designed for SNPs and small indels. Other variant types (fusions, amplifications, splice variants, etc.) are intentionally excluded to maintain focus and accuracy on point mutations.
+**Note**: This tool is specifically designed for SNPs and small indels (missense, nonsense, insertions, deletions, frameshifts).. Other variant types (fusions, amplifications, splice variants, etc.) are intentionally excluded to maintain focus and accuracy on point mutations.
 
-TumorBoard includes a clean, modern Streamlit web interface:
-
-- **Single Container**: No separate frontend/backend - one Docker command starts everything
-- **Interactive UI**: Three-tab interface for single variants, batch processing, and validation
-- **Multiple LLM Providers**: OpenAI, Anthropic (Claude), Google (Gemini), Groq via LiteLLM
-- **Real-time Results**: See comprehensive annotations and LLM analysis with confidence scores
-- **Batch Processing**: Upload CSV files for concurrent variant assessment
-- **Validation Framework**: Built-in gold standard validation with per-tier metrics
-- **🐳 Docker Ready**: One-command deployment with Docker Compose
-
-### Quick Start with Streamlit
+### Quick Start (Docker)
 
 ```bash
-# 1. Set your API keys
-cd streamlit
-cp .env.example .env
-# Edit .env with your API keys
+cd streamlit && cp .env.example .env  # Add your API keys
+docker compose up --build  
 
-# 2. Start the app
-docker compose up --build
-
-# 3. Open in browser
-open http://localhost:8501
+# Open http://localhost:8501
 ```
 
-**Features:**
-- **Single Variant Tab**: Assess individual variants with full evidence and therapy recommendations
-- **Batch Upload Tab**: Process CSV files with multiple variants
-- **Validation Tab**: Run gold standard benchmarking
+![alt text](image.png)
 
-👉 **[Streamlit App Guide](streamlit/README.md)**
+See **[Streamlit App Guide](streamlit/README.md)** for full details on the web interface.
 
 ## Overview
 
 TumorBoard combines clinical evidence from multiple genomic databases (CIViC, ClinVar, COSMIC) and FDA drug approval data. It then uses large language models to approximate expert application of the **AMP/ASCO/CAP 4-tier classification system**.
 
 Available in two interfaces:
-- **Streamlit Web App**: Modern single-container web interface (recommended)
+- **Streamlit Web App**: Modern single-container web interface
 - **Command-Line Interface**: Python CLI tool for batch processing and automation
 
 ### Key Features
@@ -73,6 +54,7 @@ Available in two interfaces:
 - **Rich CLI**: Command-line interface with progress indicators
 - **Streamlit Interface**: Modern single-container web app with three-tab interface
 
+
 ## Why This Tool Exists
 
 Molecular tumor boards face significant challenges:
@@ -85,12 +67,6 @@ Molecular tumor boards face significant challenges:
    databases (CIViC, ClinVar, COSMIC), requiring manual synthesis.
 4. **Rapid Evolution**: New trials and approvals constantly change variant
    actionability.
-
-
-
-3. **Prompt Engineering (50%)**: Embedded explicit FDA-approved variant rules directly in the LLM
-   system prompt. This was the most impactful change—the LLM had the evidence but needed explicit
-   domain knowledge to interpret it correctly.
 
 
 ## Disclaimer
@@ -110,7 +86,7 @@ be made by qualified healthcare professionals.
 
 We're actively working on enhancing TumorBoard with additional features:
 
-### 📊 Enhanced Evidence Sources
+### Enhanced Evidence Sources
 
 - **AlphaMissense Integration**: Pathogenicity predictions for missense variants using Google DeepMind's AlphaMissense scores
 - **SpliceAI Annotations**: Splice variant impact predictions to better assess variants affecting RNA splicing
@@ -121,7 +97,7 @@ We're actively working on enhancing TumorBoard with additional features:
 - **TCGA Data**: Real somatic mutation frequency and cancer-type prevalence across 11,000+ tumors to confirm driver status
 
 
-### 🔍 RAG (Retrieval-Augmented Generation)
+### RAG (Retrieval-Augmented Generation)
 
 Enhance evidence gathering with semantic search over domain-specific knowledge:
 
@@ -132,7 +108,7 @@ Enhance evidence gathering with semantic search over domain-specific knowledge:
 
 **Proposed Stack**: ChromaDB/Pinecone + sentence-transformers for embeddings, integrated before LLM assessment
 
-### 🤖 Agentic AI Architecture
+### Agentic AI Architecture
 
 Two-phase multi-agent system mimicking real tumor board dynamics:
 
@@ -141,7 +117,7 @@ Two-phase multi-agent system mimicking real tumor board dynamics:
 
 This debate-based approach reduces LLM overconfidence and provides explainable reasoning. 
 
-### 🧬 Patient-Level Genomic Analysis
+### Patient-Level Genomic Analysis
 
 - **VCF File Upload & Processing**: Direct import of patient VCF (Variant Call Format) files for comprehensive multi-variant analysis
 - **Whole-Exome/Genome Support**: Process entire patient genomic profiles, not just individual variants
@@ -170,8 +146,6 @@ docker compose up --build
 
 # 3. Open http://localhost:8501
 ```
-
-**That's it!** No pip install, no dependencies. Docker handles everything.
 
 ---
 
@@ -269,7 +243,7 @@ Each line is a complete JSON object capturing either:
 - **Research**: Analyze LLM performance patterns and accuracy trends over time
 - **Validation**: Compare decisions against gold standards for benchmarking
 
-**📖 Full Documentation:** See [logging.md](logging.md) for complete details on log format, analysis examples with Python/jq, and best practices.
+**Full Documentation:** See [logging.md](logging.md) for complete details on log format, analysis examples with Python/jq, and best practices.
 
 ## CLI Reference
 
@@ -369,19 +343,19 @@ TumorBoard automatically normalizes variant notations to improve evidence matchi
 
 The system handles multiple variant notation formats for **SNPs and small indels only**:
 
-**✅ Supported - Protein Changes (Missense/Nonsense):**
+**Supported - Protein Changes (Missense/Nonsense):**
 - One-letter amino acid codes: `V600E`, `L858R`, `G12C`
 - Three-letter amino acid codes: `Val600Glu`, `Leu858Arg`, `Gly12Cys`
 - HGVS protein notation: `p.V600E`, `p.Val600Glu`
 - Case-insensitive: `v600e`, `V600E`, `val600glu` all normalize to `V600E`
 
-**✅ Supported - Small Indels:**
+**Supported - Small Indels:**
 - Small deletions: `185delAG`, `6174delT`, `del19`
 - Small insertions: variants containing `ins`
 - Frameshift: `L747fs`, `Q61fs*5`
 - Nonsense: `R248*`, `Q61*`
 
-**❌ Not Supported - Structural Variants:**
+**Not Supported - Structural Variants:**
 - Fusions: `fusion`, `ALK fusion`, `EML4-ALK rearrangement` (will be rejected)
 - Amplifications: `amplification`, `amp`, `overexpression` (will be rejected)
 - Large deletions: `exon 19 deletion` (will be rejected)
