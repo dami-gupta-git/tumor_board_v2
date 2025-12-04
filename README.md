@@ -27,8 +27,11 @@ The result: higher accuracy, transparent debate traces, and reasoning that close
 ```bash
 git clone https://github.com/dami-gupta-git/tumor_board_v2
 cd tumor_board_v2/streamlit
-cp .env.example .env  # Add your API keys
-docker compose up --build  
+cp .env.example .env  
+
+# Add your API keys to .env
+
+docker compose up --build
 
 # Open http://localhost:8501
 ```
