@@ -4,7 +4,7 @@ An LLM-powered cancer variant actionability assessment tool with a built-in vali
 **Current Validation Performance: 70% accuracy | 92% Tier I F1 score**
 
 **TL;DR**:  
-In precision oncology, determining whether a variant identified in a patient’s tumor is clinically “actionable” — i.e., whether an FDA-approved therapy or evidence-based guideline exists for that specific alteration — is a complex, expert-driven process performed by molecular tumor boards.
+In precision oncology, determining whether a variant identified in a patient’s tumor is clinically “actionable” — i.e., whether an FDA-approved therapy or guideline exists for that specific alteration — is a complex process performed by expert molecular tumor boards.
 
 This research tool mimics that decision-making workflow. It aggregates evidence from leading genomic databases (CIViC, ClinVar, COSMIC) and FDA drug-labeling data, then employs large language models to assign standardized AMP/ASCO/CAP actionability tiers (Tier I = strongest evidence for clinical action; Tier IV = benign/likely benign). All reasoning steps and evidence sources are fully logged for transparency and auditability. A separate validation framework benchmarks these assigned tiers against specified expert‑curated “gold‑standard” classifications.  
  
