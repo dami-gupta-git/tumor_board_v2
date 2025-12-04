@@ -4,7 +4,7 @@ An LLM-powered cancer variant actionability assessment tool with a built-in vali
 **Current Validation Performance: 78% accuracy | 92% Tier I F1 score**
 
 **TL;DR**:  
-Molecular tumor boards manually review somatic cancer variants to assign clinical actionability tiers—a time‑consuming process that requires expert panels. This research tool automates that workflow by fetching variant evidence from genomic databases (CIViC, ClinVar, COSMIC) and using LLMs to assign AMP/ASCO/CAP somatic variant tier classifications, mimicking expert judgment. It includes logging of intermediate reasoning steps and evidence sources to support explainability and auditability of decisions made. A separate validation framework benchmarks LLM‑assigned tiers against expert‑curated “gold‑standard” classifications.  
+Molecular tumor boards manually review cancer variants to assign clinical actionability tiers—a time‑consuming process that requires expert panels. This research tool automates that workflow, mimicking expert judgment. It fetches evidence from various sources (CIViC, ClinVar, COSMIC, the FDA), and uses LLMs to assign variant tier classifications (AMP/ASCO/CAP scores). It includes logging of intermediate reasoning steps and evidence sources to support explainability and auditability of decisions made. A separate validation framework benchmarks these assigned tiers against specified expert‑curated “gold‑standard” classifications.  
 **Important** : This tool currently only supports SNPs and small indels.
 
 **NOTE** : This is a research prototype exploring whether LLMs can approximate molecular tumor‑board decision‑making; strictly not for clinical use.
@@ -12,9 +12,9 @@ Molecular tumor boards manually review somatic cancer variants to assign clinica
 
 ### Coming Soon TL;DR – The Real AI Tumor Board
 
-- Full RAG stack (PubMed, ClinicalTrials.gov, NCCN/ESMO guidelines, similar-variant lookup)  
+- Full RAG stack (PubMed, ClinicalTrials.gov, NCCN/ESMO guidelines,..)  
 - New evidence sources: AlphaMissense, SpliceAI, TCGA prevalence, gnomAD filtering  
-- From single-variant → whole patient genome: VCF upload → variant prioritization → comprehensive clinical reports + trial matching  
+- Patient VCF Files. From single-variant → whole patient genome: VCF upload → variant prioritization → comprehensive clinical reports + trial matching  
 - Two-phase agentic architecture:  
   → Collaborative phase: parallel specialized agents (Literature, Pathways, Trials, Guidelines, etc.)  
   → Adversarial phase: Advocate vs. Skeptic debate → Arbiter assigns final tier  
@@ -26,11 +26,11 @@ The result: higher accuracy, transparent debate traces, and reasoning that close
 
 ```bash
 git clone https://github.com/dami-gupta-git/tumor_board_v2
-cd tumor_board_v2/streamlit
+cd tumor_board_v2
 cp .env.example .env  
 
 # Add your API keys to .env
-
+cd streamlit
 docker compose up --build
 
 # Open http://localhost:8501
@@ -48,7 +48,7 @@ See **[Streamlit App Guide](streamlit/README.md)** for full details on the web i
 
 ## Overview
 
-TumorBoard combines clinical evidence from multiple genomic databases (CIViC, ClinVar, COSMIC) and FDA drug approval data. It then uses large language models to approximate expert application of the **AMP/ASCO/CAP 4-tier classification system**.
+TumorBoard models the expert application of the **AMP/ASCO/CAP 4-tier classification system**.
 
 Available in two interfaces:
 - **Streamlit Web App**: Modern single-container web interface
@@ -97,7 +97,7 @@ be made by qualified healthcare professionals.
 AlphaMissense, SpliceAI, gnomAD, TCGA prevalence data, and ClinicalTrials.gov integration.
 
 ### RAG Pipeline
-Vector-indexed PubMed abstracts, clinical trial matching, NCCN/ESMO guideline retrieval, and similar variant lookup for rare mutations.
+Indexed PubMed abstracts, clinical trial matching, NCCN/ESMO guideline retrieval, and variant lookups for rare mutations.
 
 ### Agentic AI Architecture
 Two-phase multi-agent system: collaborative evidence gathering (Literature, Trials, Pathways agents) followed by adversarial debate (Advocate vs Skeptic → Arbiter assigns final tier).
@@ -148,7 +148,7 @@ tumorboard batch benchmarks/sample_batch.json --no-log
 tumorboard validate benchmarks/gold_standard.json --no-log
 ```
 
-**Alternative Models:**
+**Alternative Large Language Models:**
 ```bash
 # Use Anthropic Claude 3 Haiku
 export ANTHROPIC_API_KEY="your-key-here"
@@ -162,8 +162,6 @@ tumorboard assess BRAF V600E --model gemini/gemini-1.5-pro
 export GROQ_API_KEY="your-key-here"
 tumorboard assess BRAF V600E --model groq/llama-3.1-70b-versatile
 ```
-
-**Note:** Claude 3 Opus and Sonnet models require higher-tier Anthropic API access. Claude 3 Haiku is available on all API tiers.
 
 ## LLM Decision Logging
 
@@ -217,7 +215,7 @@ See **[Variant Annotations Details](VARIANT_ANNOTATIONS.md)** for the full list 
 
 ## Configuration
 
-**Models:** OpenAI (gpt-4o-mini validated), Anthropic, Google Gemini, Groq via litellm
+**Models:** OpenAI (gpt-4o-mini), Anthropic, Google Gemini, Groq via litellm
 **Data:** MyVariant.info (CIViC, ClinVar, COSMIC) + FDA openFDA API
 
 
