@@ -86,7 +86,10 @@ Find structurally similar variants with known actionability for novel mutations:
 
 ## Agentic AI Architecture
 
-Two-phase multi-agent system mimicking real tumor board dynamics.
+Two-phase multi-agent system mimicking real tumor board dynamics. 
+
+Semantic embeddings and a knowledge graph that store and retrieve the full history of agent debates for improved 
+reasoning and transparency
 
 ### Collaborative Phase
 Specialized agents gather evidence in parallel into a shared pool:
@@ -173,7 +176,3 @@ Compare variant profiles across multiple patients:
 ## Implementation Timeline
 
 Features are prioritized based on clinical impact and implementation complexity. Check the GitHub issues for current status and contributions welcome.
-
-## Contributing
-
-Interested in contributing to any of these features? See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines, or open an issue to discuss implementation approaches.

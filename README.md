@@ -1,23 +1,28 @@
 # TumorBoard v2
-An LLM-powered cancer variant actionability assessment tool with a built-in validation framework. 
+An AI-powered tool for assessing cancer variant actionability with integrated validation.
 
 **Current Validation Performance: 70% accuracy | 92% Tier I F1 score**
 
 **TL;DR**:  
-In precision oncology, determining whether a variant identified in a patient’s tumor is clinically “actionable” — i.e., whether an FDA-approved therapy or guideline exists for that specific alteration — is a complex process performed by expert molecular tumor boards.
+Precision oncology depends on expert molecular tumor boards to determine whether genetic variants found in 
+tumors are clinically 'actionable'—that is, whether they have associated FDA-approved therapies or clinical 
+guidelines. This is a complex, manual process involving synthesis of evidence from multiple databases.
 
-This research tool mimics that decision-making workflow. It aggregates evidence from leading genomic databases (CIViC, ClinVar, COSMIC) and FDA drug-labeling data, then employs large language models to assign standardized AMP/ASCO/CAP actionability tiers (Tier I = strongest evidence for clinical action; Tier IV = benign/likely benign). All reasoning steps and evidence sources are fully logged for transparency and auditability. A separate validation framework benchmarks these assigned tiers against specified expert‑curated “gold‑standard” classifications.  
- 
-**Important** : This tool currently only supports SNPs and small indels.
+TumorBoard v2 automates and mimics this expert workflow by aggregating evidence from key genomic and drug-labeling 
+databases (CIViC, ClinVar, COSMIC, FDA) and uses large language models (LLMs) to assign standardized 
+AMP/ASCO/CAP tiers indicating clinical actionability levels. All AI decision rationale and evidence sources are 
+fully logged for transparency and auditability. A built-in validation framework benchmarks AI predictions against 
+expert-labeled “gold-standard” variant classifications.
 
-**NOTE** : This is a research prototype exploring whether LLMs can approximate molecular tumor‑board decision‑making; strictly not for clinical use.
+Note: Currently, this tool supports only single nucleotide polymorphisms (SNPs) and small insertions/deletions (indels).  
+It is a research prototype exploring AI-assisted decision-making and is not intended for clinical use.  
 
-
-### Coming Soon TL;DR – The Real AI Tumor Board
-
+**Coming Soon TL;DR – The Real AI Tumor Board**
 - Full RAG stack (PubMed, ClinicalTrials.gov, NCCN/ESMO guidelines,..)  
 - New evidence sources: AlphaMissense, SpliceAI, TCGA prevalence, gnomAD filtering  
-- Patient VCF Files. From single-variant → whole patient genome: VCF upload → variant prioritization → comprehensive clinical reports + trial matching  
+- Patient VCF Files:
+Supports analysis from single variants to whole patient exomes/genomes by uploading VCF files, performing 
+variant prioritization, and generating comprehensive clinical reports with trial matching.
 - Two-phase agentic architecture:  
   → Collaborative phase: parallel specialized agents (Literature, Pathways, Trials, Guidelines, etc.)  
   → Adversarial phase: Advocate vs. Skeptic debate → Arbiter assigns final tier  
@@ -72,14 +77,15 @@ See **[Full Feature List](FEATURES.md)** for variant normalization, functional a
 
 Molecular tumor boards face significant challenges:
 
-1. **Resource Intensive**: Expert panels must manually review variants and apply
-   classification frameworks - a time-consuming process requiring coordinated expertise.
-2. **Coverage Gaps**: Curated databases like CIViC don't cover every variant-tumor
-   combination, especially rare or novel variants.
-3. **Evidence Fragmentation**: Relevant evidence is scattered across multiple
-   databases (CIViC, ClinVar, COSMIC), requiring manual synthesis.
-4. **Rapid Evolution**: New trials and approvals constantly change variant
-   actionability.
+Variant classification for tumor boards is:
+
+1. Resource Intensive: Manual variant review is slow, requiring deep expertise and coordination.
+2. Incomplete: No single database fully covers all variants or tumor contexts.
+3. Fragmented: Evidence is scattered across multiple sources, demanding extensive manual integration.
+4. Rapidly Evolving: Clinical evidence, trials, and approvals constantly change, challenging up-to-date assessments.  
+
+TumorBoard tackles these challenges by automating evidence synthesis and triaging variant actionability with 
+AI, aiming to improve speed, coverage, and transparency.
 
 
 ## Disclaimer
@@ -95,7 +101,7 @@ Molecular tumor boards face significant challenges:
 **This tool is for research purposes only.** Clinical decisions should always
 be made by qualified healthcare professionals.
 
-## Coming Soon
+## Summary Roadmap 
 
 ### Enhanced Evidence Sources
 AlphaMissense, SpliceAI, gnomAD, TCGA prevalence data, and ClinicalTrials.gov integration.
@@ -104,7 +110,11 @@ AlphaMissense, SpliceAI, gnomAD, TCGA prevalence data, and ClinicalTrials.gov in
 Indexed PubMed abstracts, clinical trial matching, NCCN/ESMO guideline retrieval, and variant lookups for rare mutations.
 
 ### Agentic AI Architecture
-Two-phase multi-agent system: collaborative evidence gathering (Literature, Trials, Pathways agents) followed by adversarial debate (Advocate vs Skeptic → Arbiter assigns final tier).
+A two-phase multi-agent system that first performs collaborative evidence gathering through specialized agents 
+(e.g., Literature, Trials, Pathways), followed by an adversarial debate between Advocate and Skeptic agents 
+where an Arbiter assigns the final clinical actionability tier; this process leverages semantic embeddings and a 
+knowledge graph to store and retrieve the complete history of agent debates, enhancing reasoning transparency and 
+accuracy.
 
 ### Patient-Level Analysis
 VCF upload, whole-exome/genome processing, variant prioritization, and comprehensive clinical report generation.
