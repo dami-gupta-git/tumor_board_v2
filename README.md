@@ -21,7 +21,8 @@ This research tool mimics that decision-making workflow. It aggregates evidence 
 - Two-phase agentic architecture:  
   → Collaborative phase: parallel specialized agents (Literature, Pathways, Trials, Guidelines, etc.)  
   → Adversarial phase: Advocate vs. Skeptic debate → Arbiter assigns final tier  
-  → Configurable meta-rules decide who speaks when, when to dig deeper, and when to escalate 
+  → Configurable meta-rules decide who speaks when, when to dig deeper, and when to escalate
+  → Semantic embeddings and a knowledge graph to store and retrieve the history of agent debates.
 
 The result: higher accuracy, transparent debate traces, and reasoning that closely resembles a real multidisciplinary panel.
 
