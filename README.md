@@ -1,17 +1,28 @@
 # TumorBoard v2
 An LLM-powered cancer variant actionability assessment tool with a built-in validation framework. 
 
-This tool currently only support SNPs and small indels.
-
 **Current Validation Performance: 78% accuracy | 92% Tier I F1 score** *(on SNP/indel variants only)*
 
 **TL;DR**:  
-Molecular tumor boards manually review somatic cancer variants to assign clinical actionability tiers—a time‑consuming process that requires expert panels. This research tool automates that workflow by fetching variant evidence from genomic databases (CIViC, ClinVar, COSMIC) and using LLMs to assign AMP/ASCO/CAP somatic variant tier classifications, mimicking expert judgment. It includes  logging of intermediate reasoning steps and evidence sources to support explainability and auditability of decisions made. A separate validation framework benchmarks LLM‑assigned tiers against expert‑curated “gold‑standard” classifications.
+Molecular tumor boards manually review somatic cancer variants to assign clinical actionability tiers—a time‑consuming process that requires expert panels. This research tool automates that workflow by fetching variant evidence from genomic databases (CIViC, ClinVar, COSMIC) and using LLMs to assign AMP/ASCO/CAP somatic variant tier classifications, mimicking expert judgment. It includes logging of intermediate reasoning steps and evidence sources to support explainability and auditability of decisions made. A separate validation framework benchmarks LLM‑assigned tiers against expert‑curated “gold‑standard” classifications.
+**Important** This tool currently only support SNPs and small indels.
 
-Planned: a two-phase agentic architecture 
-Phase I: Collaborative evidence building (data enrichment).
-Phase II: Adversarial tumor‑board–style debate that mimics real MTB dynamics.
+**NOTE** : This is a research prototype exploring whether LLMs can approximate molecular tumor‑board decision‑making; strictly not for clinical use.
 
+
+### Coming Soon TL;DR – The Real AI Tumor Board
+
+
+- Full RAG stack (PubMed, ClinicalTrials.gov, NCCN/ESMO guidelines, similar-variant lookup)  
+- New evidence sources: AlphaMissense, SpliceAI, TCGA prevalence, gnomAD filtering  
+- From single-variant → whole patient genome: VCF upload → variant prioritization → comprehensive clinical reports + trial matching  
+- Two-phase agentic architecture:  
+  → Collaborative phase: parallel specialized agents (Literature, Pathways, Trials, Guidelines, etc.)  
+  → Adversarial phase: Advocate vs. Skeptic debate → Arbiter assigns final tier  
+  → Configurable meta-rules decide who speaks when, when to dig deeper, and when to escalate
+
+Toggle between fast single-LLM mode and full multi-agent tumor board mode.  
+The result: higher accuracy, transparent debate traces, and reasoning that feels like a real multidisciplinary panel.
 This is a research prototype exploring whether LLMs can approximate molecular tumor‑board decision‑making; strictly not for clinical use.
 
 **Note**: This tool is specifically designed for SNPs and small indels (missense, nonsense, insertions, deletions, frameshifts).. Other variant types (fusions, amplifications, splice variants, etc.) are intentionally excluded to maintain focus and accuracy on point mutations.
