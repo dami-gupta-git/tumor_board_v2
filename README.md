@@ -1,7 +1,7 @@
 # TumorBoard v2
 An LLM-powered cancer variant actionability assessment tool with a built-in validation framework. 
 
-**Current Validation Performance: 78% accuracy | 92% Tier I F1 score**
+**Current Validation Performance: 70% accuracy | 92% Tier I F1 score**
 
 **TL;DR**:  
 In precision oncology, determining whether a variant identified in a patient’s tumor is clinically “actionable” — i.e., whether an FDA-approved therapy or evidence-based guideline exists for that specific alteration — is a complex, expert-driven process performed by molecular tumor boards.
