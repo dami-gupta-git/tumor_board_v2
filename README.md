@@ -143,8 +143,8 @@ pip install -e .
 export OPENAI_API_KEY="your-key-here"
 
 # 3. Use CLI commands
-tumorboard assess BRAF V600E --tumor "Melanoma"
-tumorboard batch benchmarks/sample_batch.json
+tumorboard assess BRAF V600E --tumor "Melanoma" --no-log
+tumorboard batch benchmarks/sample_batch.json --no-log
 tumorboard validate benchmarks/gold_standard.json --no-log
 ```
 
