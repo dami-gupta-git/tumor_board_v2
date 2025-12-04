@@ -119,6 +119,9 @@ Debate-based tiering for robust decisions:
    - Weighs arguments from both sides
    - Applies AMP/ASCO/CAP guidelines strictly
    - Provides final tier with confidence and rationale
+   - 
+All reasoning is embedded and stored as evolving edges in a knowledge graph so future queries can “remember” past debates and why decisions changed.
+This will lead to a self-improving clinical decision engine that never repeats the same argument twice.
 
 ### Benefits
 - Reduces LLM overconfidence through adversarial challenge
