@@ -75,6 +75,7 @@ with tab1:
             )
         else:
             tumor = st.text_input("Tumor Type (optional)", value=st.session_state['input_tumor'], help="e.g., Melanoma, Lung Adenocarcinoma", key="tumor_input")
+            st.caption("⚠️ The tumor type should exactly match values from the OncoTree ontology or CIViC database")
 
         model_name = st.selectbox("LLM Model", list(MODELS.keys()))
         temperature = st.slider("Temperature", 0.0, 1.0, 0.1, 0.05)

@@ -24,7 +24,7 @@ http://localhost:8501
 ## Features
 
 ### 🔬 Single Variant Assessment
-- Input gene, variant, and optional tumor type
+- Input gene, variant, and tumor type (The tumor type should exactly match values from the OncoTree ontology or CIViC database)
 - Select LLM model (OpenAI, Anthropic, Google, Groq)
 - Get comprehensive assessment with:
   - AMP/ASCO/CAP tier classification
