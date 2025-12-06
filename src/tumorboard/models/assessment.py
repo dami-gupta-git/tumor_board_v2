@@ -105,6 +105,12 @@ class ActionabilityAssessment(VariantAnnotations):
             annotations.append(f"Effect: {self.snpeff_effect}")
         if self.polyphen2_prediction:
             annotations.append(f"PolyPhen2: {self.polyphen2_prediction}")
+        if self.alphamissense_prediction:
+            am_display = {"P": "Pathogenic", "B": "Benign", "A": "Ambiguous"}.get(
+                self.alphamissense_prediction, self.alphamissense_prediction
+            )
+            score_str = f" ({self.alphamissense_score:.2f})" if self.alphamissense_score else ""
+            annotations.append(f"AlphaMissense: {am_display}{score_str}")
         if self.cadd_score is not None:
             annotations.append(f"CADD: {self.cadd_score:.2f}")
         if self.gnomad_exome_af is not None:

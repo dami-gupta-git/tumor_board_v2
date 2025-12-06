@@ -13,6 +13,7 @@ Key Design:
 """
 
 import asyncio
+import re
 from typing import Any
 
 import httpx
@@ -419,6 +420,27 @@ class MyVariantClient:
             except (ValueError, TypeError):
                 pass
 
+        # Extract AlphaMissense prediction
+        alphamissense_score = None
+        alphamissense_prediction = None
+        if hit.dbnsfp and hit.dbnsfp.alphamissense:
+            am = hit.dbnsfp.alphamissense
+            # Handle score (can be float or list[float])
+            if am.score is not None:
+                try:
+                    if isinstance(am.score, list):
+                        alphamissense_score = float(am.score[0]) if am.score else None
+                    else:
+                        alphamissense_score = float(am.score)
+                except (ValueError, TypeError):
+                    pass
+            # Handle prediction (can be str or list[str])
+            if am.pred is not None:
+                if isinstance(am.pred, list):
+                    alphamissense_prediction = am.pred[0] if am.pred else None
+                else:
+                    alphamissense_prediction = am.pred
+
         # Parse evidence using existing parsers (CIViC, ClinVar, COSMIC)
         civic_evidence = []
         if hit.civic:
@@ -459,6 +481,8 @@ class MyVariantClient:
             polyphen2_prediction=polyphen2_prediction,
             cadd_score=cadd_score,
             gnomad_exome_af=gnomad_exome_af,
+            alphamissense_score=alphamissense_score,
+            alphamissense_prediction=alphamissense_prediction,
             transcript_id=transcript_id,
             transcript_consequence=transcript_consequence,
             civic=civic_evidence,
@@ -637,12 +661,22 @@ class MyVariantClient:
         elif any(kw in variant_clean for kw in ["AMP", "AMPLIFICATION", "OVEREXPRESSION"]):
             mp_names = [f"{gene} AMPLIFICATION"]
         else:
-            # For SNPs/indels: query both specific variant AND gene-level MUTATION
-            # Example: ["IDH1 R132H", "IDH1 MUTATION"] or ["BRAF V600E", "BRAF MUTATION"]
+            # For SNPs/indels: query specific variant, codon-level, AND gene-level MUTATION
+            # Example: ["NRAS Q61K", "NRAS Q61", "NRAS MUTATION"]
+            # CIViC often has evidence at codon level (e.g., Q61 covers Q61K/L/R/H)
             mp_names = [
-                f"{gene} {variant_clean}",  # Specific variant
-                f"{gene} MUTATION"          # Gene-level profile (often has FDA approvals)
+                f"{gene} {variant_clean}",  # Specific variant (e.g., NRAS Q61K)
             ]
+
+            # Extract codon-level variant (e.g., Q61K -> Q61, V600E -> V600)
+            # Pattern: letter + digits + optional letter(s) at end
+            codon_match = re.match(r'^([A-Z])(\d+)[A-Z]*$', variant_clean)
+            if codon_match:
+                codon_variant = f"{codon_match.group(1)}{codon_match.group(2)}"
+                if codon_variant != variant_clean:  # Only add if different
+                    mp_names.append(f"{gene} {codon_variant}")  # Codon level (e.g., NRAS Q61)
+
+            mp_names.append(f"{gene} MUTATION")  # Gene-level profile (often has FDA approvals)
 
         client = self._get_client()
         all_civic_evidence = []
@@ -761,6 +795,7 @@ class MyVariantClient:
             "snpeff",  # SnpEff effect prediction
             "dbnsfp.polyphen2.hdiv.pred",  # PolyPhen2 prediction
             "dbnsfp.cadd.phred",  # CADD phred score
+            "dbnsfp.alphamissense",  # AlphaMissense pathogenicity prediction
             "gnomad_exome.af.af",  # gnomAD exome allele frequency
             "vcf.alt",  # VCF alternative allele
             "vcf.ref",  # VCF reference allele
@@ -819,6 +854,8 @@ class MyVariantClient:
                     polyphen2_prediction=None,
                     cadd_score=None,
                     gnomad_exome_af=None,
+                    alphamissense_score=None,
+                    alphamissense_prediction=None,
                     transcript_id=None,
                     transcript_consequence=None,
                     civic=civic_fallback,  # Use CIViC fallback evidence

@@ -23,6 +23,8 @@ TumorBoard automatically extracts comprehensive variant annotations from MyVaria
 - **PolyPhen2**: Pathogenicity prediction (D=Damaging, P=Possibly damaging, B=Benign)
 - **CADD Score**: Combined Annotation Dependent Depletion score (higher = more deleterious)
 - **gnomAD AF**: Population allele frequency from gnomAD exomes (helps assess rarity)
+- **AlphaMissense Score**: Google DeepMind's pathogenicity score (0-1, higher = more pathogenic)
+- **AlphaMissense Prediction**: Classification (P=Pathogenic, B=Benign, A=Ambiguous)
 
 ## Transcript Information
 

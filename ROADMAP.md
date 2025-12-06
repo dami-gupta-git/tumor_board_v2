@@ -4,11 +4,12 @@ Detailed roadmap for upcoming TumorBoard features and enhancements.
 
 ## Enhanced Evidence Sources
 
-### AlphaMissense Integration
-Pathogenicity predictions for missense variants using Google DeepMind's AlphaMissense scores. This will provide:
-- Pre-computed pathogenicity scores for all possible missense variants
-- Classification into likely benign, ambiguous, or likely pathogenic
-- Integration with existing evidence for more informed tiering
+### AlphaMissense Integration ✅ COMPLETED
+Pathogenicity predictions for missense variants using Google DeepMind's AlphaMissense scores:
+- Pre-computed pathogenicity scores (0-1) for all possible missense variants
+- Classification into Pathogenic, Benign, or Ambiguous
+- Integrated with existing evidence for more informed tiering
+- Available via MyVariant.info dbNSFP annotations
 
 ### SpliceAI Annotations
 Splice variant impact predictions to better assess variants affecting RNA splicing:

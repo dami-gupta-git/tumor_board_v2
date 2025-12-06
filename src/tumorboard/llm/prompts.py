@@ -32,14 +32,21 @@ IMPORTANT: The evidence summary now includes FDA Approved Drugs data. Pay specia
 - FDA approvals provide the strongest evidence for Tier I classification
 - Cross-reference FDA approvals with CIViC evidence for comprehensive assessment
 
-WELL-ESTABLISHED POINT MUTATION RESISTANCE MARKERS (Tier I when applicable):
-- RAS mutations (KRAS/NRAS G12/13/61 etc.) in colorectal cancer → anti-EGFR resistance
-- EGFR T790M, C797S in NSCLC → EGFR TKI resistance
-- ESR1 LBD mutations (Y537S, D538G, etc.) in ER+ breast cancer → endocrine resistance
-- KIT D816V/H/Y in GIST → imatinib resistance
-- BRAF V600E bypass point mutations (NRAS mutations, MEK1 mutations) → BRAF inhibitor resistance
-- PIK3CA mutations conferring resistance to HER2-targeted therapy
-- Any acquired point mutation known to cause resistance to standard targeted therapy
+INTERPRETING CIViC EVIDENCE SIGNIFICANCE:
+The CIViC evidence includes a "Significance" field that is CRITICAL for therapy recommendations:
+- SENSITIVITY or SENSITIVITYRESPONSE → Drug may be effective, can be recommended
+- RESISTANCE → Drug will NOT work, must NEVER be recommended
+- When a drug appears with RESISTANCE significance, it means the variant causes the patient to NOT respond to that drug
+
+CRITICAL RULE FOR THERAPY RECOMMENDATIONS:
+1. ONLY recommend drugs where evidence shows SENSITIVITY/SENSITIVITYRESPONSE
+2. NEVER recommend drugs where evidence shows RESISTANCE - these are contraindicated
+3. If a drug appears in both SENSITIVITY and RESISTANCE contexts, carefully check which applies to the specific tumor type
+
+TIERING FOR RESISTANCE MARKERS:
+- A variant that causes resistance to standard-of-care therapy IS clinically actionable
+- If Level A/B evidence shows RESISTANCE to major therapies AND Level B evidence shows SENSITIVITY to alternative therapies → Tier I or II (not Tier III)
+- The clinical utility is guiding treatment selection, even if it means avoiding certain drugs
 
 TIER I ACTIONABLE POINT MUTATIONS (when criteria met):
 - BRAF V600E/K → dabrafenib + trametinib (melanoma, NSCLC, others)

@@ -98,6 +98,7 @@ class LLMService:
                     'clinvar_clinical_significance', 'clinvar_accession',
                     'hgvs_genomic', 'hgvs_protein', 'hgvs_transcript',
                     'snpeff_effect', 'polyphen2_prediction', 'cadd_score', 'gnomad_exome_af',
+                    'alphamissense_score', 'alphamissense_prediction',
                     'transcript_id', 'transcript_consequence'
                 })
             )

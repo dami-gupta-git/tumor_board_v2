@@ -69,11 +69,20 @@ class CaddData(BaseModel):
     phred: float | str | None = None
 
 
+class AlphaMissenseData(BaseModel):
+    """AlphaMissense pathogenicity prediction data structure."""
+
+    score: float | list[float] | None = None  # Pathogenicity score (0-1)
+    pred: str | list[str] | None = None  # P=pathogenic, B=benign, A=ambiguous
+    rankscore: float | None = None
+
+
 class DbNSFPData(BaseModel):
     """dbNSFP data structure."""
 
     polyphen2: PolyPhen2Data | None = None
     cadd: CaddData | None = None
+    alphamissense: AlphaMissenseData | None = None
 
 
 class GnomadAF(BaseModel):

@@ -10,7 +10,7 @@ Detailed feature documentation for TumorBoard v2.
 - **Evidence Aggregation**: Automatically fetches variant evidence from MyVariant.info API and FDA drug approval data
 - **FDA Drug Approvals**: Fetches FDA-approved oncology drugs with companion diagnostics and biomarker-based indications
 - **Database Identifiers**: Extracts COSMIC, dbSNP, ClinVar, NCBI Gene IDs, and HGVS notations
-- **Functional Annotations**: SnpEff effects, PolyPhen2 predictions, CADD scores, gnomAD frequencies
+- **Functional Annotations**: SnpEff effects, PolyPhen2 predictions, CADD scores, gnomAD frequencies, AlphaMissense pathogenicity
 - **LLM Assessment**: Uses LLMs to interpret evidence and assign actionability tiers
 - **Evidence Prioritization**: Intelligent ranking of PREDICTIVE evidence with tumor-type-specific filtering
 - **Validated Performance**: 73.33% overall accuracy on SNP/indel gold standard dataset

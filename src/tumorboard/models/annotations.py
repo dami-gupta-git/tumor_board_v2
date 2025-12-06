@@ -22,6 +22,8 @@ class VariantAnnotations(BaseModel):
     polyphen2_prediction: str | None = Field(None, description="PolyPhen2 HDIV prediction")
     cadd_score: float | None = Field(None, description="CADD phred score")
     gnomad_exome_af: float | None = Field(None, description="gnomAD exome allele frequency")
+    alphamissense_score: float | None = Field(None, description="AlphaMissense pathogenicity score (0-1)")
+    alphamissense_prediction: str | None = Field(None, description="AlphaMissense prediction (P=pathogenic, B=benign, A=ambiguous)")
 
     # Transcript information
     transcript_id: str | None = Field(None, description="Reference transcript ID")

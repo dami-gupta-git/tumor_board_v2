@@ -93,36 +93,58 @@ class Evidence(VariantAnnotations):
 
             # Filter and prioritize CIViC evidence
             civic_evidence = list(self.civic)
+            tumor_lower = tumor_type.lower() if tumor_type else ""
 
-            # Prioritize PREDICTIVE evidence with drugs, sorted by evidence level
-            predictive_with_drugs = [e for e in civic_evidence
-                                      if e.evidence_type == "PREDICTIVE" and e.drugs]
-            predictive_with_drugs = sorted(predictive_with_drugs, key=evidence_level_key)
-
-            # Then tumor-type-specific evidence if tumor type provided, sorted by evidence level
-            tumor_specific = []
+            # Priority 1: Tumor-specific SENSITIVITY evidence (most actionable for treatment)
+            tumor_sensitivity = []
             if tumor_type:
-                tumor_specific = [e for e in civic_evidence
-                                  if e.disease and tumor_type.lower() in e.disease.lower()
-                                  and e not in predictive_with_drugs]
-                tumor_specific = sorted(tumor_specific, key=evidence_level_key)
+                tumor_sensitivity = [e for e in civic_evidence
+                                     if e.disease and tumor_lower in e.disease.lower()
+                                     and e.evidence_type == "PREDICTIVE"
+                                     and e.clinical_significance
+                                     and "RESISTANCE" not in e.clinical_significance.upper()]
+                tumor_sensitivity = sorted(tumor_sensitivity, key=evidence_level_key)
 
-            # Then other predictive evidence, sorted by evidence level
-            other_predictive = [e for e in civic_evidence
+            # Priority 2: Tumor-specific RESISTANCE evidence (important for avoiding drugs)
+            tumor_resistance = []
+            if tumor_type:
+                tumor_resistance = [e for e in civic_evidence
+                                    if e.disease and tumor_lower in e.disease.lower()
+                                    and e.evidence_type == "PREDICTIVE"
+                                    and e.clinical_significance
+                                    and "RESISTANCE" in e.clinical_significance.upper()
+                                    and e not in tumor_sensitivity]
+                tumor_resistance = sorted(tumor_resistance, key=evidence_level_key)
+
+            # Priority 3: Other PREDICTIVE with drugs and SENSITIVITY
+            other_sensitivity = [e for e in civic_evidence
+                                 if e.evidence_type == "PREDICTIVE" and e.drugs
+                                 and e.clinical_significance
+                                 and "RESISTANCE" not in e.clinical_significance.upper()
+                                 and e not in tumor_sensitivity
+                                 and e not in tumor_resistance]
+            other_sensitivity = sorted(other_sensitivity, key=evidence_level_key)
+
+            # Priority 4: Other RESISTANCE evidence
+            other_resistance = [e for e in civic_evidence
                                 if e.evidence_type == "PREDICTIVE"
-                                and e not in predictive_with_drugs
-                                and e not in tumor_specific]
-            other_predictive = sorted(other_predictive, key=evidence_level_key)
+                                and e.clinical_significance
+                                and "RESISTANCE" in e.clinical_significance.upper()
+                                and e not in tumor_sensitivity
+                                and e not in tumor_resistance
+                                and e not in other_sensitivity]
+            other_resistance = sorted(other_resistance, key=evidence_level_key)
 
-            # Then rest, sorted by evidence level
+            # Priority 5: Remaining evidence
             remaining = [e for e in civic_evidence
-                         if e not in predictive_with_drugs
-                         and e not in tumor_specific
-                         and e not in other_predictive]
+                         if e not in tumor_sensitivity
+                         and e not in tumor_resistance
+                         and e not in other_sensitivity
+                         and e not in other_resistance]
             remaining = sorted(remaining, key=evidence_level_key)
 
             # Combine in priority order
-            prioritized = predictive_with_drugs + tumor_specific + other_predictive + remaining
+            prioritized = tumor_sensitivity + tumor_resistance + other_sensitivity + other_resistance + remaining
 
             lines.append(f"CIViC Evidence ({len(self.civic)} entries, showing top {min(len(prioritized), max_items)}):")
             for idx, ev in enumerate(prioritized[:max_items], 1):

@@ -18,8 +18,8 @@ Note: Currently, this tool supports only single nucleotide polymorphisms (SNPs) 
 It is a research prototype exploring AI-assisted decision-making and is not intended for clinical use.  
 
 **Coming Soon TL;DR – The Real AI Tumor Board**
-- Full RAG stack (PubMed, ClinicalTrials.gov, NCCN/ESMO guidelines,..)  
-- New evidence sources: AlphaMissense, SpliceAI, TCGA prevalence, gnomAD filtering  
+- Full RAG stack (PubMed, ClinicalTrials.gov, NCCN/ESMO guidelines,..)
+- New evidence sources: SpliceAI, TCGA prevalence, ClinicalTrials.gov integration
 - Patient VCF Files:
 Supports analysis from single variants to whole patient exomes/genomes by uploading VCF files, performing 
 variant prioritization, and generating comprehensive clinical reports with trial matching.
@@ -65,8 +65,9 @@ Available in two interfaces:
 
 ### Key Features
 
-- **Evidence Aggregation**: Fetches from CIViC, ClinVar, COSMIC, and FDA drug approvals
+- **Evidence Aggregation**: Fetches from CIViC, ClinVar, COSMIC, FDA drug approvals, and AlphaMissense
 - **LLM Tiering**: Assigns AMP/ASCO/CAP tiers with confidence scores and rationale
+- **Smart Evidence Prioritization**: Surfaces tumor-specific sensitivity evidence first; correctly interprets resistance markers
 - **Validation Framework**: Built-in benchmarking against gold standard datasets
 - **Multi-LLM Support**: OpenAI, Anthropic, Google, Groq via litellm
 
@@ -104,7 +105,7 @@ be made by qualified healthcare professionals.
 ## Summary Roadmap 
 
 ### Enhanced Evidence Sources
-AlphaMissense, SpliceAI, gnomAD, TCGA prevalence data, and ClinicalTrials.gov integration.
+SpliceAI, TCGA prevalence data, and ClinicalTrials.gov integration. AlphaMissense pathogenicity predictions are now integrated.
 
 ### RAG Pipeline
 Indexed PubMed abstracts, clinical trial matching, NCCN/ESMO guideline retrieval, and variant lookups for rare mutations.
@@ -223,7 +224,7 @@ See **[Variant Normalization Details](VARIANT_NORMALIZATION.md)** for supported 
 
 ## Variant Annotations
 
-Extracts COSMIC, dbSNP, ClinVar IDs, HGVS notations, PolyPhen2/CADD scores, gnomAD frequencies, and FDA drug approvals from MyVariant.info.
+Extracts COSMIC, dbSNP, ClinVar IDs, HGVS notations, PolyPhen2/CADD scores, gnomAD frequencies, AlphaMissense pathogenicity predictions, and FDA drug approvals from MyVariant.info.
 
 See **[Variant Annotations Details](VARIANT_ANNOTATIONS.md)** for the full list of extracted fields.
 

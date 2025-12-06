@@ -120,6 +120,14 @@ class FDAClient:
                 return {"results": []}
             raise FDAAPIError(f"HTTP error: {e}")
 
+    # Gene aliases for FDA label search (FDA labels often use different nomenclature)
+    GENE_ALIASES = {
+        "ERBB2": ["HER2"],
+        "HER2": ["ERBB2"],
+        "EGFR": ["HER1"],
+        "ERBB1": ["EGFR", "HER1"],
+    }
+
     async def fetch_drug_approvals(
         self, gene: str, variant: str | None = None
     ) -> list[dict[str, Any]]:
@@ -137,6 +145,12 @@ class FDAClient:
         """
         gene_upper = gene.upper()
         approvals = []
+        seen_drugs = set()  # Track drugs to avoid duplicates
+
+        # Get all gene names to search (primary + aliases)
+        genes_to_search = [gene_upper]
+        if gene_upper in self.GENE_ALIASES:
+            genes_to_search.extend(self.GENE_ALIASES[gene_upper])
 
         try:
             # Clean variant notation
@@ -149,19 +163,27 @@ class FDAClient:
                         variant_clean = variant_clean[2:]
 
             # Strategy 1: Search for gene + variant in indication text (most specific)
+            # Search with all gene aliases
             if variant_clean:
-                # Search for both gene AND variant mentioned together
-                search_query = f'indications_and_usage:({gene_upper} AND {variant_clean})'
-                result = await self._query_drugsfda(search_query, limit=15)
-                if result.get("results"):
-                    approvals.extend(result["results"])
+                for search_gene in genes_to_search:
+                    search_query = f'indications_and_usage:({search_gene} AND {variant_clean})'
+                    result = await self._query_drugsfda(search_query, limit=15)
+                    for r in result.get("results", []):
+                        drug_id = r.get("openfda", {}).get("brand_name", [""])[0]
+                        if drug_id and drug_id not in seen_drugs:
+                            seen_drugs.add(drug_id)
+                            approvals.append(r)
 
             # Strategy 2: If no results, search for just gene in indications
             if not approvals:
-                gene_search = f'indications_and_usage:{gene_upper}'
-                result = await self._query_drugsfda(gene_search, limit=15)
-                if result.get("results"):
-                    approvals.extend(result["results"])
+                for search_gene in genes_to_search:
+                    gene_search = f'indications_and_usage:{search_gene}'
+                    result = await self._query_drugsfda(gene_search, limit=15)
+                    for r in result.get("results", []):
+                        drug_id = r.get("openfda", {}).get("brand_name", [""])[0]
+                        if drug_id and drug_id not in seen_drugs:
+                            seen_drugs.add(drug_id)
+                            approvals.append(r)
 
             # Strategy 3: Known gene-drug mappings as final fallback
             # This ensures major drugs like Tafinlar, Zelboraf are captured
@@ -200,8 +222,8 @@ class FDAClient:
             "KRAS": ["Lumakras", "Krazati"],
             "ALK": ["Xalkori", "Alecensa", "Zykadia"],
             "ROS1": ["Xalkori", "Rozlytrek"],
-            "ERBB2": ["Herceptin", "Enhertu", "Kadcyla"],
-            "HER2": ["Herceptin", "Enhertu", "Kadcyla"],
+            "ERBB2": ["Herceptin", "Enhertu", "Kadcyla", "Tukysa", "Nerlynx"],
+            "HER2": ["Herceptin", "Enhertu", "Kadcyla", "Tukysa", "Nerlynx"],
             "KIT": ["Gleevec", "Sutent"],
             "PDGFRA": ["Gleevec", "Ayvakit"],
             "IDH1": ["Tibsovo"],
