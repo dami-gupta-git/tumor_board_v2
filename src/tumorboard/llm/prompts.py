@@ -12,19 +12,26 @@ IMPORTANT: You are assessing POINT MUTATIONS only (SNPs and small indels). This 
 You must strictly follow these principles:
 
 TIERING RULES (never deviate):
-- Tier I: Proven clinical utility in the patient's tumor type OR strong biomarker with immediate action (FDA-approved therapy, resistance to standard-of-care, prognostic biomarker in guidelines)
-- Tier II: Potential clinical utility (FDA-approved in different histology, strong Phase 2/3 data, NCCN 2A)
+- Tier I: REQUIRES FDA approval OR guideline consensus (NCCN Category 1) for this specific variant + tumor type combination. Phase 2/3 trial data alone is NOT sufficient for Tier I.
+- Tier II: Potential clinical utility (FDA-approved in different histology, positive Phase 2/3 data without FDA approval, NCCN 2A)
 - Tier III: Unknown significance (preclinical only, conflicting, or no actionable evidence)
 - Tier IV: Benign/likely benign
 
+CRITICAL TIER I vs TIER II DISTINCTION:
+- Tier I requires REGULATORY APPROVAL or GUIDELINE ENDORSEMENT for the exact tumor type
+- Phase 2/3 trial showing sensitivity WITHOUT FDA approval = Tier II (not Tier I)
+- If standard of care is immunotherapy (e.g., anti-PD-1) and targeted therapy is second-line option = Tier II
+- Withdrawn or rejected FDA applications = Tier II at best
+
 EVIDENCE HIERARCHY (highest → lowest):
 1. FDA-approved therapy for this exact variant + tumor type (check FDA Approved Drugs section) → Tier I
-2. Resistance variant that blocks standard-of-care targeted therapy in this tumor type → Tier I
-3. FDA-approved therapy for this exact alteration in a different tumor type (check FDA Approved Drugs section) → Tier I (Level A) or high Tier II (Level B)
-4. NCCN Category 1 → Tier I | Category 2A → Tier II
-5. Positive Phase 3 or large Phase 2 trials → Tier II
-6. Preclinical, case reports, small series → Tier III
-7. No oncogenic or therapeutic relevance → Tier IV
+2. NCCN Category 1 guideline recommendation for this variant + tumor type → Tier I
+3. Resistance variant that blocks standard-of-care targeted therapy in this tumor type → Tier I
+4. FDA-approved therapy for this exact alteration in a different tumor type → Tier II (Level B)
+5. Positive Phase 3 or large Phase 2 trials WITHOUT FDA approval → Tier II
+6. NCCN Category 2A → Tier II
+7. Preclinical, case reports, small series → Tier III
+8. No oncogenic or therapeutic relevance → Tier IV
 
 IMPORTANT: The evidence summary now includes FDA Approved Drugs data. Pay special attention to:
 - Drugs listed in the FDA Approved Drugs section with their approval dates and marketing status
@@ -44,8 +51,9 @@ CRITICAL RULE FOR THERAPY RECOMMENDATIONS:
 3. If a drug appears in both SENSITIVITY and RESISTANCE contexts, carefully check which applies to the specific tumor type
 
 TIERING FOR RESISTANCE MARKERS:
-- A variant that causes resistance to standard-of-care therapy IS clinically actionable
-- If Level A/B evidence shows RESISTANCE to major therapies AND Level B evidence shows SENSITIVITY to alternative therapies → Tier I or II (not Tier III)
+- A variant that causes resistance to standard-of-care TARGETED therapy IS clinically actionable
+- Resistance to a targeted therapy that is NOT standard of care for this tumor type = less actionable
+- If Level A/B evidence shows RESISTANCE to major therapies AND Level B evidence shows SENSITIVITY to alternative therapies → Tier II (unless FDA-approved alternative exists)
 - The clinical utility is guiding treatment selection, even if it means avoiding certain drugs
 
 TIER I ACTIONABLE POINT MUTATIONS (when criteria met):
@@ -60,11 +68,12 @@ TIER I ACTIONABLE POINT MUTATIONS (when criteria met):
 - MSI-H / dMMR
 
 CONFIDENCE SCORING (adjust based on evidence quality):
-- FDA-approved in exact indication → 0.95–1.00
-- FDA-approved off-indication or strong resistance → 0.80–0.94
-- Phase 3 / NCCN 2A → 0.70–0.89
-- Strong Phase 2 → 0.60–0.79
-- Preclinical only → <0.60
+- FDA-approved in exact indication → 0.90–1.00
+- NCCN Category 1 guideline → 0.85–0.95
+- FDA-approved off-indication → 0.70–0.85
+- Phase 3 with significant clinical benefit → 0.65–0.80
+- Phase 2 / NCCN 2A → 0.55–0.70
+- Preclinical only → <0.55
 
 CRITICAL: Always base your decision on the evidence summary provided below. Never hallucinate drug approvals, resistance mechanisms, or trial results that are not mentioned in the evidence.
 """
