@@ -7,8 +7,9 @@ Detailed feature documentation for TumorBoard v2.
 - **SNP/Small Indel Focus**: Specialized support for point mutations, small insertions, deletions, and frameshifts
 - **Variant Type Validation**: Automatically validates and rejects unsupported variant types (fusions, amplifications, etc.)
 - **Variant Normalization**: Automatically standardizes variant notations (Val600Glu → V600E, p.V600E → V600E) for better API matching
-- **Evidence Aggregation**: Automatically fetches variant evidence from MyVariant.info API and FDA drug approval data
+- **Evidence Aggregation**: Automatically fetches variant evidence from MyVariant.info API, FDA drug approval data, and CGI biomarkers
 - **FDA Drug Approvals**: Fetches FDA-approved oncology drugs with companion diagnostics and biomarker-based indications
+- **CGI Biomarkers**: Cancer Genome Interpreter biomarkers with explicit FDA/NCCN approval status for accurate Tier I classification
 - **Database Identifiers**: Extracts COSMIC, dbSNP, ClinVar, NCBI Gene IDs, and HGVS notations
 - **Functional Annotations**: SnpEff effects, PolyPhen2 predictions, CADD scores, gnomAD frequencies, AlphaMissense pathogenicity
 - **LLM Assessment**: Uses LLMs to interpret evidence and assign actionability tiers

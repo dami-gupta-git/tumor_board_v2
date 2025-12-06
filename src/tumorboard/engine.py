@@ -1,7 +1,7 @@
 """Core assessment engine combining API and LLM services.
 
 ARCHITECTURE:
-    VariantInput → Normalize → MyVariantClient + FDAClient → Evidence → LLMService → Assessment
+    VariantInput → Normalize → MyVariantClient + FDAClient + CGIClient → Evidence → LLMService → Assessment
 
 Orchestrates the pipeline with async concurrency for single and batch processing.
 
@@ -12,16 +12,18 @@ Key Design:
 - Stateless with no shared state
 - Variant normalization before API calls for better evidence matching
 - FDA drug approval data fetched in parallel with MyVariant data
+- CGI biomarkers provide explicit FDA/NCCN approval status
 """
 
 import asyncio
 from tumorboard.api.myvariant import MyVariantClient
 from tumorboard.api.fda import FDAClient
+from tumorboard.api.cgi import CGIClient
 from tumorboard.api.oncotree import OncoTreeClient
 from tumorboard.llm.service import LLMService
 from tumorboard.models.assessment import ActionabilityAssessment
 from tumorboard.models.variant import VariantInput
-from tumorboard.models.evidence import FDAApproval
+from tumorboard.models.evidence import FDAApproval, CGIBiomarkerEvidence
 from tumorboard.utils import normalize_variant
 
 
@@ -36,6 +38,7 @@ class AssessmentEngine:
     def __init__(self, llm_model: str = "gpt-4o-mini", llm_temperature: float = 0.1, enable_logging: bool = True):
         self.myvariant_client = MyVariantClient()
         self.fda_client = FDAClient()
+        self.cgi_client = CGIClient()
         self.oncotree_client = OncoTreeClient()
         self.llm_service = LLMService(model=llm_model, temperature=llm_temperature, enable_logging=enable_logging)
 
@@ -99,9 +102,9 @@ class AssessmentEngine:
                 print(f"  Warning: OncoTree resolution failed: {str(e)}")
                 resolved_tumor_type = variant_input.tumor_type
 
-        # Step 3: Fetch evidence from MyVariant and FDA APIs in parallel
-        # This improves performance by running both API calls concurrently
-        evidence, fda_approvals_raw = await asyncio.gather(
+        # Step 3: Fetch evidence from MyVariant, FDA, and CGI APIs in parallel
+        # This improves performance by running all API calls concurrently
+        evidence, fda_approvals_raw, cgi_biomarkers_raw = await asyncio.gather(
             self.myvariant_client.fetch_evidence(
                 gene=variant_input.gene,
                 variant=normalized_variant,  # Use normalized variant for API query
@@ -109,6 +112,12 @@ class AssessmentEngine:
             self.fda_client.fetch_drug_approvals(
                 gene=variant_input.gene,
                 variant=normalized_variant,
+            ),
+            asyncio.to_thread(
+                self.cgi_client.fetch_biomarkers,
+                variant_input.gene,
+                normalized_variant,
+                resolved_tumor_type,
             ),
             return_exceptions=True
         )
@@ -128,6 +137,10 @@ class AssessmentEngine:
             print(f"  Warning: FDA API failed: {str(fda_approvals_raw)}")
             fda_approvals_raw = []
 
+        if isinstance(cgi_biomarkers_raw, Exception):
+            print(f"  Warning: CGI biomarkers failed: {str(cgi_biomarkers_raw)}")
+            cgi_biomarkers_raw = []
+
         # Parse FDA approval data and add to evidence
         if fda_approvals_raw:
             fda_approvals = []
@@ -136,6 +149,23 @@ class AssessmentEngine:
                 if parsed:
                     fda_approvals.append(FDAApproval(**parsed))
             evidence.fda_approvals = fda_approvals
+
+        # Add CGI biomarkers to evidence
+        if cgi_biomarkers_raw:
+            cgi_evidence = []
+            for biomarker in cgi_biomarkers_raw:
+                cgi_evidence.append(CGIBiomarkerEvidence(
+                    gene=biomarker.gene,
+                    alteration=biomarker.alteration,
+                    drug=biomarker.drug,
+                    drug_status=biomarker.drug_status,
+                    association=biomarker.association,
+                    evidence_level=biomarker.evidence_level,
+                    source=biomarker.source,
+                    tumor_type=biomarker.tumor_type,
+                    fda_approved=biomarker.is_fda_approved(),
+                ))
+            evidence.cgi_biomarkers = cgi_evidence
 
         # Step 4: Assess with LLM (must run sequentially since it depends on evidence)
         # Use original variant notation for display/reporting

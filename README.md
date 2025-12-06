@@ -65,7 +65,7 @@ Available in two interfaces:
 
 ### Key Features
 
-- **Evidence Aggregation**: Fetches from CIViC, ClinVar, COSMIC, FDA drug approvals, and AlphaMissense
+- **Evidence Aggregation**: Fetches from CIViC, ClinVar, COSMIC, FDA drug approvals, CGI Biomarkers, and AlphaMissense
 - **LLM Tiering**: Assigns AMP/ASCO/CAP tiers with confidence scores and rationale
 - **Smart Evidence Prioritization**: Surfaces tumor-specific sensitivity evidence first; correctly interprets resistance markers
 - **Validation Framework**: Built-in benchmarking against gold standard datasets

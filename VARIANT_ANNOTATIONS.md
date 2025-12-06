@@ -1,6 +1,6 @@
 # Variant Annotations
 
-TumorBoard automatically extracts comprehensive variant annotations from MyVariant.info and FDA drug approval data.
+TumorBoard automatically extracts comprehensive variant annotations from MyVariant.info, FDA drug approval data, and Cancer Genome Interpreter (CGI) biomarkers.
 
 ## Database Identifiers
 
@@ -37,6 +37,19 @@ TumorBoard automatically extracts comprehensive variant annotations from MyVaria
 - **Indications**: Specific cancer indications and biomarker requirements
 - **Approval Dates**: When drugs were approved by FDA
 - **Marketing Status**: Current prescription status
+
+## CGI Biomarkers
+
+Cancer Genome Interpreter (CGI) biomarkers provide curated variant-drug associations with explicit approval status:
+
+- **Drug**: Drug name or combination
+- **Drug Status**: Approval status (Approved, Clinical trial, etc.)
+- **Evidence Level**: Source of evidence (FDA guidelines, NCCN guidelines, Late trials, etc.)
+- **Association**: Drug response (Responsive, Resistant)
+- **Tumor Type**: Cancer type for which the association is valid
+- **FDA Approved**: Boolean indicating FDA/NCCN approval for Tier I classification
+
+CGI biomarkers are particularly useful for variants where FDA labels use generic language (e.g., "uncommon EGFR mutations" rather than listing specific variants like G719S).
 
 ## Where Annotations Appear
 

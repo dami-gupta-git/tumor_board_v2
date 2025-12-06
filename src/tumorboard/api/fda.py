@@ -296,7 +296,7 @@ class FDAClient:
                     "drug_name": brand_name or generic_name,
                     "brand_name": brand_name,
                     "generic_name": generic_name,
-                    "indication": indication_text[:800] if indication_text else None,  # Keep more context
+                    "indication": indication_text[:1800] if indication_text else None,  # Full indication for multi-indication drugs
                     "approval_date": approval_date,  # Not available in label endpoint
                     "marketing_status": marketing_status,
                     "gene": gene,

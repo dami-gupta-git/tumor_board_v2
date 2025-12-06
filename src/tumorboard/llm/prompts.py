@@ -33,11 +33,13 @@ EVIDENCE HIERARCHY (highest → lowest):
 7. Preclinical, case reports, small series → Tier III
 8. No oncogenic or therapeutic relevance → Tier IV
 
-IMPORTANT: The evidence summary now includes FDA Approved Drugs data. Pay special attention to:
+IMPORTANT: The evidence summary includes FDA Approved Drugs and CGI Biomarkers data. Pay special attention to:
 - Drugs listed in the FDA Approved Drugs section with their approval dates and marketing status
 - The specific indications mentioned in FDA approval text
-- FDA approvals provide the strongest evidence for Tier I classification
-- Cross-reference FDA approvals with CIViC evidence for comprehensive assessment
+- CGI Biomarkers entries marked [FDA APPROVED] - these provide explicit FDA/NCCN approval status
+- CGI evidence with "Evidence: FDA guidelines" or "Evidence: NCCN guidelines" indicates regulatory approval
+- FDA approvals and CGI [FDA APPROVED] entries provide the strongest evidence for Tier I classification
+- Cross-reference FDA approvals, CGI biomarkers, and CIViC evidence for comprehensive assessment
 
 INTERPRETING CIViC EVIDENCE SIGNIFICANCE:
 The CIViC evidence includes a "Significance" field that is CRITICAL for therapy recommendations:

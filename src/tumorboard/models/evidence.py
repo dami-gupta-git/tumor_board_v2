@@ -55,6 +55,24 @@ class FDAApproval(BaseModel):
     gene: str | None = None
 
 
+class CGIBiomarkerEvidence(BaseModel):
+    """Evidence from Cancer Genome Interpreter biomarkers database.
+
+    CGI provides curated biomarker-drug associations with explicit
+    FDA/NCCN approval status, complementing FDA label searches.
+    """
+
+    gene: str | None = None
+    alteration: str | None = None
+    drug: str | None = None
+    drug_status: str | None = None  # "Approved", "Clinical trial", etc.
+    association: str | None = None  # "Responsive", "Resistant"
+    evidence_level: str | None = None  # "FDA guidelines", "NCCN guidelines", etc.
+    source: str | None = None
+    tumor_type: str | None = None
+    fda_approved: bool = False
+
+
 class Evidence(VariantAnnotations):
     """Aggregated evidence from multiple sources."""
 
@@ -67,11 +85,12 @@ class Evidence(VariantAnnotations):
     clinvar: list[ClinVarEvidence] = Field(default_factory=list)
     cosmic: list[COSMICEvidence] = Field(default_factory=list)
     fda_approvals: list[FDAApproval] = Field(default_factory=list)
+    cgi_biomarkers: list[CGIBiomarkerEvidence] = Field(default_factory=list)
     raw_data: dict[str, Any] = Field(default_factory=dict)
 
     def has_evidence(self) -> bool:
         """Check if any evidence was found."""
-        return bool(self.civic or self.clinvar or self.cosmic or self.fda_approvals)
+        return bool(self.civic or self.clinvar or self.cosmic or self.fda_approvals or self.cgi_biomarkers)
 
     def summary(self, tumor_type: str | None = None, max_items: int = 15) -> str:
         """Generate a text summary of all evidence.
@@ -191,9 +210,29 @@ class Evidence(VariantAnnotations):
                 if approval.marketing_status:
                     lines.append(f"     Status: {approval.marketing_status}")
                 if approval.indication:
-                    # Truncate long indications
-                    indication = approval.indication[:600] if len(approval.indication) > 600 else approval.indication
+                    # Show full indication text - critical for multi-indication drugs like Tafinlar
+                    # which has ATC approval listed after melanoma/NSCLC indications
+                    indication = approval.indication[:1500] if len(approval.indication) > 1500 else approval.indication
                     lines.append(f"     Indication: {indication}...")
+            lines.append("")
+
+        if self.cgi_biomarkers:
+            # CGI biomarkers provide explicit FDA/NCCN approval status
+            # Prioritize FDA-approved entries
+            approved = [b for b in self.cgi_biomarkers if b.fda_approved]
+            other = [b for b in self.cgi_biomarkers if not b.fda_approved]
+            prioritized = approved + other
+
+            lines.append(f"CGI Biomarkers ({len(self.cgi_biomarkers)} entries):")
+            for idx, biomarker in enumerate(prioritized[:10], 1):
+                status_marker = "[FDA APPROVED]" if biomarker.fda_approved else ""
+                lines.append(f"  {idx}. Drug: {biomarker.drug} {status_marker}")
+                lines.append(f"     Status: {biomarker.drug_status} | Evidence: {biomarker.evidence_level}")
+                lines.append(f"     Association: {biomarker.association}")
+                if biomarker.tumor_type:
+                    lines.append(f"     Tumor Type: {biomarker.tumor_type}")
+                if biomarker.source:
+                    lines.append(f"     Source: {biomarker.source[:200]}...")
             lines.append("")
 
         return "\n".join(lines) if len(lines) > 1 else "No evidence found."
