@@ -170,7 +170,7 @@ class Evidence(VariantAnnotations):
                     lines.append(f"     Status: {approval.marketing_status}")
                 if approval.indication:
                     # Truncate long indications
-                    indication = approval.indication[:200] if len(approval.indication) > 200 else approval.indication
+                    indication = approval.indication[:600] if len(approval.indication) > 600 else approval.indication
                     lines.append(f"     Indication: {indication}...")
             lines.append("")
 
