@@ -1,7 +1,7 @@
 # TumorBoard v2
 An AI-powered tool for assessing cancer variant actionability with integrated validation.
 
-**Current Validation Performance: 70% accuracy | 92% Tier I F1 score**
+**Current Validation Performance: 82% accuracy | 89% Tier I F1 score**
 
 **TL;DR**:  
 Precision oncology depends on expert molecular tumor boards to determine whether genetic variants found in 
