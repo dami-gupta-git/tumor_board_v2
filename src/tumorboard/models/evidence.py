@@ -4,6 +4,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from tumorboard.constants import TUMOR_TYPE_MAPPINGS
 from tumorboard.models.annotations import VariantAnnotations
 
 
@@ -92,6 +93,37 @@ class Evidence(VariantAnnotations):
         """Check if any evidence was found."""
         return bool(self.civic or self.clinvar or self.cosmic or self.fda_approvals or self.cgi_biomarkers)
 
+    @staticmethod
+    def _tumor_matches(tumor_type: str | None, disease: str | None) -> bool:
+        """Check if tumor type matches disease using flexible matching.
+
+        Args:
+            tumor_type: User-provided tumor type (e.g., 'CRC', 'NSCLC')
+            disease: Disease from evidence database (e.g., 'Colorectal Cancer')
+
+        Returns:
+            True if they match
+        """
+        if not tumor_type or not disease:
+            return False
+
+        tumor_lower = tumor_type.lower().strip()
+        disease_lower = disease.lower().strip()
+
+        # Direct substring match
+        if tumor_lower in disease_lower or disease_lower in tumor_lower:
+            return True
+
+        # Check tumor type mappings
+        for abbrev, full_names in TUMOR_TYPE_MAPPINGS.items():
+            # If user's tumor_type matches an abbreviation or full name
+            if tumor_lower == abbrev or any(tumor_lower in name for name in full_names):
+                # Check if disease matches any of the full names
+                if any(name in disease_lower for name in full_names):
+                    return True
+
+        return False
+
     def summary(self, tumor_type: str | None = None, max_items: int = 15) -> str:
         """Generate a text summary of all evidence.
 
@@ -112,13 +144,12 @@ class Evidence(VariantAnnotations):
 
             # Filter and prioritize CIViC evidence
             civic_evidence = list(self.civic)
-            tumor_lower = tumor_type.lower() if tumor_type else ""
 
             # Priority 1: Tumor-specific SENSITIVITY evidence (most actionable for treatment)
             tumor_sensitivity = []
             if tumor_type:
                 tumor_sensitivity = [e for e in civic_evidence
-                                     if e.disease and tumor_lower in e.disease.lower()
+                                     if self._tumor_matches(tumor_type, e.disease)
                                      and e.evidence_type == "PREDICTIVE"
                                      and e.clinical_significance
                                      and "RESISTANCE" not in e.clinical_significance.upper()]
@@ -128,7 +159,7 @@ class Evidence(VariantAnnotations):
             tumor_resistance = []
             if tumor_type:
                 tumor_resistance = [e for e in civic_evidence
-                                    if e.disease and tumor_lower in e.disease.lower()
+                                    if self._tumor_matches(tumor_type, e.disease)
                                     and e.evidence_type == "PREDICTIVE"
                                     and e.clinical_significance
                                     and "RESISTANCE" in e.clinical_significance.upper()
@@ -163,7 +194,24 @@ class Evidence(VariantAnnotations):
             remaining = sorted(remaining, key=evidence_level_key)
 
             # Combine in priority order
-            prioritized = tumor_sensitivity + tumor_resistance + other_sensitivity + other_resistance + remaining
+            # CRITICAL: Interleave sensitivity and resistance to ensure both are represented
+            # Take top entries from each category proportionally
+            max_per_category = max(max_items // 3, 3)  # At least 3 per major category
+
+            prioritized = []
+            # Add tumor-specific entries (interleaved)
+            for i in range(max(len(tumor_sensitivity), len(tumor_resistance))):
+                if i < len(tumor_sensitivity):
+                    prioritized.append(tumor_sensitivity[i])
+                if i < len(tumor_resistance):
+                    prioritized.append(tumor_resistance[i])
+
+            # Then add other sensitivity
+            prioritized.extend(other_sensitivity[:max_per_category])
+            # Then other resistance
+            prioritized.extend(other_resistance[:max_per_category])
+            # Then remaining
+            prioritized.extend(remaining[:max_per_category])
 
             lines.append(f"CIViC Evidence ({len(self.civic)} entries, showing top {min(len(prioritized), max_items)}):")
             for idx, ev in enumerate(prioritized[:max_items], 1):

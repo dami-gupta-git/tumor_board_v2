@@ -35,7 +35,7 @@ class AssessmentEngine:
     significantly improving performance for batch assessments.
     """
 
-    def __init__(self, llm_model: str = "gpt-4o-mini", llm_temperature: float = 0.1, enable_logging: bool = True):
+    def __init__(self, llm_model: str = "gpt-4o", llm_temperature: float = 0.1, enable_logging: bool = True):
         self.myvariant_client = MyVariantClient()
         self.fda_client = FDAClient()
         self.cgi_client = CGIClient()

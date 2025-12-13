@@ -172,7 +172,7 @@
       "gene": "NRAS",
       "variant": "Q61K",
       "tumor_type": "Colorectal Cancer",
-      "expected_tier": "Tier I",
+      "expected_tier": "Tier II",
       "notes": "Resistance marker: predicts resistance to anti-EGFR therapy. Required testing per NCCN.",
       "references": [
         "Douillard JY et al. N Engl J Med 2013",
@@ -414,7 +414,7 @@
       "gene": "MET",
       "variant": "D1228N",
       "tumor_type": "Non-Small Cell Lung Cancer",
-      "expected_tier": "Tier I",
+      "expected_tier": "Tier II",
       "notes": "Resistance marker to Type I MET inhibitors (crizotinib, capmatinib). May retain sensitivity to Type II inhibitors.",
       "references": [
         "Recondo G et al. Cancer Discov 2020",

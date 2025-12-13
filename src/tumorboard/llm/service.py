@@ -11,7 +11,7 @@ from tumorboard.utils.logging_config import get_logger
 class LLMService:
     """High-accuracy LLM service for somatic variant actionability (88–92% agreement)."""
 
-    def __init__(self, model: str = "gpt-4o-mini", temperature: float = 0.0, enable_logging: bool = True):
+    def __init__(self, model: str = "gpt-4o", temperature: float = 0.0, enable_logging: bool = True):
         self.model = model
         # ↓↓↓ CRITICAL: temperature=0.0 → deterministic, no hallucinations
         self.temperature = temperature
