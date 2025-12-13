@@ -72,26 +72,36 @@ CRITICAL: OFF-LABEL USE REQUIRES FDA APPROVAL IN SOME INDICATION:
   - NO (only trial data, no FDA approval for this biomarker) → Tier III
 
 TIER I CRITERIA (strict):
-- FDA-approved therapy for this exact variant + tumor type, OR
+- FDA-approved FIRST-LINE therapy for this exact variant + tumor type, OR
 - NCCN Category 1 or strong guideline consensus for this variant + tumor type, OR
 - Well-established resistance marker that directly blocks standard-of-care therapy in this tumor type
 
 TIER II CRITERIA (must meet at least one):
+- FDA-approved therapy for this variant + tumor type but LATER-LINE or RESTRICTED indication (e.g., "after prior therapy", "after progression"), OR
 - FDA-approved therapy in a DIFFERENT tumor type that can be used off-label, OR
 - Resistance to a therapy that IS standard-of-care in this tumor type, OR
 - Strong guideline support (NCCN Category 2A or equivalent) recommending a specific therapy
 
+CRITICAL: FIRST-LINE vs LATER-LINE FDA APPROVALS:
+- Tier I requires the FDA approval to be applicable as FIRST-LINE or UNIVERSAL treatment in the tumor type.
+- If the FDA label specifies "after prior therapy", "second-line", "after progression", or similar restrictions, this is Tier II, NOT Tier I.
+- If the FDA approval is under "accelerated approval" pending confirmatory trials, this is Tier II, NOT Tier I.
+- Example: BRAF V600E in colorectal cancer - encorafenib+cetuximab is FDA-approved but ONLY for later-line use ("after prior therapy") or under accelerated approval → Tier II (not Tier I).
+- Example: BRAF V600E in melanoma - dabrafenib+trametinib is FDA-approved as first-line with full approval → Tier I.
+- Read the FDA indication text carefully to determine if the approval is first-line or later-line, and whether it's full approval or accelerated approval.
+
 EVIDENCE HIERARCHY (highest → lowest):
-1. FDA-approved therapy for this exact variant + tumor type → Tier I
+1. FDA-approved FIRST-LINE therapy for this exact variant + tumor type → Tier I
 2. NCCN Category 1 / strong guideline consensus in this tumor type → Tier I
 3. Resistance to standard-of-care targeted therapy in this tumor type → Tier I
-4. FDA-approved therapy in a different tumor type WITH clinically plausible off-label use → Tier II
-5. NCCN Category 2A or equivalent guideline support for specific therapy → Tier II
-6. FDA-approved therapy in a different tumor type but NOT clinically transferable (e.g., tumor-specific combinations) → Tier III
-7. Resistance to therapy that is NOT standard-of-care → Tier III (informative only)
-8. Phase 2/3 trials WITHOUT FDA approval AND without guideline support → Tier III
-9. Preclinical data, case reports, emerging evidence → Tier III
-10. No oncogenic, therapeutic, or prognostic relevance → Tier IV
+4. FDA-approved LATER-LINE therapy for this exact variant + tumor type → Tier II
+5. FDA-approved therapy in a different tumor type WITH clinically plausible off-label use → Tier II
+6. NCCN Category 2A or equivalent guideline support for specific therapy → Tier II
+7. FDA-approved therapy in a different tumor type but NOT clinically transferable (e.g., tumor-specific combinations) → Tier III
+8. Resistance to therapy that is NOT standard-of-care → Tier III (informative only)
+9. Phase 2/3 trials WITHOUT FDA approval AND without guideline support → Tier III
+10. Preclinical data, case reports, emerging evidence → Tier III
+11. No oncogenic, therapeutic, or prognostic relevance → Tier IV
 
 IMPORTANT: The evidence summary includes FDA Approved Drugs, CIViC, OncoKB/CGI Biomarkers, and other annotations. Pay special attention to:
 - Drugs listed in the FDA Approved Drugs section with their approval dates and indication texts.

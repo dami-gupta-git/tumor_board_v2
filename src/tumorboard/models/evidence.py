@@ -55,6 +55,144 @@ class FDAApproval(BaseModel):
     marketing_status: str | None = None
     gene: str | None = None
 
+    def parse_indication_for_tumor(self, tumor_type: str) -> dict:
+        """Parse FDA indication text to extract line-of-therapy and approval type for a specific tumor.
+
+        Returns dict with:
+        - tumor_match: bool - whether indication mentions this tumor type
+        - line_of_therapy: 'first-line' | 'later-line' | 'unspecified'
+        - approval_type: 'full' | 'accelerated' | 'unspecified'
+        - indication_excerpt: str - relevant excerpt from indication text
+        """
+        if not self.indication or not tumor_type:
+            return {
+                'tumor_match': False,
+                'line_of_therapy': 'unspecified',
+                'approval_type': 'unspecified',
+                'indication_excerpt': ''
+            }
+
+        indication_lower = self.indication.lower()
+        tumor_lower = tumor_type.lower()
+
+        # Check for tumor type match (flexible matching)
+        tumor_keywords = {
+            'colorectal': ['colorectal', 'colon', 'rectal', 'crc', 'mcrc'],
+            'melanoma': ['melanoma'],
+            'lung': ['lung', 'nsclc', 'non-small cell'],
+            'breast': ['breast'],
+            'thyroid': ['thyroid', 'atc', 'anaplastic thyroid'],
+        }
+
+        tumor_match = False
+        matched_section = ""
+
+        # Find which tumor keywords to use
+        tumor_keys = []
+        for key, keywords in tumor_keywords.items():
+            if any(kw in tumor_lower for kw in keywords):
+                tumor_keys = keywords
+                break
+        if not tumor_keys:
+            tumor_keys = [tumor_lower]
+
+        # Find the relevant section of the indication
+        # Need to capture the FULL tumor-specific section, not just first 500 chars
+        for kw in tumor_keys:
+            if kw in indication_lower:
+                tumor_match = True
+                # Extract a larger window to capture all indications for this tumor
+                idx = indication_lower.find(kw)
+                start = max(0, idx - 50)
+                # Look for next major section (other tumor types) to find end
+                # Use section headers that clearly indicate a new tumor type
+                next_section_markers = [
+                    'non-small cell lung cancer',
+                    'nsclc)',  # Parenthetical NSCLC
+                    'melanoma •',
+                    'breast cancer',
+                    'thyroid cancer',
+                    'limitations of use',
+                    '1.1 braf',  # Next numbered section
+                    '1.2 braf',
+                    '1.3 braf',
+                    '1.4 ',
+                ]
+                end = len(self.indication)
+                for next_sec in next_section_markers:
+                    next_idx = indication_lower.find(next_sec, idx + len(kw) + 100)
+                    if next_idx > idx and next_idx < end:
+                        end = next_idx
+                matched_section = self.indication[start:end]
+                break
+
+        if not tumor_match:
+            return {
+                'tumor_match': False,
+                'line_of_therapy': 'unspecified',
+                'approval_type': 'unspecified',
+                'indication_excerpt': ''
+            }
+
+        # Determine line of therapy
+        later_line_phrases = [
+            'after prior therapy',
+            'after progression',
+            'second-line',
+            'second line',
+            'third-line',
+            'third line',
+            'previously treated',
+            'refractory',
+            'who have failed',
+            'after failure',
+            'following prior',
+        ]
+
+        first_line_phrases = [
+            'first-line',
+            'first line',
+            'frontline',
+            'initial treatment',
+            'treatment-naive',
+            'previously untreated',
+        ]
+
+        matched_lower = matched_section.lower()
+        line_of_therapy = 'unspecified'
+
+        for phrase in later_line_phrases:
+            if phrase in matched_lower:
+                line_of_therapy = 'later-line'
+                break
+
+        if line_of_therapy == 'unspecified':
+            for phrase in first_line_phrases:
+                if phrase in matched_lower:
+                    line_of_therapy = 'first-line'
+                    break
+
+        # Determine approval type
+        approval_type = 'full'
+        accelerated_phrases = [
+            'accelerated approval',
+            'approved under accelerated',
+            'contingent upon verification',
+            'confirmatory trial',
+        ]
+
+        for phrase in accelerated_phrases:
+            if phrase in matched_lower:
+                approval_type = 'accelerated'
+                break
+
+        return {
+            'tumor_match': True,
+            'line_of_therapy': line_of_therapy,
+            'approval_type': approval_type,
+            'indication_excerpt': matched_section[:300]
+        }
+
 
 class CGIBiomarkerEvidence(BaseModel):
     """Evidence from Cancer Genome Interpreter biomarkers database.
@@ -464,8 +602,26 @@ class Evidence(VariantAnnotations):
             lines.append(f"FDA Approved Drugs ({len(self.fda_approvals)}):")
             for approval in self.fda_approvals[:5]:
                 drug = approval.brand_name or approval.generic_name or approval.drug_name
-                indication = (approval.indication or "")[:200]
-                lines.append(f"  • {drug}: {indication}...")
+
+                # Parse indication for tumor-specific metadata
+                if tumor_type:
+                    parsed = approval.parse_indication_for_tumor(tumor_type)
+                    if parsed['tumor_match']:
+                        # Show structured metadata for this tumor type
+                        line_info = parsed['line_of_therapy'].upper()
+                        approval_info = parsed['approval_type'].upper()
+                        lines.append(f"  • {drug} [FOR {tumor_type.upper()}]:")
+                        lines.append(f"      Line of therapy: {line_info}")
+                        lines.append(f"      Approval type: {approval_info}")
+                        lines.append(f"      Excerpt: {parsed['indication_excerpt'][:200]}...")
+                    else:
+                        # Drug approved but not for this tumor type
+                        indication = (approval.indication or "")[:300]
+                        lines.append(f"  • {drug} [OTHER INDICATIONS]: {indication}...")
+                else:
+                    # No tumor type specified, show raw indication
+                    indication = (approval.indication or "")[:800]
+                    lines.append(f"  • {drug}: {indication}...")
             lines.append("")
 
         if self.cgi_biomarkers:

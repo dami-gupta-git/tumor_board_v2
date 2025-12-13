@@ -40,7 +40,7 @@
       "gene": "BRAF",
       "variant": "V600E",
       "tumor_type": "Colorectal Cancer",
-      "expected_tier": "Tier I",
+      "expected_tier": "Tier II",
       "notes": "FDA-approved: encorafenib+cetuximab for BRAF V600E mCRC (2020)",
       "references": [
         "FDA approval April 2020",
