@@ -250,6 +250,73 @@ INTERPRETING CIViC/CGI/OncoKB EVIDENCE SIGNIFICANCE:
 
 ---
 
+### 12. Low-Quality Minority Signal Filtering
+
+**Location:** `src/tumorboard/models/evidence.py` - `filter_low_quality_minority_signals()`
+
+**Current Approach:** Filter out low-quality minority signals from VICC evidence before showing to LLM.
+
+```python
+def filter_low_quality_minority_signals(self) -> tuple[list[VICCEvidence], list[VICCEvidence]]:
+    """Filter out low-quality minority signals from VICC evidence.
+
+    If we have Level A/B sensitivity evidence and only Level C/D resistance,
+    the resistance is likely noise from case reports and should be filtered.
+    """
+    # If high-quality sensitivity (A/B) and low-quality resistance (C/D only, <=2 entries):
+    #   → Drop the resistance entries
+    # If high-quality resistance (A/B) and low-quality sensitivity (C/D only, <=2 entries):
+    #   → Drop the sensitivity entries
+    # Otherwise keep both
+```
+
+**Rationale:**
+- Level C/D evidence is case reports and preclinical data
+- A single Level C resistance entry shouldn't override Level A sensitivity
+- Threshold of ≤2 entries prevents filtering real signals that have multiple sources
+
+**Safety Valve:** If there are 3+ low-quality minority entries, they're kept since multiple sources might indicate a real signal.
+
+---
+
+### 13. Drug-Level Evidence Aggregation
+
+**Location:** `src/tumorboard/models/evidence.py` - `aggregate_evidence_by_drug()` and `format_drug_aggregation_summary()`
+
+**Current Approach:** Aggregate multiple evidence entries per drug into a single summary line.
+
+**Before (5 entries):**
+```
+1. Erlotinib [SENSITIVITY] Level B - NSCLC
+2. Erlotinib [SENSITIVITY] Level C - NSCLC
+3. Erlotinib [SENSITIVITY] Level C - lung adenocarcinoma
+4. Erlotinib [RESISTANCE] Level C - lung cancer
+5. Gefitinib [SENSITIVITY] Level A - NSCLC
+```
+
+**After (2 aggregated lines):**
+```
+DRUG-LEVEL SUMMARY:
+1. Erlotinib: 3 sens (B:1, C:2), 1 res (C:1) → SENSITIVE [Level B]
+2. Gefitinib: 1 sens (A:1), 0 res → SENSITIVE [Level A]
+```
+
+**Net Signal Rules:**
+- Sensitivity only → `SENSITIVE`
+- Resistance only → `RESISTANT`
+- 3:1 ratio favoring sensitivity → `SENSITIVE`
+- 3:1 ratio favoring resistance → `RESISTANT`
+- Otherwise → `MIXED`
+
+**Rationale:**
+- Reduces cognitive load on LLM from parsing many repetitive entries
+- Makes the overall signal clearer at a glance
+- Best evidence level (A > B > C > D) shown for drug prioritization
+
+**Integration:** Called in `src/tumorboard/llm/service.py` and included between the evidence header and detailed evidence.
+
+---
+
 ## Open Issues
 
 1. ~~**Mixed evidence weighting**~~ - ADDRESSED: Pre-processing now computes stats and dominant signal (Decision #1)

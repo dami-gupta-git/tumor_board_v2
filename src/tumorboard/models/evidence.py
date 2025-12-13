@@ -299,6 +299,191 @@ class Evidence(VariantAnnotations):
 
         return "\n".join(lines)
 
+    def filter_low_quality_minority_signals(self) -> tuple[list["VICCEvidence"], list["VICCEvidence"]]:
+        """Filter out low-quality minority signals from VICC evidence.
+
+        If we have Level A/B sensitivity evidence and only Level C/D resistance,
+        the resistance is likely noise from case reports and should be filtered.
+        Similarly, if we have Level A/B resistance and only Level C/D sensitivity.
+
+        Returns:
+            Tuple of (filtered_sensitivity, filtered_resistance) VICC entries
+        """
+        sensitivity = [e for e in self.vicc if e.is_sensitivity]
+        resistance = [e for e in self.vicc if e.is_resistance]
+
+        # Check evidence quality levels
+        high_quality_levels = {'A', 'B'}
+        low_quality_levels = {'C', 'D'}
+
+        sens_levels = {e.evidence_level for e in sensitivity if e.evidence_level}
+        res_levels = {e.evidence_level for e in resistance if e.evidence_level}
+
+        sens_has_high = bool(sens_levels & high_quality_levels)
+        sens_only_low = sens_levels and sens_levels <= low_quality_levels
+        res_has_high = bool(res_levels & high_quality_levels)
+        res_only_low = res_levels and res_levels <= low_quality_levels
+
+        # Filter out low-quality minority signals
+        if sens_has_high and res_only_low and len(resistance) <= 2:
+            # Strong sensitivity, weak resistance - drop resistance
+            return sensitivity, []
+        elif res_has_high and sens_only_low and len(sensitivity) <= 2:
+            # Strong resistance, weak sensitivity - drop sensitivity
+            return [], resistance
+
+        return sensitivity, resistance
+
+    def aggregate_evidence_by_drug(self, tumor_type: str | None = None) -> list[dict]:
+        """Aggregate evidence entries by drug for cleaner LLM presentation.
+
+        Instead of showing 5 separate Erlotinib entries, show:
+        "Erlotinib: 4 sensitivity (A:1, B:2, C:1), 1 resistance (C:1) → net: SENSITIVE"
+
+        Returns:
+            List of drug aggregation dicts with keys:
+            - drug: drug name
+            - sensitivity_count, resistance_count
+            - sensitivity_levels, resistance_levels (dict of level -> count)
+            - diseases: list of unique diseases
+            - net_signal: 'SENSITIVE', 'RESISTANT', or 'MIXED'
+            - best_level: highest evidence level (A > B > C > D)
+        """
+        drug_data: dict[str, dict] = {}
+
+        def add_entry(drug: str, is_sens: bool, level: str | None, disease: str | None):
+            drug_key = drug.lower().strip()
+            if drug_key not in drug_data:
+                drug_data[drug_key] = {
+                    'drug': drug,
+                    'sensitivity_count': 0,
+                    'resistance_count': 0,
+                    'sensitivity_levels': {},
+                    'resistance_levels': {},
+                    'diseases': set(),
+                    'best_level': 'D',
+                }
+            entry = drug_data[drug_key]
+            if is_sens:
+                entry['sensitivity_count'] += 1
+                lvl = level or 'Unknown'
+                entry['sensitivity_levels'][lvl] = entry['sensitivity_levels'].get(lvl, 0) + 1
+            else:
+                entry['resistance_count'] += 1
+                lvl = level or 'Unknown'
+                entry['resistance_levels'][lvl] = entry['resistance_levels'].get(lvl, 0) + 1
+            if disease:
+                entry['diseases'].add(disease[:50])  # Truncate long disease names
+            # Update best level
+            level_priority = {'A': 0, 'B': 1, 'C': 2, 'D': 3}
+            if level and level_priority.get(level, 99) < level_priority.get(entry['best_level'], 99):
+                entry['best_level'] = level
+
+        # Process VICC evidence
+        for ev in self.vicc:
+            for drug in ev.drugs:
+                add_entry(drug, ev.is_sensitivity, ev.evidence_level, ev.disease)
+
+        # Process CIViC evidence
+        for ev in self.civic:
+            if ev.evidence_type != "PREDICTIVE":
+                continue
+            sig = (ev.clinical_significance or '').upper()
+            is_sens = 'SENSITIVITY' in sig or 'RESPONSE' in sig
+            is_res = 'RESISTANCE' in sig
+            if not is_sens and not is_res:
+                continue
+            for drug in ev.drugs:
+                add_entry(drug, is_sens, ev.evidence_level, ev.disease)
+
+        # Calculate net signal for each drug
+        results = []
+        for drug_key, data in drug_data.items():
+            sens = data['sensitivity_count']
+            res = data['resistance_count']
+            if sens > 0 and res == 0:
+                net_signal = 'SENSITIVE'
+            elif res > 0 and sens == 0:
+                net_signal = 'RESISTANT'
+            elif sens >= res * 3:  # 3:1 ratio = clearly sensitive
+                net_signal = 'SENSITIVE'
+            elif res >= sens * 3:  # 3:1 ratio = clearly resistant
+                net_signal = 'RESISTANT'
+            else:
+                net_signal = 'MIXED'
+
+            data['net_signal'] = net_signal
+            data['diseases'] = list(data['diseases'])[:5]  # Convert to list, limit to 5
+            results.append(data)
+
+        # Sort by best evidence level, then by total entries
+        level_priority = {'A': 0, 'B': 1, 'C': 2, 'D': 3}
+        results.sort(key=lambda x: (level_priority.get(x['best_level'], 99), -(x['sensitivity_count'] + x['resistance_count'])))
+
+        return results
+
+    def format_drug_aggregation_summary(self, tumor_type: str | None = None) -> str:
+        """Format drug-level aggregation for LLM prompt.
+
+        Returns a concise summary like:
+        DRUG-LEVEL SUMMARY:
+        1. Vemurafenib: 5 sens (A:2, B:3), 0 res → SENSITIVE [Level A]
+        2. Erlotinib: 3 sens (B:2, C:1), 2 res (C:2) → MIXED [Level B]
+        """
+        aggregated = self.aggregate_evidence_by_drug(tumor_type)
+        if not aggregated:
+            return ""
+
+        lines = ["", "DRUG-LEVEL SUMMARY (aggregated from all sources):"]
+
+        for idx, drug in enumerate(aggregated[:10], 1):  # Top 10 drugs
+            sens_str = f"{drug['sensitivity_count']} sens"
+            if drug['sensitivity_levels']:
+                levels = ', '.join(f"{k}:{v}" for k, v in sorted(drug['sensitivity_levels'].items()))
+                sens_str += f" ({levels})"
+
+            res_str = f"{drug['resistance_count']} res"
+            if drug['resistance_levels']:
+                levels = ', '.join(f"{k}:{v}" for k, v in sorted(drug['resistance_levels'].items()))
+                res_str += f" ({levels})"
+
+            lines.append(f"  {idx}. {drug['drug']}: {sens_str}, {res_str} → {drug['net_signal']} [Level {drug['best_level']}]")
+
+        lines.append("")
+        return "\n".join(lines)
+
+    def summary_compact(self, tumor_type: str | None = None) -> str:
+        """Generate a compact summary - FDA approvals and CGI only (no verbose VICC/CIViC).
+
+        Used when drug aggregation summary is provided separately.
+        This reduces prompt size by ~50-70% while keeping tier-critical info.
+        """
+        lines = [f"Evidence for {self.gene} {self.variant}:\n"]
+
+        if self.fda_approvals:
+            lines.append(f"FDA Approved Drugs ({len(self.fda_approvals)}):")
+            for approval in self.fda_approvals[:5]:
+                drug = approval.brand_name or approval.generic_name or approval.drug_name
+                indication = (approval.indication or "")[:200]
+                lines.append(f"  • {drug}: {indication}...")
+            lines.append("")
+
+        if self.cgi_biomarkers:
+            approved = [b for b in self.cgi_biomarkers if b.fda_approved]
+            if approved:
+                lines.append(f"CGI FDA-Approved Biomarkers ({len(approved)}):")
+                for b in approved[:5]:
+                    lines.append(f"  • {b.drug} [{b.association}] in {b.tumor_type or 'solid tumors'}")
+                lines.append("")
+
+        if self.clinvar:
+            sig = self.clinvar[0].clinical_significance if self.clinvar else None
+            if sig:
+                lines.append(f"ClinVar: {sig}")
+                lines.append("")
+
+        return "\n".join(lines) if len(lines) > 1 else ""
+
     def summary(self, tumor_type: str | None = None, max_items: int = 15) -> str:
         """Generate a text summary of all evidence.
 

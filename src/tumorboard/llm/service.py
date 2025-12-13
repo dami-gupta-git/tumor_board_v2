@@ -30,11 +30,16 @@ class LLMService:
         # Pre-processed summary header with stats and conflict detection
         evidence_header = evidence.format_evidence_summary_header(tumor_type=tumor_type)
 
-        # Rich evidence summary (your existing logic is perfect)
-        evidence_details = evidence.summary(tumor_type=tumor_type, max_items=10)
+        # Drug-level aggregation REPLACES detailed VICC/CIViC when we have many entries
+        # This significantly reduces prompt size while preserving key information
+        drug_summary = evidence.format_drug_aggregation_summary(tumor_type=tumor_type)
 
-        # Combine header + details
-        evidence_summary = evidence_header + evidence_details
+        # Only include detailed evidence for FDA approvals and CGI biomarkers
+        # (these are compact and contain critical tier-determining info)
+        evidence_details = evidence.summary_compact(tumor_type=tumor_type)
+
+        # Combine header + drug summary + compact details
+        evidence_summary = evidence_header + drug_summary + evidence_details
 
         # Log the request
         request_id = None

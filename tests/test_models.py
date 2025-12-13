@@ -456,3 +456,234 @@ class TestEvidenceStats:
 
         assert stats['sensitivity_by_level'] == {'A': 2, 'B': 1}
         assert stats['resistance_by_level'] == {'C': 1}
+
+
+class TestLowQualityMinorityFilter:
+    """Tests for filtering low-quality minority signals."""
+
+    def test_filter_drops_low_quality_resistance_when_high_quality_sensitivity(self):
+        """When we have Level A/B sensitivity and only C/D resistance (<=2), drop resistance."""
+        evidence = Evidence(
+            variant_id="EGFR:L858R",
+            gene="EGFR",
+            variant="L858R",
+            vicc=[
+                # High-quality sensitivity
+                VICCEvidence(drugs=["Erlotinib"], evidence_level="A", is_sensitivity=True, disease="NSCLC"),
+                VICCEvidence(drugs=["Gefitinib"], evidence_level="B", is_sensitivity=True, disease="NSCLC"),
+                # Low-quality resistance (noise)
+                VICCEvidence(drugs=["Erlotinib"], evidence_level="C", is_resistance=True, disease="lung cancer"),
+            ]
+        )
+
+        filtered_sens, filtered_res = evidence.filter_low_quality_minority_signals()
+
+        assert len(filtered_sens) == 2
+        assert len(filtered_res) == 0  # Low-quality resistance dropped
+
+    def test_filter_drops_low_quality_sensitivity_when_high_quality_resistance(self):
+        """When we have Level A/B resistance and only C/D sensitivity (<=2), drop sensitivity."""
+        evidence = Evidence(
+            variant_id="KRAS:G12V",
+            gene="KRAS",
+            variant="G12V",
+            vicc=[
+                # High-quality resistance
+                VICCEvidence(drugs=["Cetuximab"], evidence_level="A", is_resistance=True, disease="CRC"),
+                VICCEvidence(drugs=["Panitumumab"], evidence_level="B", is_resistance=True, disease="CRC"),
+                # Low-quality sensitivity (noise)
+                VICCEvidence(drugs=["Cetuximab"], evidence_level="D", is_sensitivity=True, disease="preclinical"),
+            ]
+        )
+
+        filtered_sens, filtered_res = evidence.filter_low_quality_minority_signals()
+
+        assert len(filtered_sens) == 0  # Low-quality sensitivity dropped
+        assert len(filtered_res) == 2
+
+    def test_filter_keeps_both_when_both_have_high_quality(self):
+        """When both sensitivity and resistance have high-quality evidence, keep both."""
+        evidence = Evidence(
+            variant_id="BRAF:V600E",
+            gene="BRAF",
+            variant="V600E",
+            vicc=[
+                VICCEvidence(drugs=["Vemurafenib"], evidence_level="A", is_sensitivity=True, disease="Melanoma"),
+                VICCEvidence(drugs=["Vemurafenib"], evidence_level="B", is_resistance=True, disease="CRC"),
+            ]
+        )
+
+        filtered_sens, filtered_res = evidence.filter_low_quality_minority_signals()
+
+        assert len(filtered_sens) == 1
+        assert len(filtered_res) == 1  # Both kept - both have high-quality
+
+    def test_filter_keeps_both_when_low_quality_but_many_entries(self):
+        """Keep low-quality minority if there are more than 2 entries (might be real signal)."""
+        evidence = Evidence(
+            variant_id="TEST:V123A",
+            gene="TEST",
+            variant="V123A",
+            vicc=[
+                VICCEvidence(drugs=["DrugA"], evidence_level="A", is_sensitivity=True, disease="cancer"),
+                # 3 low-quality resistance entries - might be real signal
+                VICCEvidence(drugs=["DrugA"], evidence_level="C", is_resistance=True, disease="cancer"),
+                VICCEvidence(drugs=["DrugA"], evidence_level="D", is_resistance=True, disease="cancer"),
+                VICCEvidence(drugs=["DrugA"], evidence_level="C", is_resistance=True, disease="cancer"),
+            ]
+        )
+
+        filtered_sens, filtered_res = evidence.filter_low_quality_minority_signals()
+
+        assert len(filtered_sens) == 1
+        assert len(filtered_res) == 3  # All kept - too many to be noise
+
+
+class TestDrugAggregation:
+    """Tests for drug-level evidence aggregation."""
+
+    def test_aggregate_single_drug_sensitivity_only(self):
+        """Aggregate multiple entries for a single drug with only sensitivity."""
+        evidence = Evidence(
+            variant_id="EGFR:L858R",
+            gene="EGFR",
+            variant="L858R",
+            vicc=[
+                VICCEvidence(drugs=["Erlotinib"], evidence_level="A", is_sensitivity=True, disease="NSCLC"),
+                VICCEvidence(drugs=["Erlotinib"], evidence_level="B", is_sensitivity=True, disease="lung adenocarcinoma"),
+                VICCEvidence(drugs=["Erlotinib"], evidence_level="C", is_sensitivity=True, disease="NSCLC"),
+            ]
+        )
+
+        aggregated = evidence.aggregate_evidence_by_drug()
+
+        assert len(aggregated) == 1
+        drug = aggregated[0]
+        assert drug['drug'].lower() == 'erlotinib'
+        assert drug['sensitivity_count'] == 3
+        assert drug['resistance_count'] == 0
+        assert drug['net_signal'] == 'SENSITIVE'
+        assert drug['best_level'] == 'A'
+
+    def test_aggregate_single_drug_resistance_only(self):
+        """Aggregate multiple entries for a single drug with only resistance."""
+        evidence = Evidence(
+            variant_id="KRAS:G12V",
+            gene="KRAS",
+            variant="G12V",
+            vicc=[
+                VICCEvidence(drugs=["Cetuximab"], evidence_level="A", is_resistance=True, disease="CRC"),
+                VICCEvidence(drugs=["Cetuximab"], evidence_level="B", is_resistance=True, disease="CRC"),
+            ]
+        )
+
+        aggregated = evidence.aggregate_evidence_by_drug()
+
+        assert len(aggregated) == 1
+        drug = aggregated[0]
+        assert drug['drug'].lower() == 'cetuximab'
+        assert drug['sensitivity_count'] == 0
+        assert drug['resistance_count'] == 2
+        assert drug['net_signal'] == 'RESISTANT'
+
+    def test_aggregate_drug_mixed_with_clear_winner(self):
+        """Aggregate drug with mixed signals but clear sensitivity winner (3:1)."""
+        evidence = Evidence(
+            variant_id="EGFR:S768I",
+            gene="EGFR",
+            variant="S768I",
+            vicc=[
+                VICCEvidence(drugs=["Erlotinib"], evidence_level="B", is_sensitivity=True, disease="NSCLC"),
+                VICCEvidence(drugs=["Erlotinib"], evidence_level="C", is_sensitivity=True, disease="NSCLC"),
+                VICCEvidence(drugs=["Erlotinib"], evidence_level="C", is_sensitivity=True, disease="NSCLC"),
+                VICCEvidence(drugs=["Erlotinib"], evidence_level="C", is_resistance=True, disease="NSCLC"),
+            ]
+        )
+
+        aggregated = evidence.aggregate_evidence_by_drug()
+
+        assert len(aggregated) == 1
+        drug = aggregated[0]
+        assert drug['sensitivity_count'] == 3
+        assert drug['resistance_count'] == 1
+        assert drug['net_signal'] == 'SENSITIVE'  # 3:1 ratio -> SENSITIVE
+
+    def test_aggregate_drug_truly_mixed(self):
+        """Aggregate drug with truly mixed signals (no clear winner)."""
+        evidence = Evidence(
+            variant_id="BRAF:V600E",
+            gene="BRAF",
+            variant="V600E",
+            vicc=[
+                VICCEvidence(drugs=["Vemurafenib"], evidence_level="A", is_sensitivity=True, disease="Melanoma"),
+                VICCEvidence(drugs=["Vemurafenib"], evidence_level="A", is_sensitivity=True, disease="Melanoma"),
+                VICCEvidence(drugs=["Vemurafenib"], evidence_level="B", is_resistance=True, disease="CRC"),
+            ]
+        )
+
+        aggregated = evidence.aggregate_evidence_by_drug()
+
+        assert len(aggregated) == 1
+        drug = aggregated[0]
+        assert drug['sensitivity_count'] == 2
+        assert drug['resistance_count'] == 1
+        assert drug['net_signal'] == 'MIXED'  # 2:1 ratio -> not 3:1, so MIXED
+
+    def test_aggregate_multiple_drugs(self):
+        """Aggregate evidence for multiple drugs."""
+        evidence = Evidence(
+            variant_id="EGFR:L858R",
+            gene="EGFR",
+            variant="L858R",
+            vicc=[
+                VICCEvidence(drugs=["Erlotinib"], evidence_level="A", is_sensitivity=True, disease="NSCLC"),
+                VICCEvidence(drugs=["Gefitinib"], evidence_level="B", is_sensitivity=True, disease="NSCLC"),
+                VICCEvidence(drugs=["Osimertinib"], evidence_level="A", is_sensitivity=True, disease="NSCLC"),
+            ]
+        )
+
+        aggregated = evidence.aggregate_evidence_by_drug()
+
+        assert len(aggregated) == 3
+        # Should be sorted by best level (A > B)
+        drug_names = [d['drug'].lower() for d in aggregated]
+        # A-level drugs first
+        assert aggregated[0]['best_level'] == 'A'
+        assert aggregated[1]['best_level'] == 'A'
+        assert aggregated[2]['best_level'] == 'B'
+
+    def test_format_drug_aggregation_summary(self):
+        """Test formatted drug aggregation summary for LLM."""
+        evidence = Evidence(
+            variant_id="EGFR:L858R",
+            gene="EGFR",
+            variant="L858R",
+            vicc=[
+                VICCEvidence(drugs=["Erlotinib"], evidence_level="A", is_sensitivity=True, disease="NSCLC"),
+                VICCEvidence(drugs=["Erlotinib"], evidence_level="B", is_sensitivity=True, disease="NSCLC"),
+                VICCEvidence(drugs=["Erlotinib"], evidence_level="C", is_resistance=True, disease="NSCLC"),
+            ]
+        )
+
+        summary = evidence.format_drug_aggregation_summary()
+
+        assert "DRUG-LEVEL SUMMARY" in summary
+        assert "Erlotinib" in summary
+        assert "2 sens" in summary
+        assert "1 res" in summary
+        assert "SENSITIVE" in summary or "MIXED" in summary  # 2:1 ratio
+
+    def test_aggregate_empty_evidence(self):
+        """Test aggregation with no drug evidence."""
+        evidence = Evidence(
+            variant_id="TEST:V123A",
+            gene="TEST",
+            variant="V123A",
+            vicc=[]
+        )
+
+        aggregated = evidence.aggregate_evidence_by_drug()
+        assert len(aggregated) == 0
+
+        summary = evidence.format_drug_aggregation_summary()
+        assert summary == ""  # No summary for empty evidence
