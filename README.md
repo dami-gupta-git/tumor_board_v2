@@ -65,7 +65,8 @@ Available in two interfaces:
 
 ### Key Features
 
-- **Evidence Aggregation**: Fetches from CIViC, ClinVar, COSMIC, FDA drug approvals, CGI Biomarkers, and AlphaMissense
+- **Evidence Aggregation**: Fetches from CIViC, ClinVar, COSMIC, FDA drug approvals, CGI Biomarkers, VICC MetaKB, and AlphaMissense
+- **VICC MetaKB Integration**: Harmonized evidence from 6 major cancer variant knowledgebases (CIViC, CGI, JAX-CKB, OncoKB, PMKB, MolecularMatch)
 - **LLM Tiering**: Assigns AMP/ASCO/CAP tiers with confidence scores and rationale
 - **Smart Evidence Prioritization**: Surfaces tumor-specific sensitivity evidence first; correctly interprets resistance markers
 - **Validation Framework**: Built-in benchmarking against gold standard datasets
@@ -260,6 +261,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, testing, and code 
 - [AMP/ASCO/CAP Guidelines](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5707196/)
 - [MyVariant.info](https://myvariant.info/) | [CIViC](https://civicdb.org/) | [ClinVar](https://www.ncbi.nlm.nih.gov/clinvar/) | [COSMIC](https://cancer.sanger.ac.uk/cosmic)
 - [FDA openFDA API](https://open.fda.gov/) | [Drugs@FDA](https://www.fda.gov/drugs/drug-approvals-and-databases/drugsfda-data-files)
+- [VICC MetaKB](https://search.cancervariants.org/) | [CGI Biomarkers](https://www.cancergenomeinterpreter.org/biomarkers)
 
 ---
 

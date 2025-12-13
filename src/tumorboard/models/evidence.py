@@ -74,6 +74,31 @@ class CGIBiomarkerEvidence(BaseModel):
     fda_approved: bool = False
 
 
+class VICCEvidence(BaseModel):
+    """Evidence from VICC MetaKB (harmonized multi-KB interpretations).
+
+    VICC aggregates and harmonizes clinical interpretations from:
+    - CIViC, CGI, JAX-CKB, OncoKB, PMKB, MolecularMatch
+
+    Evidence levels: A (validated), B (clinical), C (case study), D (preclinical)
+    Response types: Responsive/Sensitivity, Resistant, or OncoKB levels (1A, 1B, etc.)
+    """
+
+    description: str | None = None
+    gene: str | None = None
+    variant: str | None = None
+    disease: str | None = None
+    drugs: list[str] = Field(default_factory=list)
+    evidence_level: str | None = None  # A, B, C, D
+    response_type: str | None = None  # Responsive, Resistant, Sensitivity, 1A, etc.
+    source: str | None = None  # civic, cgi, jax, oncokb, pmkb
+    publication_url: str | list[str] | None = None  # Can be single URL or list
+    oncogenic: str | None = None
+    is_sensitivity: bool = False
+    is_resistance: bool = False
+    oncokb_level: str | None = None  # 1A, 1B, 2A, 2B, 3A, 3B, 4, R1, R2
+
+
 class Evidence(VariantAnnotations):
     """Aggregated evidence from multiple sources."""
 
@@ -87,11 +112,12 @@ class Evidence(VariantAnnotations):
     cosmic: list[COSMICEvidence] = Field(default_factory=list)
     fda_approvals: list[FDAApproval] = Field(default_factory=list)
     cgi_biomarkers: list[CGIBiomarkerEvidence] = Field(default_factory=list)
+    vicc: list[VICCEvidence] = Field(default_factory=list)
     raw_data: dict[str, Any] = Field(default_factory=dict)
 
     def has_evidence(self) -> bool:
         """Check if any evidence was found."""
-        return bool(self.civic or self.clinvar or self.cosmic or self.fda_approvals or self.cgi_biomarkers)
+        return bool(self.civic or self.clinvar or self.cosmic or self.fda_approvals or self.cgi_biomarkers or self.vicc)
 
     @staticmethod
     def _tumor_matches(tumor_type: str | None, disease: str | None) -> bool:
@@ -281,6 +307,54 @@ class Evidence(VariantAnnotations):
                     lines.append(f"     Tumor Type: {biomarker.tumor_type}")
                 if biomarker.source:
                     lines.append(f"     Source: {biomarker.source[:200]}...")
+            lines.append("")
+
+        if self.vicc:
+            # VICC MetaKB provides harmonized evidence from multiple KBs
+            # Prioritize by evidence level (A > B > C > D) and OncoKB levels
+            def vicc_priority(ev):
+                level_priority = {'A': 0, 'B': 1, 'C': 2, 'D': 3}
+                oncokb_priority = {'1A': 0, '1B': 1, '2A': 2, '2B': 3, '3A': 4, '3B': 5, '4': 6, 'R1': 7, 'R2': 8}
+                base = level_priority.get(ev.evidence_level, 99)
+                oncokb = oncokb_priority.get(ev.oncokb_level, 99) if ev.oncokb_level else 99
+                return (base, oncokb)
+
+            # Separate sensitivity and resistance
+            sensitivity = [e for e in self.vicc if e.is_sensitivity]
+            resistance = [e for e in self.vicc if e.is_resistance]
+            other_vicc = [e for e in self.vicc if not e.is_sensitivity and not e.is_resistance]
+
+            sensitivity = sorted(sensitivity, key=vicc_priority)
+            resistance = sorted(resistance, key=vicc_priority)
+            other_vicc = sorted(other_vicc, key=vicc_priority)
+
+            # Interleave sensitivity and resistance
+            vicc_prioritized = []
+            for i in range(max(len(sensitivity), len(resistance))):
+                if i < len(sensitivity):
+                    vicc_prioritized.append(sensitivity[i])
+                if i < len(resistance):
+                    vicc_prioritized.append(resistance[i])
+            vicc_prioritized.extend(other_vicc)
+
+            lines.append(f"VICC MetaKB Evidence ({len(self.vicc)} entries, harmonized from CIViC/CGI/JAX/OncoKB/PMKB):")
+            for idx, ev in enumerate(vicc_prioritized[:15], 1):
+                level_str = f"Level {ev.evidence_level}" if ev.evidence_level else "N/A"
+                oncokb_str = f" [OncoKB {ev.oncokb_level}]" if ev.oncokb_level else ""
+                response_str = ""
+                if ev.is_sensitivity:
+                    response_str = " [SENSITIVITY]"
+                elif ev.is_resistance:
+                    response_str = " [RESISTANCE]"
+
+                lines.append(f"  {idx}. {level_str}{oncokb_str}{response_str} (via {ev.source})")
+                if ev.disease:
+                    lines.append(f"     Disease: {ev.disease[:100]}...")
+                if ev.drugs:
+                    lines.append(f"     Drugs: {', '.join(ev.drugs[:5])}")
+                if ev.description:
+                    desc = ev.description[:250] if len(ev.description) > 250 else ev.description
+                    lines.append(f"     Description: {desc}...")
             lines.append("")
 
         return "\n".join(lines) if len(lines) > 1 else "No evidence found."

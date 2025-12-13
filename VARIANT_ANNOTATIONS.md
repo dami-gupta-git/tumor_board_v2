@@ -1,6 +1,6 @@
 # Variant Annotations
 
-TumorBoard automatically extracts comprehensive variant annotations from MyVariant.info, FDA drug approval data, and Cancer Genome Interpreter (CGI) biomarkers.
+TumorBoard automatically extracts comprehensive variant annotations from MyVariant.info, FDA drug approval data, Cancer Genome Interpreter (CGI) biomarkers, and VICC MetaKB.
 
 ## Database Identifiers
 
@@ -50,6 +50,24 @@ Cancer Genome Interpreter (CGI) biomarkers provide curated variant-drug associat
 - **FDA Approved**: Boolean indicating FDA/NCCN approval for Tier I classification
 
 CGI biomarkers are particularly useful for variants where FDA labels use generic language (e.g., "uncommon EGFR mutations" rather than listing specific variants like G719S).
+
+## VICC MetaKB
+
+The VICC (Variant Interpretation for Cancer Consortium) Meta-Knowledgebase provides harmonized clinical interpretations from multiple cancer variant databases:
+
+- **Source Databases**: CIViC, CGI, JAX-CKB, OncoKB, PMKB, MolecularMatch
+- **Evidence Level**: A (validated), B (clinical), C (case study), D (preclinical)
+- **Response Type**: Sensitivity/Responsive, Resistant, or OncoKB-style levels (1A, 1B, 2A, 2B, 3A, 3B, 4, R1, R2)
+- **Disease**: Cancer type for the association
+- **Drugs**: Associated therapeutic agents
+- **Oncogenic**: Oncogenicity classification when available
+- **Publication**: Supporting publication URLs
+
+VICC MetaKB is particularly valuable for:
+- Cross-referencing evidence across multiple knowledgebases
+- Identifying consensus interpretations from different sources
+- Finding sensitivity vs. resistance associations for drug-variant pairs
+- Accessing OncoKB-style evidence levels (1A = FDA-approved, 2A = standard care, etc.)
 
 ## Where Annotations Appear
 

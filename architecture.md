@@ -14,7 +14,7 @@
 ## System Overview
 
 TumorBoard is designed to automate cancer variant actionability assessment by combining:
-1. **Evidence Aggregation** from multiple genomic databases (CIViC, ClinVar, COSMIC) and FDA drug approvals
+1. **Evidence Aggregation** from multiple genomic databases (CIViC, ClinVar, COSMIC, VICC MetaKB, CGI) and FDA drug approvals
 2. **Variant Normalization** for standardized representation across formats
 3. **LLM Assessment** to interpret evidence and assign AMP/ASCO/CAP tier classifications
 4. **Validation Framework** for benchmarking accuracy against gold standards
@@ -320,6 +320,41 @@ VariantInput → Normalize → MyVariantClient → Evidence → LLMService → A
 - Queries both specific variant AND gene-level MUTATION profiles
 - Example: `BRAF V600E` + `BRAF MUTATION` (captures FDA approvals)
 
+### 4b. CGI Client (`api/cgi.py`)
+**Purpose:** Cancer Genome Interpreter biomarkers database
+
+**Data Sources:**
+- **CGI Biomarkers TSV:** Curated variant-drug associations with explicit FDA/NCCN status
+
+**Features:**
+- Downloads and caches biomarkers TSV file (7-day cache)
+- Variant pattern matching (wildcards like `G719.` match `G719S`, `G719A`, etc.)
+- Tumor type matching using centralized mappings
+- Explicit FDA approval status for each biomarker
+
+### 4c. VICC MetaKB Client (`api/vicc.py`)
+**Purpose:** Harmonized evidence from multiple cancer variant knowledgebases
+
+**Data Sources:**
+- **VICC MetaKB API v1:** Aggregates and harmonizes clinical interpretations from:
+  - CIViC (Clinical Interpretations of Variants in Cancer)
+  - CGI (Cancer Genome Interpreter)
+  - JAX-CKB (Jackson Laboratory Clinical Knowledgebase)
+  - OncoKB
+  - PMKB (Precision Medicine Knowledgebase)
+  - MolecularMatch
+
+**Features:**
+- Lucene query syntax for flexible variant search
+- Evidence levels: A (validated), B (clinical), C (case study), D (preclinical)
+- Response types: Sensitivity/Responsive, Resistant, or OncoKB levels (1A, 1B, 2A, etc.)
+- Source attribution for provenance tracking
+- Tumor type filtering with centralized mappings
+- Sensitivity/resistance classification
+
+**API Endpoint:**
+- `GET /api/v1/associations?q=GENE+VARIANT&size=N`
+
 ### 5. LLM Service (`llm/service.py`)
 **Purpose:** LLM-based variant assessment
 
@@ -352,7 +387,9 @@ VariantInput → Normalize → MyVariantClient → Evidence → LLMService → A
 - `ClinVarEvidence`: Pathogenicity classifications
 - `COSMICEvidence`: Somatic mutation prevalence
 - `FDAApproval`: FDA drug approval information (brand name, generic name, indication, approval date, marketing status)
-- `Evidence`: Aggregated multi-source evidence including FDA approvals
+- `CGIBiomarkerEvidence`: CGI variant-drug associations with FDA/NCCN approval status
+- `VICCEvidence`: Harmonized interpretations from VICC MetaKB with sensitivity/resistance classification
+- `Evidence`: Aggregated multi-source evidence including FDA approvals, CGI biomarkers, and VICC associations
 
 **Evidence Summary Method:**
 - Prioritizes PREDICTIVE evidence with drugs
@@ -413,6 +450,8 @@ Gold Standard JSON → Load → Assess Each Variant → Compare Tiers → Metric
 - **CIViC GraphQL API:** Clinical evidence (v2)
 - **NCBI E-utilities:** ClinVar fallback queries
 - **FDA openFDA API:** Drug approval data with biomarker indications
+- **CGI Biomarkers:** Cancer Genome Interpreter variant-drug associations
+- **VICC MetaKB:** Harmonized evidence from CIViC, CGI, JAX-CKB, OncoKB, PMKB, MolecularMatch
 
 ### Development Tools
 - **pytest:** Testing framework
@@ -655,7 +694,9 @@ tumor_board_v2/
 │   ├── api/                  # External API clients
 │   │   ├── myvariant.py      # MyVariant API client
 │   │   ├── myvariant_models.py  # API response models
-│   │   └── fda.py            # FDA openFDA API client
+│   │   ├── fda.py            # FDA openFDA API client
+│   │   ├── cgi.py            # CGI biomarkers client
+│   │   └── vicc.py           # VICC MetaKB client
 │   │
 │   ├── llm/                  # LLM integration
 │   │   ├── service.py        # LLM assessment service

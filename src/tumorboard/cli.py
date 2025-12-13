@@ -40,7 +40,7 @@ def assess(
     gene: str = typer.Argument(..., help="Gene symbol (e.g., BRAF)"),
     variant: str = typer.Argument(..., help="Variant notation (e.g., V600E)"),
     tumor: Optional[str] = typer.Option(None, "--tumor", "-t", help="Tumor type"),
-    model: str = typer.Option("gpt-4o", "--model", "-m", help="LLM model"),
+    model: str = typer.Option("gpt-4o-mini", "--model", "-m", help="LLM model"),
     temperature: float = typer.Option(0.1, "--temperature", help="LLM temperature (0.0-1.0)"),
     output: Optional[Path] = typer.Option(None, "--output", "-o", help="Output JSON file"),
     log: bool = typer.Option(True, "--log/--no-log", help="Enable LLM decision logging"),
@@ -73,7 +73,7 @@ def assess(
 def batch(
     input_file: Path = typer.Argument(..., help="Input JSON file with variants"),
     output: Path = typer.Option("results.json", "--output", "-o", help="Output file"),
-    model: str = typer.Option("gpt-4o", "--model", "-m", help="LLM model"),
+    model: str = typer.Option("gpt-4o-mini", "--model", "-m", help="LLM model"),
     temperature: float = typer.Option(0.1, "--temperature", help="LLM temperature (0.0-1.0)"),
     log: bool = typer.Option(True, "--log/--no-log", help="Enable LLM decision logging"),
 ) -> None:
@@ -117,7 +117,7 @@ def batch(
 @app.command()
 def validate(
     gold_standard: Path = typer.Argument(..., help="Gold standard JSON file"),
-    model: str = typer.Option("gpt-4o", "--model", "-m", help="LLM model"),
+    model: str = typer.Option("gpt-4o-mini", "--model", "-m", help="LLM model"),
     temperature: float = typer.Option(0.1, "--temperature", help="LLM temperature (0.0-1.0)"),
     output: Optional[Path] = typer.Option(None, "--output", "-o", help="Output file"),
     max_concurrent: int = typer.Option(3, "--max-concurrent", "-c", help="Max concurrent"),

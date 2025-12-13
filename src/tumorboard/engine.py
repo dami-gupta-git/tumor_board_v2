@@ -20,10 +20,11 @@ from tumorboard.api.myvariant import MyVariantClient
 from tumorboard.api.fda import FDAClient
 from tumorboard.api.cgi import CGIClient
 from tumorboard.api.oncotree import OncoTreeClient
+from tumorboard.api.vicc import VICCClient
 from tumorboard.llm.service import LLMService
 from tumorboard.models.assessment import ActionabilityAssessment
 from tumorboard.models.variant import VariantInput
-from tumorboard.models.evidence import FDAApproval, CGIBiomarkerEvidence
+from tumorboard.models.evidence import FDAApproval, CGIBiomarkerEvidence, VICCEvidence
 from tumorboard.utils import normalize_variant
 
 
@@ -35,11 +36,12 @@ class AssessmentEngine:
     significantly improving performance for batch assessments.
     """
 
-    def __init__(self, llm_model: str = "gpt-4o", llm_temperature: float = 0.1, enable_logging: bool = True):
+    def __init__(self, llm_model: str = "gpt-4o-mini", llm_temperature: float = 0.1, enable_logging: bool = True):
         self.myvariant_client = MyVariantClient()
         self.fda_client = FDAClient()
         self.cgi_client = CGIClient()
         self.oncotree_client = OncoTreeClient()
+        self.vicc_client = VICCClient()
         self.llm_service = LLMService(model=llm_model, temperature=llm_temperature, enable_logging=enable_logging)
 
     async def __aenter__(self):
@@ -51,6 +53,7 @@ class AssessmentEngine:
         await self.myvariant_client.__aenter__()
         await self.fda_client.__aenter__()
         await self.oncotree_client.__aenter__()
+        await self.vicc_client.__aenter__()
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
@@ -58,6 +61,7 @@ class AssessmentEngine:
         await self.myvariant_client.__aexit__(exc_type, exc_val, exc_tb)
         await self.fda_client.__aexit__(exc_type, exc_val, exc_tb)
         await self.oncotree_client.__aexit__(exc_type, exc_val, exc_tb)
+        await self.vicc_client.__aexit__(exc_type, exc_val, exc_tb)
 
     async def assess_variant(self, variant_input: VariantInput) -> ActionabilityAssessment:
         """Assess a single variant.
@@ -102,9 +106,9 @@ class AssessmentEngine:
                 print(f"  Warning: OncoTree resolution failed: {str(e)}")
                 resolved_tumor_type = variant_input.tumor_type
 
-        # Step 3: Fetch evidence from MyVariant, FDA, and CGI APIs in parallel
+        # Step 3: Fetch evidence from MyVariant, FDA, CGI, and VICC APIs in parallel
         # This improves performance by running all API calls concurrently
-        evidence, fda_approvals_raw, cgi_biomarkers_raw = await asyncio.gather(
+        evidence, fda_approvals_raw, cgi_biomarkers_raw, vicc_associations_raw = await asyncio.gather(
             self.myvariant_client.fetch_evidence(
                 gene=variant_input.gene,
                 variant=normalized_variant,  # Use normalized variant for API query
@@ -118,6 +122,12 @@ class AssessmentEngine:
                 variant_input.gene,
                 normalized_variant,
                 resolved_tumor_type,
+            ),
+            self.vicc_client.fetch_associations(
+                gene=variant_input.gene,
+                variant=normalized_variant,
+                tumor_type=resolved_tumor_type,
+                max_results=15,
             ),
             return_exceptions=True
         )
@@ -140,6 +150,10 @@ class AssessmentEngine:
         if isinstance(cgi_biomarkers_raw, Exception):
             print(f"  Warning: CGI biomarkers failed: {str(cgi_biomarkers_raw)}")
             cgi_biomarkers_raw = []
+
+        if isinstance(vicc_associations_raw, Exception):
+            print(f"  Warning: VICC MetaKB API failed: {str(vicc_associations_raw)}")
+            vicc_associations_raw = []
 
         # Parse FDA approval data and add to evidence
         if fda_approvals_raw:
@@ -166,6 +180,27 @@ class AssessmentEngine:
                     fda_approved=biomarker.is_fda_approved(),
                 ))
             evidence.cgi_biomarkers = cgi_evidence
+
+        # Add VICC MetaKB associations to evidence
+        if vicc_associations_raw:
+            vicc_evidence = []
+            for assoc in vicc_associations_raw:
+                vicc_evidence.append(VICCEvidence(
+                    description=assoc.description,
+                    gene=assoc.gene,
+                    variant=assoc.variant,
+                    disease=assoc.disease,
+                    drugs=assoc.drugs,
+                    evidence_level=assoc.evidence_level,
+                    response_type=assoc.response_type,
+                    source=assoc.source,
+                    publication_url=assoc.publication_url,
+                    oncogenic=assoc.oncogenic,
+                    is_sensitivity=assoc.is_sensitivity(),
+                    is_resistance=assoc.is_resistance(),
+                    oncokb_level=assoc.get_oncokb_level(),
+                ))
+            evidence.vicc = vicc_evidence
 
         # Step 4: Assess with LLM (must run sequentially since it depends on evidence)
         # Use original variant notation for display/reporting

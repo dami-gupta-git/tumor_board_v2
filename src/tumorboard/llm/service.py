@@ -11,7 +11,7 @@ from tumorboard.utils.logging_config import get_logger
 class LLMService:
     """High-accuracy LLM service for somatic variant actionability (88–92% agreement)."""
 
-    def __init__(self, model: str = "gpt-4o", temperature: float = 0.0, enable_logging: bool = True):
+    def __init__(self, model: str = "gpt-4o-mini", temperature: float = 0.0, enable_logging: bool = True):
         self.model = model
         # ↓↓↓ CRITICAL: temperature=0.0 → deterministic, no hallucinations
         self.temperature = temperature
@@ -28,7 +28,7 @@ class LLMService:
         """Assess variant using the new evidence-driven prompt system."""
 
         # Rich evidence summary (your existing logic is perfect)
-        evidence_summary = evidence.summary(tumor_type=tumor_type, max_items=15)
+        evidence_summary = evidence.summary(tumor_type=tumor_type, max_items=10)
 
         # Log the request
         request_id = None
@@ -56,7 +56,7 @@ class LLMService:
         # Only use response_format for OpenAI models that support JSON mode
         # Supported: gpt-4-turbo, gpt-4o, gpt-4o-mini, gpt-3.5-turbo-1106+
         # Not supported: Claude models, open-source models, older OpenAI models
-        openai_json_models = ["gpt-4o", "gpt-4-turbo", "gpt-3.5-turbo"]
+        openai_json_models = ["gpt-4o-mini", "gpt-4-turbo", "gpt-3.5-turbo"]
         if any(model_prefix in self.model.lower() for model_prefix in openai_json_models):
             try:
                 completion_kwargs["response_format"] = {"type": "json_object"}
