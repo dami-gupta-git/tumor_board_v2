@@ -36,12 +36,13 @@ class AssessmentEngine:
     significantly improving performance for batch assessments.
     """
 
-    def __init__(self, llm_model: str = "gpt-4o-mini", llm_temperature: float = 0.1, enable_logging: bool = True):
+    def __init__(self, llm_model: str = "gpt-4o-mini", llm_temperature: float = 0.1, enable_logging: bool = True, enable_vicc: bool = True):
         self.myvariant_client = MyVariantClient()
         self.fda_client = FDAClient()
         self.cgi_client = CGIClient()
         self.oncotree_client = OncoTreeClient()
-        self.vicc_client = VICCClient()
+        self.vicc_client = VICCClient() if enable_vicc else None
+        self.enable_vicc = enable_vicc
         self.llm_service = LLMService(model=llm_model, temperature=llm_temperature, enable_logging=enable_logging)
 
     async def __aenter__(self):
@@ -53,7 +54,8 @@ class AssessmentEngine:
         await self.myvariant_client.__aenter__()
         await self.fda_client.__aenter__()
         await self.oncotree_client.__aenter__()
-        await self.vicc_client.__aenter__()
+        if self.vicc_client:
+            await self.vicc_client.__aenter__()
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
@@ -61,7 +63,8 @@ class AssessmentEngine:
         await self.myvariant_client.__aexit__(exc_type, exc_val, exc_tb)
         await self.fda_client.__aexit__(exc_type, exc_val, exc_tb)
         await self.oncotree_client.__aexit__(exc_type, exc_val, exc_tb)
-        await self.vicc_client.__aexit__(exc_type, exc_val, exc_tb)
+        if self.vicc_client:
+            await self.vicc_client.__aexit__(exc_type, exc_val, exc_tb)
 
     async def assess_variant(self, variant_input: VariantInput) -> ActionabilityAssessment:
         """Assess a single variant.
@@ -106,8 +109,18 @@ class AssessmentEngine:
                 print(f"  Warning: OncoTree resolution failed: {str(e)}")
                 resolved_tumor_type = variant_input.tumor_type
 
-        # Step 3: Fetch evidence from MyVariant, FDA, CGI, and VICC APIs in parallel
+        # Step 3: Fetch evidence from MyVariant, FDA, CGI, and optionally VICC APIs in parallel
         # This improves performance by running all API calls concurrently
+        async def fetch_vicc():
+            if self.vicc_client:
+                return await self.vicc_client.fetch_associations(
+                    gene=variant_input.gene,
+                    variant=normalized_variant,
+                    tumor_type=resolved_tumor_type,
+                    max_results=15,
+                )
+            return []
+
         evidence, fda_approvals_raw, cgi_biomarkers_raw, vicc_associations_raw = await asyncio.gather(
             self.myvariant_client.fetch_evidence(
                 gene=variant_input.gene,
@@ -123,12 +136,7 @@ class AssessmentEngine:
                 normalized_variant,
                 resolved_tumor_type,
             ),
-            self.vicc_client.fetch_associations(
-                gene=variant_input.gene,
-                variant=normalized_variant,
-                tumor_type=resolved_tumor_type,
-                max_results=15,
-            ),
+            fetch_vicc(),
             return_exceptions=True
         )
 

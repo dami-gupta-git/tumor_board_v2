@@ -44,6 +44,7 @@ def assess(
     temperature: float = typer.Option(0.1, "--temperature", help="LLM temperature (0.0-1.0)"),
     output: Optional[Path] = typer.Option(None, "--output", "-o", help="Output JSON file"),
     log: bool = typer.Option(True, "--log/--no-log", help="Enable LLM decision logging"),
+    vicc: bool = typer.Option(True, "--vicc/--no-vicc", help="Enable VICC MetaKB integration"),
 ) -> None:
     """Assess clinical actionability of a single variant."""
 
@@ -55,7 +56,7 @@ def assess(
         else:
             print(f"\nAssessing {gene} {variant}...")
 
-        async with AssessmentEngine(llm_model=model, llm_temperature=temperature, enable_logging=log) as engine:
+        async with AssessmentEngine(llm_model=model, llm_temperature=temperature, enable_logging=log, enable_vicc=vicc) as engine:
             assessment = await engine.assess_variant(variant_input)
 
             print(assessment.to_report())
@@ -122,6 +123,7 @@ def validate(
     output: Optional[Path] = typer.Option(None, "--output", "-o", help="Output file"),
     max_concurrent: int = typer.Option(3, "--max-concurrent", "-c", help="Max concurrent"),
     log: bool = typer.Option(True, "--log/--no-log", help="Enable LLM decision logging"),
+    vicc: bool = typer.Option(True, "--vicc/--no-vicc", help="Enable VICC MetaKB integration"),
 ) -> None:
     """Validate LLM assessments against gold standard."""
 
@@ -130,7 +132,7 @@ def validate(
         raise typer.Exit(1)
 
     async def run_validation() -> None:
-        async with AssessmentEngine(llm_model=model, llm_temperature=temperature, enable_logging=log) as engine:
+        async with AssessmentEngine(llm_model=model, llm_temperature=temperature, enable_logging=log, enable_vicc=vicc) as engine:
             validator = Validator(engine)
 
             entries = validator.load_gold_standard(gold_standard)

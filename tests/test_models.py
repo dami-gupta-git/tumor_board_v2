@@ -4,7 +4,7 @@ import pytest
 from pydantic import ValidationError
 
 from tumorboard.models.assessment import ActionabilityAssessment, ActionabilityTier, RecommendedTherapy
-from tumorboard.models.evidence import CIViCEvidence, Evidence
+from tumorboard.models.evidence import CIViCEvidence, Evidence, VICCEvidence
 from tumorboard.models.validation import GoldStandardEntry, ValidationMetrics, ValidationResult
 from tumorboard.models.variant import VariantInput
 
@@ -289,3 +289,170 @@ class TestValidationModels:
         assert metrics.total_cases == 1
         assert metrics.correct_predictions == 1
         assert metrics.accuracy == 1.0
+
+
+class TestEvidenceStats:
+    """Tests for evidence statistics and conflict detection."""
+
+    def test_compute_stats_sensitivity_only(self):
+        """Test stats when all evidence is sensitivity."""
+        evidence = Evidence(
+            variant_id="EGFR:L858R",
+            gene="EGFR",
+            variant="L858R",
+            vicc=[
+                VICCEvidence(drugs=["Erlotinib"], evidence_level="A", is_sensitivity=True, disease="NSCLC"),
+                VICCEvidence(drugs=["Gefitinib"], evidence_level="B", is_sensitivity=True, disease="NSCLC"),
+                VICCEvidence(drugs=["Osimertinib"], evidence_level="A", is_sensitivity=True, disease="NSCLC"),
+            ]
+        )
+
+        stats = evidence.compute_evidence_stats()
+
+        assert stats['sensitivity_count'] == 3
+        assert stats['resistance_count'] == 0
+        assert stats['dominant_signal'] == 'sensitivity_only'
+        assert stats['conflicts'] == []
+
+    def test_compute_stats_resistance_only(self):
+        """Test stats when all evidence is resistance."""
+        evidence = Evidence(
+            variant_id="KRAS:G12V",
+            gene="KRAS",
+            variant="G12V",
+            vicc=[
+                VICCEvidence(drugs=["Cetuximab"], evidence_level="A", is_resistance=True, disease="Colorectal Cancer"),
+                VICCEvidence(drugs=["Panitumumab"], evidence_level="B", is_resistance=True, disease="Colorectal Cancer"),
+            ]
+        )
+
+        stats = evidence.compute_evidence_stats()
+
+        assert stats['sensitivity_count'] == 0
+        assert stats['resistance_count'] == 2
+        assert stats['dominant_signal'] == 'resistance_only'
+
+    def test_compute_stats_sensitivity_dominant(self):
+        """Test stats when sensitivity strongly predominates (>80%)."""
+        evidence = Evidence(
+            variant_id="EGFR:S768I",
+            gene="EGFR",
+            variant="S768I",
+            vicc=[
+                VICCEvidence(drugs=["Erlotinib"], evidence_level="C", is_sensitivity=True, disease="NSCLC"),
+                VICCEvidence(drugs=["Erlotinib"], evidence_level="C", is_sensitivity=True, disease="NSCLC"),
+                VICCEvidence(drugs=["Erlotinib"], evidence_level="B", is_sensitivity=True, disease="NSCLC"),
+                VICCEvidence(drugs=["Gefitinib"], evidence_level="B", is_sensitivity=True, disease="NSCLC"),
+                VICCEvidence(drugs=["Gefitinib"], evidence_level="D", is_sensitivity=True, disease="NSCLC"),
+                VICCEvidence(drugs=["Gefitinib"], evidence_level="C", is_sensitivity=True, disease="NSCLC"),
+                VICCEvidence(drugs=["Afatinib"], evidence_level="A", is_sensitivity=True, disease="NSCLC"),
+                # 1 resistance entry
+                VICCEvidence(drugs=["Erlotinib"], evidence_level="C", is_resistance=True, disease="NSCLC"),
+            ]
+        )
+
+        stats = evidence.compute_evidence_stats()
+
+        assert stats['sensitivity_count'] == 7
+        assert stats['resistance_count'] == 1
+        assert stats['dominant_signal'] == 'sensitivity_dominant'
+        # Should have sensitivity percentage > 80%
+        total = stats['sensitivity_count'] + stats['resistance_count']
+        sens_pct = stats['sensitivity_count'] / total * 100
+        assert sens_pct >= 80
+
+    def test_compute_stats_mixed_signals(self):
+        """Test stats when signals are mixed (neither dominates)."""
+        evidence = Evidence(
+            variant_id="BRAF:V600E",
+            gene="BRAF",
+            variant="V600E",
+            vicc=[
+                VICCEvidence(drugs=["Dabrafenib"], evidence_level="A", is_sensitivity=True, disease="Melanoma"),
+                VICCEvidence(drugs=["Vemurafenib"], evidence_level="A", is_sensitivity=True, disease="Melanoma"),
+                VICCEvidence(drugs=["Dabrafenib"], evidence_level="B", is_resistance=True, disease="Colorectal Cancer"),
+                VICCEvidence(drugs=["Vemurafenib"], evidence_level="B", is_resistance=True, disease="Colorectal Cancer"),
+            ]
+        )
+
+        stats = evidence.compute_evidence_stats()
+
+        assert stats['sensitivity_count'] == 2
+        assert stats['resistance_count'] == 2
+        assert stats['dominant_signal'] == 'mixed'
+
+    def test_detect_conflicts(self):
+        """Test detection of conflicting evidence for the same drug."""
+        evidence = Evidence(
+            variant_id="EGFR:S768I",
+            gene="EGFR",
+            variant="S768I",
+            vicc=[
+                VICCEvidence(drugs=["Erlotinib"], evidence_level="C", is_sensitivity=True, disease="lung adenocarcinoma"),
+                VICCEvidence(drugs=["Erlotinib"], evidence_level="C", is_sensitivity=True, disease="NSCLC"),
+                VICCEvidence(drugs=["Erlotinib"], evidence_level="C", is_resistance=True, disease="lung cancer"),
+            ]
+        )
+
+        stats = evidence.compute_evidence_stats()
+
+        assert len(stats['conflicts']) == 1
+        conflict = stats['conflicts'][0]
+        assert conflict['drug'].lower() == 'erlotinib'
+        assert conflict['sensitivity_count'] == 2
+        assert conflict['resistance_count'] == 1
+
+    def test_format_evidence_summary_header(self):
+        """Test that summary header is formatted correctly."""
+        evidence = Evidence(
+            variant_id="EGFR:L858R",
+            gene="EGFR",
+            variant="L858R",
+            vicc=[
+                VICCEvidence(drugs=["Erlotinib"], evidence_level="A", is_sensitivity=True, disease="NSCLC"),
+                VICCEvidence(drugs=["Gefitinib"], evidence_level="B", is_sensitivity=True, disease="NSCLC"),
+            ]
+        )
+
+        header = evidence.format_evidence_summary_header()
+
+        assert "EVIDENCE SUMMARY" in header
+        assert "Sensitivity entries: 2" in header
+        assert "sensitivity_only" in header.lower() or "sensitivity" in header.lower()
+        assert "100%" in header  # 100% sensitivity
+
+    def test_format_evidence_summary_header_with_conflicts(self):
+        """Test that conflicts appear in the summary header."""
+        evidence = Evidence(
+            variant_id="EGFR:S768I",
+            gene="EGFR",
+            variant="S768I",
+            vicc=[
+                VICCEvidence(drugs=["Erlotinib"], evidence_level="C", is_sensitivity=True, disease="NSCLC"),
+                VICCEvidence(drugs=["Erlotinib"], evidence_level="C", is_resistance=True, disease="NSCLC"),
+            ]
+        )
+
+        header = evidence.format_evidence_summary_header()
+
+        assert "CONFLICTS DETECTED" in header
+        assert "Erlotinib" in header
+
+    def test_evidence_level_breakdown(self):
+        """Test that evidence levels are correctly counted."""
+        evidence = Evidence(
+            variant_id="BRAF:V600E",
+            gene="BRAF",
+            variant="V600E",
+            vicc=[
+                VICCEvidence(drugs=["Dabrafenib"], evidence_level="A", is_sensitivity=True, disease="Melanoma"),
+                VICCEvidence(drugs=["Vemurafenib"], evidence_level="A", is_sensitivity=True, disease="Melanoma"),
+                VICCEvidence(drugs=["Encorafenib"], evidence_level="B", is_sensitivity=True, disease="Melanoma"),
+                VICCEvidence(drugs=["Dabrafenib"], evidence_level="C", is_resistance=True, disease="CRC"),
+            ]
+        )
+
+        stats = evidence.compute_evidence_stats()
+
+        assert stats['sensitivity_by_level'] == {'A': 2, 'B': 1}
+        assert stats['resistance_by_level'] == {'C': 1}

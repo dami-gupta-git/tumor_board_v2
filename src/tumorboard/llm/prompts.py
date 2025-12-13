@@ -100,6 +100,11 @@ IMPORTANT: The evidence summary includes FDA Approved Drugs, CIViC, OncoKB/CGI B
 - CIViC and OncoKB evidence levels and significance terms.
 - FDA approvals and CGI [FDA APPROVED] entries provide the strongest evidence for Tier I classification when the indication matches the tumor type.
 
+INTERPRETING FDA LABELS WITH PROTEIN EXPRESSION BIOMARKERS:
+- Some FDA labels use protein expression (e.g., "Kit (CD117) positive") rather than specific mutations.
+- When CIViC/OncoKB shows Level A evidence that a specific mutation confers sensitivity to an FDA-approved drug, AND the FDA label covers that gene/protein in the same tumor type, treat this as Tier I.
+- Example: KIT mutations in GIST with imatinib - FDA approves for "Kit (CD117) positive GIST" and CIViC shows Level A sensitivity for KIT exon 11 mutations → Tier I.
+
 INTERPRETING CIViC/CGI/OncoKB EVIDENCE SIGNIFICANCE:
 - SENSITIVITY / SENSITIVITYRESPONSE / oncogenic driver with responsive therapy:
   - Drug may be effective; can be recommended at the appropriate tier.
@@ -107,6 +112,12 @@ INTERPRETING CIViC/CGI/OncoKB EVIDENCE SIGNIFICANCE:
   - Drug is unlikely to work; should NOT be recommended in that context.
 - When a drug appears with both SENSITIVITY and RESISTANCE:
   - Carefully check tumor type, line of therapy, and combination vs monotherapy to decide which signal applies.
+
+PRIMARY vs SECONDARY/ACQUIRED MUTATIONS:
+- Resistance evidence that describes SECONDARY or ACQUIRED mutations (mutations that develop after treatment) does NOT apply to the PRIMARY mutation being assessed.
+- If evidence describes resistance due to "secondary mutation X developing after treatment with drug Y", this does not mean the primary mutation is resistant.
+- Example: Evidence saying "KIT D820A secondary mutation causes imatinib resistance in patients with KIT V560D" does NOT mean V560D itself is resistant - V560D remains sensitive, and D820A is a separate acquired resistance mechanism.
+- Always check if the resistance is attributed to the variant you are assessing or to a different secondary mutation.
 
 CRITICAL RULES FOR THERAPY RECOMMENDATIONS:
 1. ONLY recommend drugs where evidence shows SENSITIVITY/SENSITIVITYRESPONSE or strong therapeutic support.

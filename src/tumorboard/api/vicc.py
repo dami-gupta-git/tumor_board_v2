@@ -268,6 +268,37 @@ class VICCClient:
         except Exception:
             return None
 
+    def _is_compound_mutation_resistance(self, assoc: "VICCAssociation", variant: str | None) -> bool:
+        """Check if resistance is due to a compound/secondary mutation, not the queried variant.
+
+        Args:
+            assoc: The VICC association to check
+            variant: The variant being queried (e.g., "V560D")
+
+        Returns:
+            True if this is resistance from a secondary mutation, not the queried variant
+        """
+        if not variant or not assoc.is_resistance():
+            return False
+
+        desc_lower = assoc.description.lower() if assoc.description else ""
+
+        # Check for indicators of secondary/compound mutations
+        secondary_indicators = [
+            "secondary mutation",
+            "acquired mutation",
+            "harboring " + variant.lower() + " and ",
+            variant.lower() + " and " + assoc.gene.lower() if assoc.gene else "",
+            "developed resistance",
+            "resistance developed",
+        ]
+
+        for indicator in secondary_indicators:
+            if indicator and indicator in desc_lower:
+                return True
+
+        return False
+
     async def fetch_associations(
         self,
         gene: str,
@@ -318,6 +349,10 @@ class VICCClient:
 
             # Filter by tumor type if specified
             if tumor_type and not self._tumor_matches(assoc.disease, tumor_type):
+                continue
+
+            # Filter out resistance entries that are about secondary/compound mutations
+            if self._is_compound_mutation_resistance(assoc, variant):
                 continue
 
             associations.append(assoc)

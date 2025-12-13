@@ -150,6 +150,155 @@ class Evidence(VariantAnnotations):
 
         return False
 
+    def compute_evidence_stats(self, tumor_type: str | None = None) -> dict:
+        """Compute summary statistics and detect conflicts in the evidence.
+
+        Returns a dict with:
+        - sensitivity_count: total sensitivity entries
+        - resistance_count: total resistance entries
+        - sensitivity_by_level: dict of level -> count
+        - resistance_by_level: dict of level -> count
+        - conflicts: list of {drug, sensitivity_context, resistance_context}
+        - dominant_signal: 'sensitivity', 'resistance', 'mixed', or 'none'
+        - has_fda_approved: bool
+        """
+        stats = {
+            'sensitivity_count': 0,
+            'resistance_count': 0,
+            'sensitivity_by_level': {},
+            'resistance_by_level': {},
+            'conflicts': [],
+            'dominant_signal': 'none',
+            'has_fda_approved': bool(self.fda_approvals) or any(b.fda_approved for b in self.cgi_biomarkers),
+        }
+
+        # Track drugs with their signals for conflict detection
+        drug_signals: dict[str, dict] = {}  # drug -> {'sensitivity': [...], 'resistance': [...]}
+
+        def add_drug_signal(drug: str, signal_type: str, level: str | None, disease: str | None):
+            drug_lower = drug.lower().strip()
+            if drug_lower not in drug_signals:
+                drug_signals[drug_lower] = {'sensitivity': [], 'resistance': [], 'drug_name': drug}
+            drug_signals[drug_lower][signal_type].append({'level': level, 'disease': disease})
+
+        # Process VICC evidence
+        for ev in self.vicc:
+            level = ev.evidence_level or 'Unknown'
+            if ev.is_sensitivity:
+                stats['sensitivity_count'] += 1
+                stats['sensitivity_by_level'][level] = stats['sensitivity_by_level'].get(level, 0) + 1
+                for drug in ev.drugs:
+                    add_drug_signal(drug, 'sensitivity', level, ev.disease)
+            elif ev.is_resistance:
+                stats['resistance_count'] += 1
+                stats['resistance_by_level'][level] = stats['resistance_by_level'].get(level, 0) + 1
+                for drug in ev.drugs:
+                    add_drug_signal(drug, 'resistance', level, ev.disease)
+
+        # Process CIViC evidence
+        for ev in self.civic:
+            if ev.evidence_type != "PREDICTIVE":
+                continue
+            level = ev.evidence_level or 'Unknown'
+            sig = (ev.clinical_significance or '').upper()
+            if 'RESISTANCE' in sig:
+                stats['resistance_count'] += 1
+                stats['resistance_by_level'][level] = stats['resistance_by_level'].get(level, 0) + 1
+                for drug in ev.drugs:
+                    add_drug_signal(drug, 'resistance', level, ev.disease)
+            elif 'SENSITIVITY' in sig or 'RESPONSE' in sig:
+                stats['sensitivity_count'] += 1
+                stats['sensitivity_by_level'][level] = stats['sensitivity_by_level'].get(level, 0) + 1
+                for drug in ev.drugs:
+                    add_drug_signal(drug, 'sensitivity', level, ev.disease)
+
+        # Detect conflicts (same drug with both sensitivity and resistance)
+        for drug_lower, signals in drug_signals.items():
+            if signals['sensitivity'] and signals['resistance']:
+                # Summarize contexts
+                sens_diseases = list(set(s['disease'][:50] if s['disease'] else 'unspecified' for s in signals['sensitivity'][:3]))
+                res_diseases = list(set(s['disease'][:50] if s['disease'] else 'unspecified' for s in signals['resistance'][:3]))
+                stats['conflicts'].append({
+                    'drug': signals['drug_name'],
+                    'sensitivity_context': ', '.join(sens_diseases),
+                    'resistance_context': ', '.join(res_diseases),
+                    'sensitivity_count': len(signals['sensitivity']),
+                    'resistance_count': len(signals['resistance']),
+                })
+
+        # Determine dominant signal
+        total = stats['sensitivity_count'] + stats['resistance_count']
+        if total == 0:
+            stats['dominant_signal'] = 'none'
+        elif stats['sensitivity_count'] == 0:
+            stats['dominant_signal'] = 'resistance_only'
+        elif stats['resistance_count'] == 0:
+            stats['dominant_signal'] = 'sensitivity_only'
+        elif stats['sensitivity_count'] >= total * 0.8:
+            stats['dominant_signal'] = 'sensitivity_dominant'
+        elif stats['resistance_count'] >= total * 0.8:
+            stats['dominant_signal'] = 'resistance_dominant'
+        else:
+            stats['dominant_signal'] = 'mixed'
+
+        return stats
+
+    def format_evidence_summary_header(self, tumor_type: str | None = None) -> str:
+        """Generate a pre-processed summary header with stats and conflicts.
+
+        This appears BEFORE the detailed evidence to guide LLM interpretation.
+        """
+        stats = self.compute_evidence_stats(tumor_type)
+        lines = []
+
+        lines.append("=" * 60)
+        lines.append("EVIDENCE SUMMARY (Pre-processed)")
+        lines.append("=" * 60)
+
+        # Overall stats
+        total = stats['sensitivity_count'] + stats['resistance_count']
+        if total > 0:
+            sens_pct = (stats['sensitivity_count'] / total) * 100
+            res_pct = (stats['resistance_count'] / total) * 100
+
+            # Format by-level breakdown
+            sens_levels = ', '.join(f"{k}:{v}" for k, v in sorted(stats['sensitivity_by_level'].items()))
+            res_levels = ', '.join(f"{k}:{v}" for k, v in sorted(stats['resistance_by_level'].items()))
+
+            lines.append(f"Sensitivity entries: {stats['sensitivity_count']} ({sens_pct:.0f}%) - Levels: {sens_levels or 'none'}")
+            lines.append(f"Resistance entries: {stats['resistance_count']} ({res_pct:.0f}%) - Levels: {res_levels or 'none'}")
+
+            # Dominant signal interpretation
+            signal_interpretations = {
+                'sensitivity_only': "INTERPRETATION: All evidence shows sensitivity. No resistance signals.",
+                'resistance_only': "INTERPRETATION: All evidence shows resistance. This is a RESISTANCE MARKER.",
+                'sensitivity_dominant': f"INTERPRETATION: Sensitivity evidence strongly predominates ({sens_pct:.0f}%). Minor resistance signals likely context-specific.",
+                'resistance_dominant': f"INTERPRETATION: Resistance evidence strongly predominates ({res_pct:.0f}%). Minor sensitivity signals likely context-specific.",
+                'mixed': "INTERPRETATION: Mixed signals - carefully evaluate tumor type and drug contexts below.",
+            }
+            if stats['dominant_signal'] in signal_interpretations:
+                lines.append(signal_interpretations[stats['dominant_signal']])
+        else:
+            lines.append("No sensitivity/resistance evidence found in databases.")
+
+        # FDA status
+        if stats['has_fda_approved']:
+            lines.append("FDA STATUS: Has FDA-approved therapy associated with this gene.")
+
+        # Conflicts
+        if stats['conflicts']:
+            lines.append("")
+            lines.append("CONFLICTS DETECTED:")
+            for conflict in stats['conflicts'][:5]:  # Limit to 5 conflicts
+                lines.append(f"  - {conflict['drug']}: "
+                           f"SENSITIVITY in {conflict['sensitivity_context']} ({conflict['sensitivity_count']} entries) "
+                           f"vs RESISTANCE in {conflict['resistance_context']} ({conflict['resistance_count']} entries)")
+
+        lines.append("=" * 60)
+        lines.append("")
+
+        return "\n".join(lines)
+
     def summary(self, tumor_type: str | None = None, max_items: int = 15) -> str:
         """Generate a text summary of all evidence.
 

@@ -1,0 +1,487 @@
+{
+  "total_cases": 117,
+  "correct_predictions": 68,
+  "accuracy": 0.5811965811965812,
+  "average_confidence": 0.7512820512820515,
+  "tier_metrics": {
+    "Tier I": {
+      "tier": "Tier I",
+      "true_positives": 31,
+      "false_positives": 4,
+      "false_negatives": 20,
+      "precision": 0.8857142857142857,
+      "recall": 0.6078431372549019,
+      "f1_score": 0.7209302325581395
+    },
+    "Tier II": {
+      "tier": "Tier II",
+      "true_positives": 11,
+      "false_positives": 26,
+      "false_negatives": 11,
+      "precision": 0.2972972972972973,
+      "recall": 0.5,
+      "f1_score": 0.3728813559322034
+    },
+    "Tier III": {
+      "tier": "Tier III",
+      "true_positives": 26,
+      "false_positives": 19,
+      "false_negatives": 13,
+      "precision": 0.5777777777777777,
+      "recall": 0.6666666666666666,
+      "f1_score": 0.619047619047619
+    },
+    "Tier IV": {
+      "tier": "Tier IV",
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 5,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0
+    }
+  },
+  "failure_analysis": [
+    {
+      "variant": "BRAF V600E",
+      "tumor_type": "Colorectal Cancer",
+      "expected": "Tier II",
+      "predicted": "Tier I",
+      "tier_distance": "1",
+      "confidence": "95.00%",
+      "summary": "The BRAF V600E mutation in colorectal cancer is associated with sensitivity to targeted therapies, specifically BRAFTOVI in combination with cetuximab, which is FDA-approved for this indication. This ..."
+    },
+    {
+      "variant": "EGFR G719X",
+      "tumor_type": "Lung Adenocarcinoma",
+      "expected": "Tier I",
+      "predicted": "Tier II",
+      "tier_distance": "1",
+      "confidence": "85.00%",
+      "summary": "The EGFR G719X variant in lung adenocarcinoma is associated with sensitivity to afatinib and other EGFR tyrosine kinase inhibitors, indicating potential therapeutic options. While not FDA-approved spe..."
+    },
+    {
+      "variant": "EGFR S768I",
+      "tumor_type": "Lung Adenocarcinoma",
+      "expected": "Tier I",
+      "predicted": "Tier II",
+      "tier_distance": "1",
+      "confidence": "85.00%",
+      "summary": "The EGFR S768I variant in lung adenocarcinoma is associated with sensitivity to afatinib, making it clinically actionable. However, there is also evidence of resistance to erlotinib, which is a standa..."
+    },
+    {
+      "variant": "EGFR C797S",
+      "tumor_type": "Lung Adenocarcinoma",
+      "expected": "Tier I",
+      "predicted": "Tier II",
+      "tier_distance": "1",
+      "confidence": "75.00%",
+      "summary": "The EGFR C797S variant is associated with resistance to osimertinib in lung adenocarcinoma, indicating that alternative therapies may be necessary. Additionally, there is evidence suggesting sensitivi..."
+    },
+    {
+      "variant": "KRAS G12C",
+      "tumor_type": "Colorectal Cancer",
+      "expected": "Tier I",
+      "predicted": "Tier II",
+      "tier_distance": "1",
+      "confidence": "85.00%",
+      "summary": "The KRAS G12C mutation in colorectal cancer is associated with sensitivity to specific therapies, including the combination of sotorasib and panitumumab, as well as adagrasib and cetuximab. However, i..."
+    },
+    {
+      "variant": "KRAS G12V",
+      "tumor_type": "Colorectal Cancer",
+      "expected": "Tier I",
+      "predicted": "Tier III",
+      "tier_distance": "2",
+      "confidence": "65.00%",
+      "summary": "The KRAS G12V variant in colorectal cancer is associated with resistance to anti-EGFR therapies like cetuximab and panitumumab. There are no FDA-approved therapies specifically targeting KRAS G12V, an..."
+    },
+    {
+      "variant": "KRAS G13D",
+      "tumor_type": "Colorectal Cancer",
+      "expected": "Tier I",
+      "predicted": "Tier III",
+      "tier_distance": "2",
+      "confidence": "65.00%",
+      "summary": "The KRAS G13D mutation in colorectal cancer is associated with resistance to anti-EGFR therapies like cetuximab and panitumumab, which are standard treatments. While there is some evidence suggesting ..."
+    },
+    {
+      "variant": "KRAS Q61H",
+      "tumor_type": "Colorectal Cancer",
+      "expected": "Tier I",
+      "predicted": "Tier II",
+      "tier_distance": "1",
+      "confidence": "75.00%",
+      "summary": "The KRAS Q61H variant in colorectal cancer indicates resistance to anti-EGFR therapies such as cetuximab and panitumumab, which are standard treatments. This variant suggests that these therapies shou..."
+    },
+    {
+      "variant": "NRAS Q61R",
+      "tumor_type": "Colorectal Cancer",
+      "expected": "Tier III",
+      "predicted": "Tier II",
+      "tier_distance": "1",
+      "confidence": "75.00%",
+      "summary": "The NRAS Q61R variant in colorectal cancer indicates resistance to EGFR inhibitors like cetuximab and panitumumab, which are standard treatments. This variant suggests that these therapies should not ..."
+    },
+    {
+      "variant": "NRAS G12D",
+      "tumor_type": "Melanoma",
+      "expected": "Tier III",
+      "predicted": "Tier II",
+      "tier_distance": "1",
+      "confidence": "75.00%",
+      "summary": "The NRAS G12D variant in melanoma has evidence suggesting sensitivity to certain therapies, particularly MEK inhibitors like binimetinib. However, it also shows resistance to BRAF inhibitors, which in..."
+    },
+    {
+      "variant": "ERBB2 V777L",
+      "tumor_type": "Lung Adenocarcinoma",
+      "expected": "Tier II",
+      "predicted": "Tier I",
+      "tier_distance": "1",
+      "confidence": "95.00%",
+      "summary": "The ERBB2 V777L variant in lung adenocarcinoma is associated with sensitivity to trastuzumab deruxtecan and other HER2-targeted therapies. This variant is actionable, as it is linked to FDA-approved t..."
+    },
+    {
+      "variant": "ERBB2 G776delinsVC",
+      "tumor_type": "Lung Adenocarcinoma",
+      "expected": "Tier II",
+      "predicted": "Tier I",
+      "tier_distance": "1",
+      "confidence": "95.00%",
+      "summary": "The ERBB2 G776delinsVC variant in lung adenocarcinoma is associated with sensitivity to multiple FDA-approved therapies, including zongertinib and trastuzumab deruxtecan. This variant is actionable an..."
+    },
+    {
+      "variant": "MET D1010H",
+      "tumor_type": "Non-Small Cell Lung Cancer",
+      "expected": "Tier II",
+      "predicted": "Tier III",
+      "tier_distance": "1",
+      "confidence": "65.00%",
+      "summary": "The MET D1010H variant in non-small cell lung cancer has uncertain clinical significance. While there is some evidence suggesting sensitivity to MET inhibitors, it is not FDA-approved for this specifi..."
+    },
+    {
+      "variant": "MET Y1003C",
+      "tumor_type": "Non-Small Cell Lung Cancer",
+      "expected": "Tier II",
+      "predicted": "Tier III",
+      "tier_distance": "1",
+      "confidence": "55.00%",
+      "summary": "The MET Y1003C variant has uncertain clinical significance in non-small cell lung cancer. While there is evidence suggesting sensitivity to MET inhibitors, it is not FDA-approved for this specific var..."
+    },
+    {
+      "variant": "FGFR2 N549H",
+      "tumor_type": "Cholangiocarcinoma",
+      "expected": "Tier I",
+      "predicted": "Tier III",
+      "tier_distance": "2",
+      "confidence": "65.00%",
+      "summary": "The FGFR2 N549H variant in cholangiocarcinoma has limited evidence supporting its clinical significance. While there are indications of sensitivity to FGFR inhibitors, there is no FDA-approved therapy..."
+    },
+    {
+      "variant": "TP53 R175H",
+      "tumor_type": "Breast Cancer",
+      "expected": "Tier III",
+      "predicted": "Tier II",
+      "tier_distance": "1",
+      "confidence": "75.00%",
+      "summary": "The TP53 R175H variant in breast cancer is associated with resistance to tamoxifen, suggesting that patients with this mutation may not respond well to this standard treatment. However, there is evide..."
+    },
+    {
+      "variant": "TP53 R273H",
+      "tumor_type": "Lung Cancer",
+      "expected": "Tier III",
+      "predicted": "Tier II",
+      "tier_distance": "1",
+      "confidence": "75.00%",
+      "summary": "The TP53 R273H variant is associated with sensitivity to certain therapies, including eprenetapopt and pembrolizumab, in lung cancer. However, it also shows resistance to MDM2 inhibitors, which inform..."
+    },
+    {
+      "variant": "ALK L1196M",
+      "tumor_type": "Non-Small Cell Lung Cancer",
+      "expected": "Tier I",
+      "predicted": "Tier II",
+      "tier_distance": "1",
+      "confidence": "75.00%",
+      "summary": "The ALK L1196M variant in non-small cell lung cancer (NSCLC) is associated with resistance to crizotinib but sensitivity to second and third-generation ALK inhibitors. This variant indicates that alte..."
+    },
+    {
+      "variant": "ALK G1269A",
+      "tumor_type": "Non-Small Cell Lung Cancer",
+      "expected": "Tier I",
+      "predicted": "Tier II",
+      "tier_distance": "1",
+      "confidence": "75.00%",
+      "summary": "The ALK G1269A variant in non-small cell lung cancer (NSCLC) is associated with sensitivity to brigatinib and ceritinib, making it clinically actionable. However, it also shows resistance to alectinib..."
+    },
+    {
+      "variant": "ROS1 G2032R",
+      "tumor_type": "Non-Small Cell Lung Cancer",
+      "expected": "Tier I",
+      "predicted": "Tier II",
+      "tier_distance": "1",
+      "confidence": "85.00%",
+      "summary": "The ROS1 G2032R variant is associated with sensitivity to specific ROS1 inhibitors in non-small cell lung cancer (NSCLC), making it clinically actionable. Although it is a resistance mutation to crizo..."
+    },
+    {
+      "variant": "PDGFRA V561D",
+      "tumor_type": "Gastrointestinal Stromal Tumor",
+      "expected": "Tier I",
+      "predicted": "Tier III",
+      "tier_distance": "2",
+      "confidence": "65.00%",
+      "summary": "The PDGFRA V561D variant is currently classified as having unknown clinical significance in gastrointestinal stromal tumors (GISTs). While there is evidence suggesting sensitivity to certain therapies..."
+    },
+    {
+      "variant": "SMO W281C",
+      "tumor_type": "Basal Cell Carcinoma",
+      "expected": "Tier I",
+      "predicted": "Tier III",
+      "tier_distance": "2",
+      "confidence": "60.00%",
+      "summary": "The SMO W281C variant in basal cell carcinoma is associated with resistance to vismodegib, a standard treatment for this cancer. While there is some evidence suggesting sensitivity to other agents, th..."
+    },
+    {
+      "variant": "MPL W515L",
+      "tumor_type": "Myeloproliferative Neoplasm",
+      "expected": "Tier I",
+      "predicted": "Tier II",
+      "tier_distance": "1",
+      "confidence": "75.00%",
+      "summary": "The MPL W515L variant is a diagnostic criterion for essential thrombocythemia and has prognostic implications in myelofibrosis. While it does not directly lead to a specific FDA-approved therapy, it i..."
+    },
+    {
+      "variant": "NPM1 W288fs",
+      "tumor_type": "Acute Myeloid Leukemia",
+      "expected": "Tier III",
+      "predicted": "Tier II",
+      "tier_distance": "1",
+      "confidence": "75.00%",
+      "summary": "The NPM1 W288fs variant in acute myeloid leukemia (AML) is associated with improved responses to certain therapies, including tretinoin and valproic acid, indicating potential therapeutic options. Whi..."
+    },
+    {
+      "variant": "DNMT3A R882H",
+      "tumor_type": "Acute Myeloid Leukemia",
+      "expected": "Tier III",
+      "predicted": "Tier II",
+      "tier_distance": "1",
+      "confidence": "75.00%",
+      "summary": "The DNMT3A R882H variant in acute myeloid leukemia (AML) is associated with sensitivity to idarubicin and decitabine, which may improve patient outcomes. However, it also shows resistance to daunorubi..."
+    },
+    {
+      "variant": "NOTCH1 P2514fs",
+      "tumor_type": "T-cell Acute Lymphoblastic Leukemia",
+      "expected": "Tier III",
+      "predicted": "Tier II",
+      "tier_distance": "1",
+      "confidence": "75.00%",
+      "summary": "The NOTCH1 P2514fs variant is associated with improved response to prednisone therapy in T-cell Acute Lymphoblastic Leukemia (T-ALL), indicating its potential therapeutic significance. While the evide..."
+    },
+    {
+      "variant": "PTEN R130*",
+      "tumor_type": "Endometrial Cancer",
+      "expected": "Tier III",
+      "predicted": "Tier II",
+      "tier_distance": "1",
+      "confidence": "75.00%",
+      "summary": "The PTEN R130* variant is associated with sensitivity to certain therapies in endometrial cancer, particularly in the context of PI3K pathway inhibitors. While there is no direct FDA-approved therapy ..."
+    },
+    {
+      "variant": "PTEN R233*",
+      "tumor_type": "Glioblastoma",
+      "expected": "Tier III",
+      "predicted": "Tier II",
+      "tier_distance": "1",
+      "confidence": "75.00%",
+      "summary": "The PTEN R233* variant is associated with resistance to PD-1 inhibitors in glioblastoma, indicating that these therapies should be avoided. Additionally, there is evidence suggesting sensitivity to PI..."
+    },
+    {
+      "variant": "SMARCA4 R1192*",
+      "tumor_type": "Small Cell Carcinoma of Ovary",
+      "expected": "Tier III",
+      "predicted": "Tier II",
+      "tier_distance": "1",
+      "confidence": "75.00%",
+      "summary": "The SMARCA4 R1192* variant is associated with small cell carcinoma of the ovary and has shown sensitivity to tazemetostat in clinical trials. This variant may guide treatment decisions in this tumor t..."
+    },
+    {
+      "variant": "SMARCB1 R374*",
+      "tumor_type": "Rhabdoid Tumor",
+      "expected": "Tier III",
+      "predicted": "Tier II",
+      "tier_distance": "1",
+      "confidence": "75.00%",
+      "summary": "The SMARCB1 R374* variant is associated with sensitivity to tazemetostat in rhabdoid tumors, suggesting potential therapeutic options for patients with this mutation. While the evidence is promising, ..."
+    },
+    {
+      "variant": "POLE P286R",
+      "tumor_type": "Endometrial Cancer",
+      "expected": "Tier II",
+      "predicted": "Tier III",
+      "tier_distance": "1",
+      "confidence": "60.00%",
+      "summary": "The POLE P286R variant has been associated with sensitivity to pembrolizumab in case reports, but there is no FDA approval specifically linking this variant to treatment decisions in endometrial cance..."
+    },
+    {
+      "variant": "POLD1 S478N",
+      "tumor_type": "Colorectal Cancer",
+      "expected": "Tier II",
+      "predicted": "Tier III",
+      "tier_distance": "1",
+      "confidence": "50.00%",
+      "summary": "The POLD1 S478N variant currently lacks sufficient evidence to determine its clinical significance in colorectal cancer. As no actionable therapies or guidelines are associated with this variant, it i..."
+    },
+    {
+      "variant": "MSH6 F1088fs",
+      "tumor_type": "Colorectal Cancer",
+      "expected": "Tier I",
+      "predicted": "Tier III",
+      "tier_distance": "2",
+      "confidence": "50.00%",
+      "summary": "The MSH6 F1088fs variant in colorectal cancer currently lacks sufficient evidence to determine its clinical significance. No FDA-approved therapies or strong guideline recommendations are associated w..."
+    },
+    {
+      "variant": "MLH1 V716M",
+      "tumor_type": "Endometrial Cancer",
+      "expected": "Tier I",
+      "predicted": "Tier III",
+      "tier_distance": "2",
+      "confidence": "50.00%",
+      "summary": "The MLH1 V716M variant is currently classified as having unknown clinical significance. There is insufficient evidence to determine its impact on treatment decisions in endometrial cancer."
+    },
+    {
+      "variant": "PMS2 R20*",
+      "tumor_type": "Colorectal Cancer",
+      "expected": "Tier I",
+      "predicted": "Tier III",
+      "tier_distance": "2",
+      "confidence": "40.00%",
+      "summary": "The PMS2 R20* variant is currently classified as having unknown clinical significance. There is limited evidence regarding its role in colorectal cancer, and existing data does not support a clear the..."
+    },
+    {
+      "variant": "TSC1 R692*",
+      "tumor_type": "Renal Cell Carcinoma",
+      "expected": "Tier II",
+      "predicted": "Tier III",
+      "tier_distance": "1",
+      "confidence": "55.00%",
+      "summary": "The TSC1 R692* variant is associated with tuberous sclerosis and shows sensitivity to everolimus, but there is no FDA approval or strong guideline support for its use in renal cell carcinoma. Therefor..."
+    },
+    {
+      "variant": "TSC2 R905*",
+      "tumor_type": "Bladder Cancer",
+      "expected": "Tier II",
+      "predicted": "Tier III",
+      "tier_distance": "1",
+      "confidence": "60.00%",
+      "summary": "The TSC2 R905* variant is associated with sensitivity to everolimus in tuberous sclerosis but lacks direct evidence for therapeutic actionability in bladder cancer. Therefore, its clinical significanc..."
+    },
+    {
+      "variant": "MTOR E2014K",
+      "tumor_type": "Renal Cell Carcinoma",
+      "expected": "Tier II",
+      "predicted": "Tier III",
+      "tier_distance": "1",
+      "confidence": "65.00%",
+      "summary": "The MTOR E2014K variant has limited evidence linking it to actionable therapies in renal cell carcinoma. While there is some indication of sensitivity to Sapanisertib in solid tumors, this evidence is..."
+    },
+    {
+      "variant": "HRAS G12D",
+      "tumor_type": "Head and Neck Cancer",
+      "expected": "Tier III",
+      "predicted": "Tier II",
+      "tier_distance": "1",
+      "confidence": "75.00%",
+      "summary": "The HRAS G12D variant in head and neck cancer is associated with sensitivity to the farnesyltransferase inhibitor tipifarnib, which has shown a significant response rate in clinical trials. However, i..."
+    },
+    {
+      "variant": "MAP2K1 K57N",
+      "tumor_type": "Melanoma",
+      "expected": "Tier I",
+      "predicted": "Tier II",
+      "tier_distance": "1",
+      "confidence": "70.00%",
+      "summary": "The MAP2K1 K57N variant is associated with resistance to selumetinib in melanoma, indicating that this variant may change treatment decisions. While there is evidence of sensitivity to cobimetinib in ..."
+    },
+    {
+      "variant": "RAC1 P29S",
+      "tumor_type": "Melanoma",
+      "expected": "Tier III",
+      "predicted": "Tier II",
+      "tier_distance": "1",
+      "confidence": "75.00%",
+      "summary": "The RAC1 P29S variant is associated with resistance to BRAF inhibitors like vemurafenib and dabrafenib in melanoma. This variant indicates that these therapies may not be effective in patients harbori..."
+    },
+    {
+      "variant": "CDK4 R24C",
+      "tumor_type": "Melanoma",
+      "expected": "Tier II",
+      "predicted": "Tier III",
+      "tier_distance": "1",
+      "confidence": "55.00%",
+      "summary": "The CDK4 R24C variant in melanoma has shown some sensitivity to palbociclib in preclinical studies, but there is no FDA approval or strong guideline support for its use in this context. Therefore, its..."
+    },
+    {
+      "variant": "ABL1 E255K",
+      "tumor_type": "Chronic Myeloid Leukemia",
+      "expected": "Tier I",
+      "predicted": "Tier II",
+      "tier_distance": "1",
+      "confidence": "85.00%",
+      "summary": "The ABL1 E255K variant in Chronic Myeloid Leukemia (CML) is associated with sensitivity to dasatinib and bosutinib, both of which are FDA-approved therapies for CML. This variant may influence treatme..."
+    },
+    {
+      "variant": "BTK C481S",
+      "tumor_type": "Chronic Lymphocytic Leukemia",
+      "expected": "Tier I",
+      "predicted": "Tier II",
+      "tier_distance": "1",
+      "confidence": "75.00%",
+      "summary": "The BTK C481S variant is associated with resistance to ibrutinib in chronic lymphocytic leukemia (CLL), indicating that patients with this mutation may not benefit from this therapy. This resistance m..."
+    },
+    {
+      "variant": "WT1 R394W",
+      "tumor_type": "Wilms Tumor",
+      "expected": "Tier IV",
+      "predicted": "Tier III",
+      "tier_distance": "1",
+      "confidence": "60.00%",
+      "summary": "The WT1 R394W variant is associated with resistance to chemotherapy in acute myeloid leukemia, but there is no direct evidence of its clinical significance in Wilms tumor treatment. The variant's impa..."
+    },
+    {
+      "variant": "VHL P81S",
+      "tumor_type": "Renal Cell Carcinoma",
+      "expected": "Tier IV",
+      "predicted": "Tier II",
+      "tier_distance": "2",
+      "confidence": "75.00%",
+      "summary": "The VHL P81S variant is associated with von Hippel-Lindau disease and has implications for renal cell carcinoma treatment. The FDA-approved drug Welireg is indicated for advanced renal cell carcinoma ..."
+    },
+    {
+      "variant": "NF2 A211T",
+      "tumor_type": "Meningioma",
+      "expected": "Tier IV",
+      "predicted": "Tier III",
+      "tier_distance": "1",
+      "confidence": "55.00%",
+      "summary": "The NF2 A211T variant has limited evidence linking it to actionable therapies in meningioma. While there is some predictive evidence for sensitivity to Samotolisib in malignant mesothelioma, this does..."
+    },
+    {
+      "variant": "EGFR P753L",
+      "tumor_type": "Lung Adenocarcinoma",
+      "expected": "Tier IV",
+      "predicted": "Tier III",
+      "tier_distance": "1",
+      "confidence": "60.00%",
+      "summary": "The EGFR P753L variant is currently classified as having unknown clinical significance in lung adenocarcinoma. While there is evidence suggesting sensitivity to certain therapies, it lacks FDA approva..."
+    },
+    {
+      "variant": "BRCA2 K3326*",
+      "tumor_type": "Ovarian Cancer",
+      "expected": "Tier IV",
+      "predicted": "Tier I",
+      "tier_distance": "3",
+      "confidence": "95.00%",
+      "summary": "The BRCA2 K3326* variant is associated with sensitivity to PARP inhibitors such as olaparib and rucaparib in ovarian cancer. This variant is actionable as it directly influences treatment decisions fo..."
+    }
+  ]
+}

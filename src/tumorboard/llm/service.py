@@ -27,8 +27,14 @@ class LLMService:
     ) -> ActionabilityAssessment:
         """Assess variant using the new evidence-driven prompt system."""
 
+        # Pre-processed summary header with stats and conflict detection
+        evidence_header = evidence.format_evidence_summary_header(tumor_type=tumor_type)
+
         # Rich evidence summary (your existing logic is perfect)
-        evidence_summary = evidence.summary(tumor_type=tumor_type, max_items=10)
+        evidence_details = evidence.summary(tumor_type=tumor_type, max_items=10)
+
+        # Combine header + details
+        evidence_summary = evidence_header + evidence_details
 
         # Log the request
         request_id = None
