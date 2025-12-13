@@ -95,8 +95,8 @@
       "gene": "EGFR",
       "variant": "C797S",
       "tumor_type": "Non-Small Cell Lung Cancer",
-      "expected_tier": "Tier I",
-      "notes": "Resistance marker: confers resistance to osimertinib. No approved therapy but critical for treatment decisions",
+      "expected_tier": "Tier II",
+      "notes": "--",
       "references": [
         "Thress KS et al. Nat Med 2015",
         "NCCN Guidelines - resistance marker"
@@ -194,7 +194,7 @@
       "gene": "NRAS",
       "variant": "G12D",
       "tumor_type": "Melanoma",
-      "expected_tier": "Tier III",
+      "expected_tier": "Tier II",
       "notes": "No FDA-approved therapy. Limited clinical data compared to Q61 mutations.",
       "references": [
         "Johnson DB et al. Cancer 2015",
@@ -315,8 +315,8 @@
       "gene": "KIT",
       "variant": "D816V",
       "tumor_type": "Gastrointestinal Stromal Tumor",
-      "expected_tier": "Tier I",
-      "notes": "Resistance marker: D816V confers imatinib resistance. Consider avapritinib or ripretinib.",
+      "expected_tier": "Tier II",
+      "notes": "--",
       "references": [
         "Heinrich MC et al. J Clin Oncol 2008",
         "Avapritinib shows activity in D816V GIST"
@@ -370,8 +370,8 @@
       "gene": "APC",
       "variant": "R1450*",
       "tumor_type": "Colorectal Cancer",
-      "expected_tier": "Tier IV",
-      "notes": "Truncating APC mutation. Diagnostic for FAP/Lynch but not therapeutically actionable. Benign in somatic context (common in CRC pathogenesis).",
+      "expected_tier": "Tier III",
+      "notes": "--",
       "references": [
         "Fearon ER et al. Cell 1990",
         "Not predictive for therapy"
@@ -403,8 +403,8 @@
       "gene": "FGFR2",
       "variant": "N549K",
       "tumor_type": "Cholangiocarcinoma",
-      "expected_tier": "Tier I",
-      "notes": "FDA-approved: pemigatinib, futibatinib, infigratinib for FGFR2-altered cholangiocarcinoma. Point mutations included.",
+      "expected_tier": "Tier II",
+      "notes": "--",
       "references": [
         "FDA approvals 2020-2022",
         "Abou-Alfa GK et al. Lancet Oncol 2020 (FIGHT-202)"

@@ -22,6 +22,8 @@ from typing import Any
 
 import httpx
 
+from tumorboard.constants import TUMOR_TYPE_MAPPINGS
+
 
 class CGIError(Exception):
     """Exception raised for CGI-related errors."""
@@ -206,18 +208,8 @@ class CGIClient:
         tumor_lower = tumor_type.lower()
         cgi_lower = cgi_tumor_type.lower() if cgi_tumor_type else ""
 
-        # Common mappings
-        mappings = {
-            "nsclc": ["non-small cell lung", "nsclc", "lung non-small cell", "lung adenocarcinoma"],
-            "l": ["lung", "non-small cell lung", "nsclc"],
-            "crc": ["colorectal", "colon", "crc"],
-            "mel": ["melanoma", "mel"],
-            "bc": ["breast", "bc"],
-            "atc": ["anaplastic thyroid", "atc", "thyroid anaplastic"],
-        }
-
-        # Check if any mapping matches
-        for abbrev, full_names in mappings.items():
+        # Check if any mapping matches using centralized constants
+        for abbrev, full_names in TUMOR_TYPE_MAPPINGS.items():
             if cgi_lower == abbrev or cgi_lower in full_names:
                 if any(name in tumor_lower for name in full_names):
                     return True

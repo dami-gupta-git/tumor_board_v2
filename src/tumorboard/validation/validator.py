@@ -66,8 +66,18 @@ class Validator:
             else:
                 raise ValueError("Invalid gold standard format")
 
-            entries = [GoldStandardEntry(**entry) for entry in entries_data]
-            logger.info(f"Loaded {len(entries)} gold standard entries")
+            entries = []
+            skipped = []
+            for idx, entry_data in enumerate(entries_data):
+                try:
+                    entries.append(GoldStandardEntry(**entry_data))
+                except Exception as e:
+                    skipped.append((idx, entry_data.get('gene', '?'), entry_data.get('variant', '?'), str(e)))
+                    logger.warning(f"Skipping entry {idx} ({entry_data.get('gene', '?')} {entry_data.get('variant', '?')}): {e}")
+
+            if skipped:
+                logger.warning(f"Skipped {len(skipped)} invalid entries out of {len(entries_data)}")
+            logger.info(f"Loaded {len(entries)} valid gold standard entries")
 
             return entries
 
@@ -140,11 +150,18 @@ class Validator:
 
         # Filter out exceptions and collect valid results
         validation_results = []
+        failed_entries = []
         for idx, result in enumerate(results):
             if isinstance(result, Exception):
+                entry = gold_standard[idx]
+                failed_entries.append((idx, entry.gene, entry.variant, str(result).split('\n')[0]))
                 logger.error(f"Validation failed for entry {idx}: {str(result)}")
             else:
                 validation_results.append(result)
+
+        # Store failed entries count for reporting
+        self._last_failed_count = len(failed_entries)
+        self._last_failed_entries = failed_entries
 
         # Calculate metrics
         metrics = ValidationMetrics()

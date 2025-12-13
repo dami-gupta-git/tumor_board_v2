@@ -12,7 +12,6 @@ Key Design:
 - Context manager for session cleanup
 """
 
-import asyncio
 from typing import Any
 
 import httpx
@@ -22,6 +21,8 @@ from tenacity import (
     stop_after_attempt,
     wait_exponential,
 )
+
+from tumorboard.constants import GENE_ALIASES
 
 
 class FDAAPIError(Exception):
@@ -120,14 +121,6 @@ class FDAClient:
                 return {"results": []}
             raise FDAAPIError(f"HTTP error: {e}")
 
-    # Gene aliases for FDA label search (FDA labels often use different nomenclature)
-    GENE_ALIASES = {
-        "ERBB2": ["HER2"],
-        "HER2": ["ERBB2"],
-        "EGFR": ["HER1"],
-        "ERBB1": ["EGFR", "HER1"],
-    }
-
     async def fetch_drug_approvals(
         self, gene: str, variant: str | None = None
     ) -> list[dict[str, Any]]:
@@ -149,8 +142,8 @@ class FDAClient:
 
         # Get all gene names to search (primary + aliases)
         genes_to_search = [gene_upper]
-        if gene_upper in self.GENE_ALIASES:
-            genes_to_search.extend(self.GENE_ALIASES[gene_upper])
+        if gene_upper in GENE_ALIASES:
+            genes_to_search.extend(GENE_ALIASES[gene_upper])
 
         try:
             # Clean variant notation
@@ -185,60 +178,12 @@ class FDAClient:
                             seen_drugs.add(drug_id)
                             approvals.append(r)
 
-            # Strategy 3: Known gene-drug mappings as final fallback
-            # This ensures major drugs like Tafinlar, Zelboraf are captured
-            if not approvals:
-                known_drugs = self._get_known_gene_drugs(gene_upper)
-                if known_drugs:
-                    for drug_name in known_drugs[:5]:  # Top 5 known drugs
-                        drug_search = f'openfda.brand_name:"{drug_name}"'
-                        result = await self._query_drugsfda(drug_search, limit=1)
-                        if result.get("results"):
-                            approvals.extend(result["results"])
-
             return approvals[:10]  # Return top 10 most relevant
 
         except Exception as e:
             # Return empty list on error, don't fail the whole pipeline
             print(f"FDA API warning: {str(e)}")
             return []
-
-    def _get_known_gene_drugs(self, gene: str) -> list[str]:
-        """Get known FDA-approved drugs for major oncology genes.
-
-        This is a fallback mapping for well-established gene-drug pairs
-        to ensure critical approvals are captured even if API search fails.
-
-        Args:
-            gene: Gene symbol (uppercase)
-
-        Returns:
-            List of known drug brand names
-        """
-        # Major oncology gene-drug mappings (brand names)
-        known_mappings = {
-            "BRAF": ["Tafinlar", "Zelboraf", "Braftovi"],
-            "EGFR": ["Tagrisso", "Tarceva", "Iressa", "Gilotrif"],
-            "KRAS": ["Lumakras", "Krazati"],
-            "ALK": ["Xalkori", "Alecensa", "Zykadia"],
-            "ROS1": ["Xalkori", "Rozlytrek"],
-            "ERBB2": ["Herceptin", "Enhertu", "Kadcyla", "Tukysa", "Nerlynx"],
-            "HER2": ["Herceptin", "Enhertu", "Kadcyla", "Tukysa", "Nerlynx"],
-            "KIT": ["Gleevec", "Sutent"],
-            "PDGFRA": ["Gleevec", "Ayvakit"],
-            "IDH1": ["Tibsovo"],
-            "IDH2": ["Idhifa"],
-            "PIK3CA": ["Piqray"],
-            "NTRK1": ["Vitrakvi", "Rozlytrek"],
-            "NTRK2": ["Vitrakvi", "Rozlytrek"],
-            "NTRK3": ["Vitrakvi", "Rozlytrek"],
-            "RET": ["Retevmo", "Gavreto"],
-            "MET": ["Tabrecta", "Tepmetko"],
-            "FGFR2": ["Pemazyre"],
-            "FGFR3": ["Balversa"],
-        }
-
-        return known_mappings.get(gene, [])
 
     def parse_approval_data(
         self, approval_record: dict[str, Any], gene: str

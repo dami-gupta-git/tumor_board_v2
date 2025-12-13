@@ -12,23 +12,20 @@ This module provides tools to normalize variant notations across different forma
 import re
 from typing import Dict, Optional
 
+from tumorboard.constants import (
+    ALLOWED_VARIANT_TYPES,
+    AMINO_ACID_3TO1,
+    AMINO_ACID_1TO3,
+)
+
 
 class VariantNormalizer:
     """Normalizes variant representations to standard formats."""
 
-    # Allowed variant types for SNPs and small indels
-    ALLOWED_VARIANT_TYPES = {'missense', 'nonsense', 'insertion', 'deletion', 'frameshift'}
-
-    # Amino acid conversion dictionaries
-    AA_3TO1 = {
-        'ALA': 'A', 'CYS': 'C', 'ASP': 'D', 'GLU': 'E', 'PHE': 'F',
-        'GLY': 'G', 'HIS': 'H', 'ILE': 'I', 'LYS': 'K', 'LEU': 'L',
-        'MET': 'M', 'ASN': 'N', 'PRO': 'P', 'GLN': 'Q', 'ARG': 'R',
-        'SER': 'S', 'THR': 'T', 'VAL': 'V', 'TRP': 'W', 'TYR': 'Y',
-        'TER': '*', 'STP': '*', 'STOP': '*'
-    }
-
-    AA_1TO3 = {v: k for k, v in AA_3TO1.items()}
+    # Reference centralized constants
+    ALLOWED_VARIANT_TYPES = ALLOWED_VARIANT_TYPES
+    AA_3TO1 = AMINO_ACID_3TO1
+    AA_1TO3 = AMINO_ACID_1TO3
 
     # Variant type patterns
     MISSENSE_PATTERN = re.compile(r'^([A-Z*])(\d+)([A-Z*])$', re.IGNORECASE)

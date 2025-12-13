@@ -13,7 +13,6 @@ Key Design:
 - Context manager for session cleanup
 """
 
-import asyncio
 from typing import Any
 
 import httpx
@@ -23,6 +22,8 @@ from tenacity import (
     stop_after_attempt,
     wait_exponential,
 )
+
+from tumorboard.constants import PRIORITY_TUMOR_CODES
 
 
 class OncoTreeAPIError(Exception):
@@ -197,32 +198,13 @@ class OncoTreeClient:
                 if code and name:
                     formatted.append(f"{code} - {name}")
 
-            # Prioritize common tumor types (most frequently assessed in clinical practice)
-            priority_codes = [
-                "NSCLC", "LUAD", "LUSC", "SCLC",  # Lung
-                "BRCA", "IDC", "ILC",  # Breast
-                "CRC", "COAD", "READ",  # Colorectal
-                "MEL", "SKCM",  # Melanoma
-                "PAAD",  # Pancreatic
-                "PRAD",  # Prostate
-                "OV",  # Ovarian
-                "GBM",  # Glioblastoma
-                "BLCA",  # Bladder
-                "RCC", "CCRCC",  # Kidney
-                "HNSC",  # Head and Neck
-                "STAD",  # Gastric
-                "LIHC",  # Liver
-                "THCA",  # Thyroid
-                "UCEC",  # Endometrial
-            ]
-
-            # Separate into priority and non-priority
+            # Separate into priority and non-priority using centralized constants
             priority = []
             non_priority = []
 
             for item in formatted:
                 code = item.split(" - ")[0] if " - " in item else ""
-                if code in priority_codes:
+                if code in PRIORITY_TUMOR_CODES:
                     priority.append(item)
                 else:
                     non_priority.append(item)

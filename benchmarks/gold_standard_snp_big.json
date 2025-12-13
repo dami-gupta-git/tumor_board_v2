@@ -73,7 +73,7 @@
       "gene": "EGFR",
       "variant": "L861Q",
       "tumor_type": "Lung Adenocarcinoma",
-      "expected_tier": "Tier I",
+      "expected_tier": "Tier II",
       "notes": "FDA-approved afatinib for uncommon EGFR mutations",
       "references": ["Yang JC et al. Lancet Oncol 2015"]
     },
@@ -161,7 +161,7 @@
       "gene": "NRAS",
       "variant": "Q61R",
       "tumor_type": "Colorectal Cancer",
-      "expected_tier": "Tier I",
+      "expected_tier": "Tier III",
       "notes": "Resistance to anti-EGFR therapy",
       "references": ["De Roock W et al. Lancet Oncol 2010"]
     },
@@ -177,7 +177,7 @@
       "gene": "KIT",
       "variant": "D816V",
       "tumor_type": "Gastrointestinal Stromal Tumor",
-      "expected_tier": "Tier I",
+      "expected_tier": "Tier II",
       "notes": "Resistance to imatinib; avapritinib FDA-approved",
       "references": ["Heinrich MC et al. Lancet Oncol 2020"]
     },
@@ -545,7 +545,7 @@
       "gene": "CALR",
       "variant": "K385fs",
       "tumor_type": "Myeloproliferative Neoplasm",
-      "expected_tier": "Tier II",
+      "expected_tier": "Tier III",
       "notes": "JAK2 inhibitors may have activity",
       "references": ["Klampfl T et al. N Engl J Med 2013"]
     },
@@ -577,7 +577,7 @@
       "gene": "NPM1",
       "variant": "W288fs",
       "tumor_type": "Acute Myeloid Leukemia",
-      "expected_tier": "Tier II",
+      "expected_tier": "Tier III",
       "notes": "Favorable prognostic marker; venetoclax combination effective",
       "references": ["DiNardo CD et al. Blood 2019"]
     },

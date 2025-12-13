@@ -42,7 +42,6 @@ class LLMService:
                 temperature=self.temperature,
             )
 
-        # ← THIS IS THE KEY CHANGE:
         # New create_assessment_prompt returns full messages list with system + user roles
         messages = create_assessment_prompt(gene, variant, tumor_type, evidence_summary)
 

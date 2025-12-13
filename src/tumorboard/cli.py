@@ -139,6 +139,14 @@ def validate(
             print("Running validation...")
             metrics = await validator.validate_dataset(entries, max_concurrent=max_concurrent)
 
+            # Report any entries that failed validation
+            if hasattr(validator, '_last_failed_count') and validator._last_failed_count > 0:
+                print(f"\nWarning: {validator._last_failed_count} entries failed during validation (unsupported variant types)")
+                for idx, gene, variant, error in validator._last_failed_entries[:5]:
+                    print(f"  - Entry {idx}: {gene} {variant}")
+                if validator._last_failed_count > 5:
+                    print(f"  ... and {validator._last_failed_count - 5} more")
+
             print(metrics.to_report())
 
             if output:
