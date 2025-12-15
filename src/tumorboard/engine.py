@@ -167,7 +167,10 @@ class AssessmentEngine:
         if fda_approvals_raw:
             fda_approvals = []
             for approval_record in fda_approvals_raw:
-                parsed = self.fda_client.parse_approval_data(approval_record, variant_input.gene)
+                # Pass variant to extract clinical_studies mentions for variants like G719X
+                parsed = self.fda_client.parse_approval_data(
+                    approval_record, variant_input.gene, normalized_variant
+                )
                 if parsed:
                     fda_approvals.append(FDAApproval(**parsed))
             evidence.fda_approvals = fda_approvals

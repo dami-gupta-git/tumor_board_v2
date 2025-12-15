@@ -33,10 +33,14 @@ TumorBoard automatically extracts comprehensive variant annotations from MyVaria
 
 ## FDA Drug Approvals
 
+The FDA client searches the openFDA `/drug/label.json` endpoint using full-text search across all label fields:
+
 - **Drug Names**: FDA-approved brand and generic drug names
 - **Indications**: Specific cancer indications and biomarker requirements
-- **Approval Dates**: When drugs were approved by FDA
+- **Clinical Studies**: Trial data with specific variant mentions (e.g., G719X, S768I, L861Q)
 - **Marketing Status**: Current prescription status
+
+**Search Strategy**: The system searches `{gene} AND {variant}` across all label fields, which finds variant mentions in the `clinical_studies` section even when the `indications_and_usage` section uses generic language (e.g., "non-resistant EGFR mutations" instead of listing specific variants).
 
 ## CGI Biomarkers
 

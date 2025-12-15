@@ -317,9 +317,49 @@ DRUG-LEVEL SUMMARY:
 
 ---
 
+---
+
+### 14. FDA Label Search Strategy - Full-Text Search Across All Fields
+
+**Location:** `src/tumorboard/api/fda.py` - `fetch_drug_approvals()` method
+
+**Previous Approach:** Search only `indications_and_usage` field:
+```python
+search_query = f'indications_and_usage:({gene} AND {variant})'
+```
+
+**Problem:** FDA drug labels often use generic language in the indications section (e.g., "non-resistant EGFR mutations") while specific variants like G719X, S768I, L861Q only appear in the `clinical_studies` section.
+
+**Example - Gilotrif (afatinib):**
+- `indications_and_usage`: "...tumors have non-resistant EGFR mutations..."
+- `clinical_studies`: "...efficacy of GILOTRIF in patients with NSCLC harboring non-resistant EGFR mutations (S768I, L861Q, and G719X)..."
+
+**Current Approach:** Use full-text search across all label fields:
+```python
+# Strategy 1: Full-text search for gene + variant across all fields
+search_query = f'{gene} AND {variant}'
+result = await self._query_drugsfda(search_query, limit=15)
+
+# Strategy 2: If no results, fall back to gene-only search in indications
+gene_search = f'indications_and_usage:{gene}'
+```
+
+**Rationale:**
+- The openFDA API supports unqualified full-text search that searches across ALL fields
+- Query `EGFR AND G719X` finds Gilotrif because G719X appears in `clinical_studies`
+- Simple and effective - no need to enumerate specific fields
+
+**Impact:** This change enables detection of FDA approvals for:
+- Uncommon EGFR mutations (G719X, S768I, L861Q) → Gilotrif (afatinib)
+- Other variants mentioned only in clinical trial sections of FDA labels
+
+**Validation:** The query `https://api.fda.gov/drug/label.json?search=EGFR+AND+G719X` now returns 7 results including Gilotrif and Gefitinib/IRESSA.
+
+---
+
 ## Open Issues
 
 1. ~~**Mixed evidence weighting**~~ - ADDRESSED: Pre-processing now computes stats and dominant signal (Decision #1)
 2. **Pure resistance markers** - Need clearer Tier I criteria for well-established resistance markers
-3. **Clinical trial integration** - Could improve Tier I recall for FDA-approved variants
+3. ~~**Clinical trial integration**~~ - ADDRESSED: FDA search now includes clinical_studies section (Decision #14)
 4. **Tier IV detection** - Currently 0% accuracy on benign/VUS variants

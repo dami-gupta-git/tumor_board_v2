@@ -54,6 +54,7 @@ class FDAApproval(BaseModel):
     approval_date: str | None = None
     marketing_status: str | None = None
     gene: str | None = None
+    variant_in_clinical_studies: bool = False  # True if variant explicitly mentioned in clinical_studies section
 
     def parse_indication_for_tumor(self, tumor_type: str) -> dict:
         """Parse FDA indication text to extract line-of-therapy and approval type for a specific tumor.
@@ -138,6 +139,8 @@ class FDAApproval(BaseModel):
         later_line_phrases = [
             'after prior therapy',
             'after progression',
+            'following progression',
+            'following recurrence',
             'second-line',
             'second line',
             'third-line',
@@ -147,6 +150,7 @@ class FDAApproval(BaseModel):
             'who have failed',
             'after failure',
             'following prior',
+            'disease progression',
         ]
 
         first_line_phrases = [
@@ -603,17 +607,35 @@ class Evidence(VariantAnnotations):
             for approval in self.fda_approvals[:5]:
                 drug = approval.brand_name or approval.generic_name or approval.drug_name
 
+                # Check if variant is explicitly mentioned in clinical studies (strong Tier I signal)
+                variant_explicit = approval.variant_in_clinical_studies
+
                 # Parse indication for tumor-specific metadata
                 if tumor_type:
                     parsed = approval.parse_indication_for_tumor(tumor_type)
-                    if parsed['tumor_match']:
+                    if parsed['tumor_match'] or variant_explicit:
                         # Show structured metadata for this tumor type
-                        line_info = parsed['line_of_therapy'].upper()
-                        approval_info = parsed['approval_type'].upper()
-                        lines.append(f"  • {drug} [FOR {tumor_type.upper()}]:")
+                        line_info = parsed['line_of_therapy'].upper() if parsed['tumor_match'] else "UNSPECIFIED"
+                        approval_info = parsed['approval_type'].upper() if parsed['tumor_match'] else "UNSPECIFIED"
+
+                        # Emphasize if variant is explicitly in FDA label clinical studies
+                        variant_note = ""
+                        if variant_explicit:
+                            variant_note = " *** VARIANT EXPLICITLY IN FDA LABEL ***"
+
+                        lines.append(f"  • {drug} [FOR {tumor_type.upper()}]{variant_note}:")
                         lines.append(f"      Line of therapy: {line_info}")
                         lines.append(f"      Approval type: {approval_info}")
-                        lines.append(f"      Excerpt: {parsed['indication_excerpt'][:200]}...")
+
+                        # Show the clinical studies excerpt if variant is mentioned there
+                        indication = approval.indication or ""
+                        if "[Clinical studies mention" in indication:
+                            # Extract and show the clinical studies note
+                            cs_start = indication.find("[Clinical studies mention")
+                            cs_excerpt = indication[cs_start:cs_start+400]
+                            lines.append(f"      {cs_excerpt}...")
+                        else:
+                            lines.append(f"      Excerpt: {parsed['indication_excerpt'][:200]}...")
                     else:
                         # Drug approved but not for this tumor type
                         indication = (approval.indication or "")[:300]

@@ -83,25 +83,31 @@ TIER II CRITERIA (must meet at least one):
 - Strong guideline support (NCCN Category 2A or equivalent) recommending a specific therapy
 
 CRITICAL: FIRST-LINE vs LATER-LINE FDA APPROVALS:
-- Tier I requires the FDA approval to be applicable as FIRST-LINE or UNIVERSAL treatment in the tumor type.
-- If the FDA label specifies "after prior therapy", "second-line", "after progression", or similar restrictions, this is Tier II, NOT Tier I.
-- If the FDA approval is under "accelerated approval" pending confirmatory trials, this is Tier II, NOT Tier I.
-- Example: BRAF V600E in colorectal cancer - encorafenib+cetuximab is FDA-approved but ONLY for later-line use ("after prior therapy") or under accelerated approval → Tier II (not Tier I).
-- Example: BRAF V600E in melanoma - dabrafenib+trametinib is FDA-approved as first-line with full approval → Tier I.
-- Read the FDA indication text carefully to determine if the approval is first-line or later-line, and whether it's full approval or accelerated approval.
+- Tier I applies when the FDA-approved therapy is THE standard treatment approach for this biomarker.
+- Later-line restriction ALONE does not downgrade to Tier II if:
+  1. The biomarker-directed therapy IS the guideline-recommended treatment at that line, OR
+  2. Finding the biomarker directly triggers the use of this specific therapy
+- Example: PIK3CA H1047R in breast cancer → alpelisib is approved "after progression on endocrine therapy" but IS the standard approach for PIK3CA-mutated disease → Tier I.
+- Example: EGFR T790M in NSCLC → osimertinib is approved "after progression on 1st/2nd-gen TKI" but IS the standard for T790M → Tier I.
+- Later-line restriction DOES downgrade to Tier II when:
+  1. The therapy is an alternative to other equally valid options, OR
+  2. The biomarker is one of many factors in treatment selection (not the primary driver)
+- Example: BRAF V600E in colorectal cancer → encorafenib+cetuximab after prior therapy, but CRC has multiple treatment options and BRAF V600E is not universally tested first-line → Tier II.
+- KEY QUESTION: "Does finding this biomarker fundamentally change the treatment algorithm for this patient?" If YES → Tier I. If "it's one option among others" → Tier II.
 
 EVIDENCE HIERARCHY (highest → lowest):
-1. FDA-approved FIRST-LINE therapy for this exact variant + tumor type → Tier I
+1. FDA-approved therapy for this exact variant + tumor type that IS the standard approach for this biomarker → Tier I
 2. NCCN Category 1 / strong guideline consensus in this tumor type → Tier I
-3. Resistance to standard-of-care targeted therapy in this tumor type → Tier I
-4. FDA-approved LATER-LINE therapy for this exact variant + tumor type → Tier II
+3. Resistance to standard-of-care targeted therapy in this tumor type (changes treatment) → Tier I
+4. FDA-approved therapy for this variant + tumor type but is ONE OF MANY options (biomarker not primary driver) → Tier II
 5. FDA-approved therapy in a different tumor type WITH clinically plausible off-label use → Tier II
 6. NCCN Category 2A or equivalent guideline support for specific therapy → Tier II
-7. FDA-approved therapy in a different tumor type but NOT clinically transferable (e.g., tumor-specific combinations) → Tier III
-8. Resistance to therapy that is NOT standard-of-care → Tier III (informative only)
-9. Phase 2/3 trials WITHOUT FDA approval AND without guideline support → Tier III
-10. Preclinical data, case reports, emerging evidence → Tier III
-11. No oncogenic, therapeutic, or prognostic relevance → Tier IV
+7. Resistance marker that excludes certain therapies (guides negative selection) → Tier II
+8. FDA-approved therapy in a different tumor type but NOT clinically transferable → Tier III
+9. Resistance to therapy that is NOT standard-of-care → Tier III (informative only)
+10. Phase 2/3 trials WITHOUT FDA approval AND without guideline support → Tier III
+11. Preclinical data, case reports, emerging evidence → Tier III
+12. No oncogenic, therapeutic, or prognostic relevance → Tier IV
 
 IMPORTANT: The evidence summary includes FDA Approved Drugs, CIViC, OncoKB/CGI Biomarkers, and other annotations. Pay special attention to:
 - Drugs listed in the FDA Approved Drugs section with their approval dates and indication texts.

@@ -291,15 +291,25 @@ VariantInput → Normalize → MyVariantClient → Evidence → LLMService → A
 **Purpose:** FDA drug approval data with biomarker indications
 
 **Data Sources:**
-- **FDA openFDA API:** Drugs@FDA database with oncology drug approvals
+- **FDA openFDA API:** Drugs@FDA database via `/drug/label.json` endpoint
+- **Full prescribing information:** Indications, clinical studies, dosing, warnings
 - **Companion Diagnostics:** Drugs approved with specific biomarker requirements
-- **Indications:** Cancer types and biomarker-based approvals
+
+**Search Strategy:**
+1. **Full-text search:** `{gene} AND {variant}` across all label fields
+   - Finds variants in `clinical_studies` section (e.g., G719X, S768I, L861Q in afatinib label)
+   - More effective than field-specific searches for uncommon mutations
+2. **Fallback:** `indications_and_usage:{gene}` if no variant-specific results
+
+**Why Full-Text Search:**
+- FDA labels often use generic language in indications (e.g., "non-resistant EGFR mutations")
+- Specific variants like G719X only appear in `clinical_studies` section
+- Full-text search finds matches in any field without enumerating all possible fields
 
 **Features:**
-- Searches by gene and variant
-- Known gene-drug mapping fallback for major oncology targets (BRAF→Tafinlar/Zelboraf, EGFR→Tagrisso, etc.)
-- Filters for oncology drugs with biomarker mentions
-- Extracts brand names, generic names, approval dates, and indications
+- Searches by gene and variant with gene alias support (ERBB2→HER2, etc.)
+- Extracts brand names, generic names, and indication text
+- Connection pooling and retry with exponential backoff
 - Parallel execution with MyVariant client (via asyncio.gather)
 
 **Query Strategies:**

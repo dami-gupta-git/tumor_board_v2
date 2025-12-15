@@ -155,11 +155,12 @@ class FDAClient:
                     if variant_clean.startswith(prefix):
                         variant_clean = variant_clean[2:]
 
-            # Strategy 1: Search for gene + variant in indication text (most specific)
-            # Search with all gene aliases
+            # Strategy 1: Search for gene + variant together (full-text search across all fields)
+            # This finds variants in clinical_studies, indications, and other label sections
             if variant_clean:
                 for search_gene in genes_to_search:
-                    search_query = f'indications_and_usage:({search_gene} AND {variant_clean})'
+                    # Full-text search: finds G719X in any field (clinical_studies, indications, etc.)
+                    search_query = f'{search_gene} AND {variant_clean}'
                     result = await self._query_drugsfda(search_query, limit=15)
                     for r in result.get("results", []):
                         drug_id = r.get("openfda", {}).get("brand_name", [""])[0]
@@ -167,7 +168,7 @@ class FDAClient:
                             seen_drugs.add(drug_id)
                             approvals.append(r)
 
-            # Strategy 2: If no results, search for just gene in indications
+            # Strategy 2: If no results with variant, search for just gene in indications
             if not approvals:
                 for search_gene in genes_to_search:
                     gene_search = f'indications_and_usage:{search_gene}'
@@ -186,7 +187,7 @@ class FDAClient:
             return []
 
     def parse_approval_data(
-        self, approval_record: dict[str, Any], gene: str
+        self, approval_record: dict[str, Any], gene: str, variant: str | None = None
     ) -> dict[str, Any] | None:
         """Parse FDA approval record into structured format.
 
@@ -196,6 +197,7 @@ class FDAClient:
         Args:
             approval_record: Raw FDA API response record from /drug/label.json
             gene: Gene symbol for context
+            variant: Optional variant to search for in clinical_studies section
 
         Returns:
             Structured approval data or None if insufficient data
@@ -235,16 +237,47 @@ class FDAClient:
             else:
                 indication_text = str(indications)
 
+            # Check clinical_studies for variant-specific approval info
+            # This is important for variants like G719X, S768I, L861Q that are mentioned
+            # in clinical studies but not in the generic indications text
+            clinical_studies_note = None
+            if variant:
+                clinical_studies = approval_record.get("clinical_studies", [])
+                if isinstance(clinical_studies, list):
+                    clinical_text = " ".join(clinical_studies)
+                else:
+                    clinical_text = str(clinical_studies) if clinical_studies else ""
+
+                variant_upper = variant.upper()
+                if variant_upper in clinical_text.upper():
+                    # Extract a relevant snippet around the variant mention
+                    idx = clinical_text.upper().find(variant_upper)
+                    start = max(0, idx - 100)
+                    end = min(len(clinical_text), idx + 200)
+                    snippet = clinical_text[start:end].strip()
+                    # Clean up the snippet
+                    if start > 0:
+                        snippet = "..." + snippet
+                    if end < len(clinical_text):
+                        snippet = snippet + "..."
+                    clinical_studies_note = f"[Clinical studies mention {variant}: {snippet}]"
+
             # Only return if we have minimum required data (drug name)
             if brand_name or generic_name:
+                # Combine indication with clinical studies note if variant was found there
+                full_indication = indication_text[:1500] if indication_text else ""
+                if clinical_studies_note:
+                    full_indication = f"{full_indication}\n\n{clinical_studies_note}"
+
                 return {
                     "drug_name": brand_name or generic_name,
                     "brand_name": brand_name,
                     "generic_name": generic_name,
-                    "indication": indication_text[:1800] if indication_text else None,  # Full indication for multi-indication drugs
+                    "indication": full_indication[:2000] if full_indication else None,
                     "approval_date": approval_date,  # Not available in label endpoint
                     "marketing_status": marketing_status,
                     "gene": gene,
+                    "variant_in_clinical_studies": clinical_studies_note is not None,
                 }
 
             return None
