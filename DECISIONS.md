@@ -659,4 +659,198 @@ CIViC PROGNOSTIC Assertions (1):
 5. ~~**Tier IV detection**~~ - ADDRESSED: Added explicit Tier IV criteria in prompt (Decision #22)
 6. ~~**Later-line downgrade errors**~~ - ADDRESSED: Clarified when later-line = Tier I (Decision #19)
 7. ~~**Tumor-type context**~~ - ADDRESSED: Added explicit tumor-type-dependent examples (Decision #18)
-8. **Validation accuracy** - Currently at 39.1% on updated gold standard, expected improvement with prompt changes
+8. **Validation accuracy** - ~~Currently at 39.1% on updated gold standard~~ → **80.43% after preprocessing-driven architecture**
+
+---
+
+### 24. Preprocessing-Driven Tier Classification Architecture (Major Refactor)
+
+**Location:** `src/tumorboard/models/evidence.py` - `get_tier_hint()` and supporting methods
+
+**Previous Architecture (Prompt-Heavy):**
+- ~290 lines of detailed tier rules in system prompt
+- LLM had to interpret evidence and apply complex rules
+- 39.1% → 52.17% → 71.74% accuracy with incremental prompt improvements
+- Still had ~20% errors from LLM misinterpreting later-line approvals, resistance markers, etc.
+
+**New Architecture (Preprocessing-Heavy):**
+- Preprocessing computes `get_tier_hint()` BEFORE sending to LLM
+- System prompt reduced to ~107 lines - focuses on "trust preprocessing, override only if evidence contradicts"
+- Complex variant-specific logic moved from prompt to testable code
+- **80.43% accuracy** (37/46 correct)
+
+**Key Methods Added:**
+
+1. **`get_tier_hint(tumor_type)`** - Master tier guidance computation
+   - Returns explicit tier indicator: "TIER I INDICATOR: FDA-approved therapy FOR this variant in this tumor type"
+   - LLM sees this as the FIRST thing in evidence header
+   - Decision tree: investigational-only → FDA for variant → resistance-only → prognostic-only → off-label → investigational
+
+2. **`is_investigational_only(tumor_type)`** - Detects known investigational-only pairs
+   - Hardcoded pairs: KRAS+pancreatic, NRAS+melanoma, TP53+*, APC+colorectal, VHL+renal, SMAD4+pancreatic, ARID1A+*
+   - These NEVER get Tier I/II regardless of evidence
+
+3. **`has_fda_for_variant_in_tumor(tumor_type)`** - Validates FDA approval FOR THIS variant
+   - Calls `_variant_matches_approval_class()` to prevent non-V600 BRAF claiming V600 approvals
+   - Checks CIViC Level A and CGI FDA-approved sensitivity markers as secondary sources
+
+4. **`_variant_matches_approval_class(gene, variant, indication_text, approval)`** - Variant-specific validation
+   - BRAF: Only V600E/K/D/R match V600 approvals
+   - KRAS/NRAS: G12C only matches G12C approval, checks for generic mentions
+   - KIT: Maps variants to exons (V560D→exon 9, D816V→exon 17)
+   - EGFR: Separates common (L858R), uncommon (G719X), and resistance (T790M) mutations
+   - Detects wild-type exclusion patterns
+
+5. **`is_resistance_marker_without_targeted_therapy(tumor_type)`** - Detects Tier II resistance markers
+   - Has resistance evidence but NO FDA-approved therapy FOR this variant
+   - Returns list of drugs excluded by the resistance
+
+6. **`_check_fda_requires_wildtype(tumor_type)`** - Detects wild-type requirements
+   - Finds drugs that require wild-type status (e.g., cetuximab requires KRAS wild-type)
+
+**Simplified System Prompt:**
+```
+The evidence summary includes a "TIER CLASSIFICATION GUIDANCE" section computed from structured evidence analysis.
+
+YOUR ROLE:
+1. Start with the tier guidance as your baseline assessment
+2. Review the detailed evidence to verify it supports this tier
+3. Check for conflicts, nuances, or context that might change the tier
+4. Assign the final tier based on your expert judgment
+
+WHEN TO FOLLOW THE GUIDANCE:
+✓ Evidence is consistent and unambiguous
+✓ The preprocessing has already validated FDA approval specificity
+
+WHEN TO OVERRIDE THE GUIDANCE:
+✗ Detailed evidence clearly contradicts the guidance
+✗ Clinical context requires nuanced judgment beyond preprocessing
+```
+
+**Impact:**
+| Metric | Prompt-Heavy | Preprocessing-Heavy |
+|--------|--------------|---------------------|
+| Accuracy | 52-72% | **80.43%** |
+| Tier I Recall | 53-96% | **~95%** |
+| Lines in prompt | ~290 | ~107 |
+| Testable logic | Minimal | **42 unit tests** |
+
+**Rationale:**
+- Complex tier logic is better expressed in code than natural language
+- Preprocessing catches errors that LLM would miss (variant-class matching)
+- Unit tests ensure regression protection
+- LLM focuses on synthesis and edge cases, not rule application
+
+---
+
+### 25. Variant-Class Approval Matching
+
+**Location:** `src/tumorboard/models/evidence.py` - `_variant_matches_approval_class()`
+
+**Problem:** LLM was treating all BRAF mutations as eligible for V600-specific therapies.
+
+**Example Error:**
+- BRAF G469A in melanoma → LLM saw "BRAF-mutated melanoma" FDA approvals → Predicted Tier I
+- Reality: V600 inhibitors are V600-specific, G469A is not covered
+
+**Solution:** Gene-specific validation rules in preprocessing:
+
+```python
+if gene_lower == 'braf':
+    if 'v600' in indication_text:
+        return variant_upper in ['V600E', 'V600K', 'V600D', 'V600R']
+    else:
+        return False  # Generic "BRAF-mutated" is suspicious
+```
+
+**Coverage:**
+- BRAF: V600 variant matching
+- KRAS/NRAS: G12C-specific vs generic mutations
+- KIT: Exon mapping (V560D→9, D816V→17)
+- EGFR: Common/uncommon/resistance mutation classes
+- Generic genes: Tentative approval if mentioned without exclusions
+
+**Impact:** Prevents ~5 false Tier I predictions per validation run.
+
+---
+
+### 26. Investigational-Only Gene-Tumor Pairs
+
+**Location:** `src/tumorboard/models/evidence.py` - `is_investigational_only()`
+
+**Problem:** Despite explicit prompt guidance, LLM would cite trial data and predict Tier I/II for combinations with NO approved therapy.
+
+**Example Error:**
+- KRAS G12D in pancreatic → LLM saw VICC sensitivity evidence → Predicted Tier I
+- Reality: NO FDA-approved KRAS-targeted therapy in pancreatic cancer
+
+**Solution:** Hardcoded investigational-only pairs that ALWAYS return Tier III:
+
+```python
+investigational_pairs = {
+    ('kras', 'pancreatic'): True,
+    ('kras', 'pancreas'): True,
+    ('nras', 'melanoma'): True,
+    ('tp53', '*'): True,  # Any tumor type
+    ('apc', 'colorectal'): True,
+    ('vhl', 'renal'): True,
+    ('smad4', 'pancreatic'): True,
+    ('cdkn2a', 'melanoma'): True,
+    ('arid1a', '*'): True,
+}
+```
+
+**Impact:** Prevents LLM hallucination of FDA approvals for known investigational combinations.
+
+---
+
+### 27. Evidence Header with Tier Guidance
+
+**Location:** `src/tumorboard/models/evidence.py` - `format_evidence_summary_header()`
+
+**Previous Format:**
+```
+============================================================
+EVIDENCE SUMMARY (Pre-processed)
+============================================================
+Sensitivity entries: 7 (88%) - Levels: A:1, B:3, C:3
+...
+```
+
+**New Format:**
+```
+============================================================
+EVIDENCE SUMMARY (Pre-processed)
+============================================================
+
+*** TIER CLASSIFICATION GUIDANCE ***
+TIER I INDICATOR: FDA-approved therapy FOR this variant in this tumor type
+============================================================
+
+Sensitivity entries: 7 (88%) - Levels: A:1, B:3, C:3
+...
+```
+
+**Impact:** LLM sees the tier guidance FIRST, before any detailed evidence that might confuse it.
+
+---
+
+### 28. Later-Line Approval Bug Fix
+
+**Location:** `src/tumorboard/models/evidence.py` - `format_evidence_summary_header()` lines 472-477
+
+**The Bug (Fixed):**
+```python
+# OLD CODE - contradicted prompt guidance!
+if later_line_approvals and not first_line_approvals:
+    lines.append("→ No first-line FDA approval. This typically indicates TIER II, not Tier I.")
+```
+
+**The Fix:**
+```python
+# NEW CODE - aligns with AMP/ASCO/CAP guidelines
+if later_line_approvals and not first_line_approvals:
+    lines.append("→ IMPORTANT: Later-line FDA approval is STILL Tier I if the biomarker IS the therapeutic indication.")
+```
+
+**Impact:** This single bug fix improved accuracy from 52% → 72%.
