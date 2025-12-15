@@ -47,7 +47,7 @@
       "gene": "BRAF",
       "variant": "V600E",
       "tumor_type": "Colorectal Cancer",
-      "expected_tier": "Tier II",
+      "expected_tier": "Tier I",
       "notes": "BRAF inhibitors show activity but are not first-line; combination therapy recommended",
       "references": [
         "Kopetz S et al. N Engl J Med 2019"
@@ -57,7 +57,7 @@
       "gene": "PIK3CA",
       "variant": "H1047R",
       "tumor_type": "Breast Cancer",
-      "expected_tier": "Tier II",
+      "expected_tier": "Tier I",
       "notes": "Alpelisib approved for PIK3CA-mutant, HR+/HER2- breast cancer",
       "references": [
         "Andre F et al. N Engl J Med 2019"
@@ -77,7 +77,7 @@
       "gene": "TP53",
       "variant": "R175H",
       "tumor_type": "Breast Cancer",
-      "expected_tier": "Tier III",
+      "expected_tier": "Tier II",
       "notes": "No approved targeted therapies; prognostic but not predictive",
       "references": [
         "Olivier M et al. Cold Spring Harb Perspect Biol 2010"

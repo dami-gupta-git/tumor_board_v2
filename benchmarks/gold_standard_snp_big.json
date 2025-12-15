@@ -361,7 +361,7 @@
       "gene": "TP53",
       "variant": "R175H",
       "tumor_type": "Breast Cancer",
-      "expected_tier": "Tier III",
+      "expected_tier": "Tier II",
       "notes": "No approved targeted therapies; prognostic marker",
       "references": ["Olivier M et al. Cold Spring Harb Perspect Biol 2010"]
     },

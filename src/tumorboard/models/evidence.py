@@ -465,6 +465,30 @@ class Evidence(VariantAnnotations):
         elif stats['has_fda_approved']:
             lines.append("FDA STATUS: Has FDA-approved therapy associated with this gene.")
 
+        # Check for later-line/accelerated approvals - important for tier classification
+        if tumor_type and self.fda_approvals:
+            later_line_approvals = []
+            first_line_approvals = []
+            for approval in self.fda_approvals:
+                parsed = approval.parse_indication_for_tumor(tumor_type)
+                if parsed['tumor_match']:
+                    drug = approval.brand_name or approval.generic_name or approval.drug_name
+                    if parsed['line_of_therapy'] == 'later-line':
+                        accel_note = " (ACCELERATED)" if parsed['approval_type'] == 'accelerated' else ""
+                        later_line_approvals.append(f"{drug}{accel_note}")
+                    elif parsed['line_of_therapy'] == 'first-line':
+                        first_line_approvals.append(drug)
+
+            if later_line_approvals and not first_line_approvals:
+                lines.append("")
+                lines.append("FDA APPROVAL CONTEXT:")
+                lines.append(f"  LATER-LINE ONLY: {', '.join(later_line_approvals)}")
+                lines.append("  → No first-line FDA approval for this variant+tumor. This typically indicates TIER II, not Tier I.")
+                lines.append("  → Tier I requires first-line therapy OR the biomarker being THE standard approach at that line.")
+            elif first_line_approvals:
+                lines.append("")
+                lines.append(f"FDA FIRST-LINE APPROVAL: {', '.join(first_line_approvals)} → Strong Tier I signal")
+
         # Conflicts
         if stats['conflicts']:
             lines.append("")
@@ -706,15 +730,20 @@ class Evidence(VariantAnnotations):
                     lines.append("")
 
         # CIViC Assertions - curated AMP/ASCO/CAP tier classifications
+        # IMPORTANT: Separate PREDICTIVE (therapy-related) from PROGNOSTIC (outcome-related)
         if self.civic_assertions:
-            # Filter to accepted or submitted assertions with AMP levels
-            tier_i = [a for a in self.civic_assertions if a.amp_tier == "Tier I"]
-            tier_ii = [a for a in self.civic_assertions if a.amp_tier == "Tier II"]
+            # Separate by assertion type - PREDICTIVE matters for therapy actionability
+            predictive_tier_i = [a for a in self.civic_assertions
+                                  if a.amp_tier == "Tier I" and a.assertion_type == "PREDICTIVE"]
+            predictive_tier_ii = [a for a in self.civic_assertions
+                                   if a.amp_tier == "Tier II" and a.assertion_type == "PREDICTIVE"]
+            prognostic = [a for a in self.civic_assertions if a.assertion_type == "PROGNOSTIC"]
 
-            if tier_i:
-                lines.append(f"CIViC AMP/ASCO/CAP TIER I ASSERTIONS ({len(tier_i)}):")
-                lines.append("  *** EXPERT-CURATED - STRONG CLINICAL SIGNIFICANCE ***")
-                for a in tier_i[:5]:
+            # PREDICTIVE Tier I = therapy actionability (most relevant for tier classification)
+            if predictive_tier_i:
+                lines.append(f"CIViC PREDICTIVE TIER I ASSERTIONS ({len(predictive_tier_i)}):")
+                lines.append("  *** EXPERT-CURATED - THERAPY ACTIONABLE ***")
+                for a in predictive_tier_i[:5]:
                     therapies = ", ".join(a.therapies) if a.therapies else "N/A"
                     fda_note = " [FDA Companion Test]" if a.fda_companion_test else ""
                     nccn_note = f" [NCCN: {a.nccn_guideline}]" if a.nccn_guideline else ""
@@ -722,11 +751,21 @@ class Evidence(VariantAnnotations):
                     lines.append(f"      AMP Level: {a.amp_level}, Disease: {a.disease}")
                 lines.append("")
 
-            if tier_ii:
-                lines.append(f"CIViC AMP/ASCO/CAP Tier II Assertions ({len(tier_ii)}):")
-                for a in tier_ii[:3]:
+            if predictive_tier_ii:
+                lines.append(f"CIViC Predictive Tier II Assertions ({len(predictive_tier_ii)}):")
+                for a in predictive_tier_ii[:3]:
                     therapies = ", ".join(a.therapies) if a.therapies else "N/A"
                     lines.append(f"  • {a.molecular_profile}: {therapies} [{a.significance}]")
+                lines.append("")
+
+            # PROGNOSTIC assertions - important but do NOT determine therapy tier
+            if prognostic:
+                lines.append(f"CIViC PROGNOSTIC Assertions ({len(prognostic)}):")
+                lines.append("  *** PROGNOSTIC ONLY - indicates outcome, NOT therapy actionability ***")
+                for a in prognostic[:3]:
+                    lines.append(f"  • {a.molecular_profile}: {a.significance} in {a.disease}")
+                    if a.amp_tier:
+                        lines.append(f"      (Prognostic {a.amp_tier} - does NOT imply Tier I/II for therapy)")
                 lines.append("")
 
         if self.clinvar:
