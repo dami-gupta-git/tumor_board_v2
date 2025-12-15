@@ -25,8 +25,11 @@ from tumorboard.api.vicc import VICCClient
 from tumorboard.api.civic import CIViCClient
 from tumorboard.llm.service import LLMService
 from tumorboard.models.assessment import ActionabilityAssessment
+from tumorboard.models.evidence.cgi import CGIBiomarkerEvidence
+from tumorboard.models.evidence.civic import CIViCAssertionEvidence
+from tumorboard.models.evidence.fda import FDAApproval
+from tumorboard.models.evidence.vicc import VICCEvidence
 from tumorboard.models.variant import VariantInput
-from tumorboard.models.evidence import FDAApproval, CGIBiomarkerEvidence, VICCEvidence, CIViCAssertionEvidence
 from tumorboard.utils import normalize_variant
 
 

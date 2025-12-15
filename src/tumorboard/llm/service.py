@@ -3,13 +3,14 @@
 import json
 from litellm import acompletion
 from tumorboard.llm.prompts import create_assessment_prompt  # ← now returns messages list!
+from tumorboard.models import Evidence
 from tumorboard.models.assessment import ActionabilityAssessment, ActionabilityTier
-from tumorboard.models.evidence import Evidence
+
 from tumorboard.utils.logging_config import get_logger
 
 
 class LLMService:
-    """High-accuracy LLM service for somatic variant actionability (88–92% agreement)."""
+    """High-accuracy LLM service for somatic variant actionability."""
 
     def __init__(self, model: str = "gpt-4o-mini", temperature: float = 0.0, enable_logging: bool = True):
         self.model = model

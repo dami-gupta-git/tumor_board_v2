@@ -6,7 +6,11 @@ from tumorboard.models.assessment import (
     ActionabilityTier,
     RecommendedTherapy,
 )
-from tumorboard.models.evidence import CIViCEvidence, ClinVarEvidence, COSMICEvidence, Evidence
+from tumorboard.models.evidence.civic import CIViCEvidence
+from tumorboard.models.evidence.clinvar import ClinVarEvidence
+from tumorboard.models.evidence.cosmic import COSMICEvidence
+from tumorboard.models.evidence.evidence import Evidence
+
 from tumorboard.models.validation import GoldStandardEntry, ValidationMetrics, ValidationResult
 from tumorboard.models.variant import VariantInput
 

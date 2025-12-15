@@ -12,7 +12,6 @@ Key Design:
 - Context manager for session cleanup
 """
 
-import asyncio
 import re
 from typing import Any
 
@@ -25,12 +24,11 @@ from tenacity import (
 )
 
 from tumorboard.api.myvariant_models import MyVariantHit, MyVariantResponse
-from tumorboard.models.evidence import (
-    CIViCEvidence,
-    ClinVarEvidence,
-    COSMICEvidence,
-    Evidence,
-)
+
+from tumorboard.models.evidence.civic import  CIViCEvidence
+from tumorboard.models.evidence.clinvar import ClinVarEvidence
+from tumorboard.models.evidence.cosmic import COSMICEvidence
+from tumorboard.models.evidence.evidence import Evidence
 
 
 class MyVariantAPIError(Exception):
