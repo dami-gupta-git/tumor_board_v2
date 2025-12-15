@@ -158,15 +158,30 @@ class FDAClient:
             # Strategy 1: Search for gene + variant together (full-text search across all fields)
             # This finds variants in clinical_studies, indications, and other label sections
             if variant_clean:
+                # Build list of search terms: exact variant + codon-level patterns
+                # e.g., for G719S, search for "G719S", "G719X" (FDA often uses X for any amino acid)
+                import re
+                search_variants = [variant_clean]
+
+                # Extract codon position for pattern-based search
+                # Matches patterns like G719S, L858R, V600E, etc.
+                codon_match = re.match(r'^([A-Z])(\d+)([A-Z])$', variant_clean)
+                if codon_match:
+                    # Add codon-level pattern with X (FDA convention for any amino acid)
+                    # e.g., "G719X" for G719S - this is how FDA labels often describe variant classes
+                    codon_x_pattern = codon_match.group(1) + codon_match.group(2) + "X"
+                    search_variants.append(codon_x_pattern)
+
                 for search_gene in genes_to_search:
-                    # Full-text search: finds G719X in any field (clinical_studies, indications, etc.)
-                    search_query = f'{search_gene} AND {variant_clean}'
-                    result = await self._query_drugsfda(search_query, limit=15)
-                    for r in result.get("results", []):
-                        drug_id = r.get("openfda", {}).get("brand_name", [""])[0]
-                        if drug_id and drug_id not in seen_drugs:
-                            seen_drugs.add(drug_id)
-                            approvals.append(r)
+                    for search_var in search_variants:
+                        # Full-text search: finds G719X in any field (clinical_studies, indications, etc.)
+                        search_query = f'{search_gene} AND {search_var}'
+                        result = await self._query_drugsfda(search_query, limit=15)
+                        for r in result.get("results", []):
+                            drug_id = r.get("openfda", {}).get("brand_name", [""])[0]
+                            if drug_id and drug_id not in seen_drugs:
+                                seen_drugs.add(drug_id)
+                                approvals.append(r)
 
             # Strategy 2: If no results with variant, search for just gene in indications
             if not approvals:
@@ -242,6 +257,7 @@ class FDAClient:
             # in clinical studies but not in the generic indications text
             clinical_studies_note = None
             if variant:
+                import re
                 clinical_studies = approval_record.get("clinical_studies", [])
                 if isinstance(clinical_studies, list):
                     clinical_text = " ".join(clinical_studies)
@@ -249,18 +265,37 @@ class FDAClient:
                     clinical_text = str(clinical_studies) if clinical_studies else ""
 
                 variant_upper = variant.upper()
-                if variant_upper in clinical_text.upper():
+                clinical_text_upper = clinical_text.upper()
+
+                # Build search patterns: exact variant + codon-level pattern with wildcard
+                # e.g., for G719S: search for "G719S", "G719X", "G719A", etc.
+                search_patterns = [variant_upper]
+                codon_match = re.match(r'^([A-Z])(\d+)([A-Z])$', variant_upper)
+                if codon_match:
+                    # Add codon pattern with X wildcard (e.g., "G719X" for G719S)
+                    codon_pattern = codon_match.group(1) + codon_match.group(2) + "X"
+                    search_patterns.append(codon_pattern)
+
+                # Search for any matching pattern
+                found_pattern = None
+                found_idx = -1
+                for pattern in search_patterns:
+                    if pattern in clinical_text_upper:
+                        found_pattern = pattern
+                        found_idx = clinical_text_upper.find(pattern)
+                        break
+
+                if found_pattern and found_idx >= 0:
                     # Extract a relevant snippet around the variant mention
-                    idx = clinical_text.upper().find(variant_upper)
-                    start = max(0, idx - 100)
-                    end = min(len(clinical_text), idx + 200)
+                    start = max(0, found_idx - 100)
+                    end = min(len(clinical_text), found_idx + 200)
                     snippet = clinical_text[start:end].strip()
                     # Clean up the snippet
                     if start > 0:
                         snippet = "..." + snippet
                     if end < len(clinical_text):
                         snippet = snippet + "..."
-                    clinical_studies_note = f"[Clinical studies mention {variant}: {snippet}]"
+                    clinical_studies_note = f"[Clinical studies mention {found_pattern} (variant class includes {variant}): {snippet}]"
 
             # Only return if we have minimum required data (drug name)
             if brand_name or generic_name:

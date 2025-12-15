@@ -357,9 +357,119 @@ gene_search = f'indications_and_usage:{gene}'
 
 ---
 
+### 15. CGI Biomarker Pattern Matching for Position-Based Wildcards
+
+**Location:** `src/tumorboard/api/cgi.py` - `_variant_matches()` method
+
+**Previous Approach:** Only handled end-of-pattern wildcards like `G719.`
+
+**Problem:** CGI database uses position-based wildcard patterns for variant groups:
+- `KRAS:.12.,.13.` - any mutation at position 12 or 13 (matches G12D, G13D, etc.)
+- `KRAS:.` - any KRAS mutation
+- `KRAS:.12.,.13.,.59.,.61.,.117.,.146.` - multiple position wildcards
+
+**Current Approach:** Extended pattern matching to handle:
+
+```python
+# Position-based wildcard: ".13." matches any mutation at position 13
+if part.startswith(".") and part.endswith(".") and len(part) > 2:
+    position_str = part[1:-1]  # Extract "13" from ".13."
+    if position_str.isdigit():
+        # Match variants like G13D where position == 13
+        variant_match = re.match(r'^([A-Z])(\d+)([A-Z])$', variant_upper)
+        if variant_match and variant_match.group(2) == position_str:
+            return True
+
+# Wildcard for any mutation in gene: "." alone matches any variant
+if part == ".":
+    return True
+```
+
+**Impact:** Enables detection of:
+- KRAS G13D, G12D as resistance markers for cetuximab/panitumumab in CRC
+- Any position-based variant groupings in CGI biomarkers database
+
+**Related Fix:** Added `coread` to `TUMOR_TYPE_MAPPINGS` in `constants.py` since CGI uses "COREAD" for colorectal cancer.
+
+---
+
+### 16. FDA-Approved Resistance Marker Emphasis in Evidence Summary
+
+**Location:** `src/tumorboard/models/evidence.py` - `format_evidence_summary_header()` and `summary_compact()`
+
+**Problem:** Resistance markers that exclude FDA-approved therapies were being presented the same as sensitivity markers, causing the LLM to underweight their clinical significance.
+
+**Current Approach:**
+1. Pre-compute FDA-approved resistance biomarkers from CGI
+2. Add explicit guidance in evidence header:
+```
+FDA STATUS: This is an FDA-MANDATED RESISTANCE BIOMARKER - variant EXCLUDES use of: Cetuximab, Panitumumab
+ACTIONABILITY: This is Tier II (or potentially Tier I) because it changes treatment decisions (do NOT use these drugs).
+```
+3. Separate resistance and sensitivity biomarkers in detailed evidence with clear headers
+
+**Impact:** KRAS G13D in CRC now correctly classified as Tier II (resistance marker changing treatment decisions) instead of Tier III.
+
+---
+
+### 17. CIViC Assertions Integration (AMP/ASCO/CAP Tier Classifications)
+
+**Location:** `src/tumorboard/api/civic.py` - New CIViC GraphQL client
+
+**Purpose:** CIViC Assertions provide curated AMP/ASCO/CAP tier classifications with:
+- Expert-curated tier assignments (Tier I/II/III/IV, Level A/B/C/D)
+- FDA companion diagnostic status
+- NCCN guideline references
+- Assertion types: PREDICTIVE, PROGNOSTIC, DIAGNOSTIC, ONCOGENIC
+
+**Why CIViC Assertions (not OncoKB):**
+- OncoKB requires commercial licensing
+- CIViC is open source and free for all use
+- CIViC Assertions align with AMP/ASCO/CAP guidelines (similar to ESCAT)
+- Provides NCCN guideline references that ESMO ESCAT would provide
+
+**GraphQL Query:**
+```graphql
+query GetAssertions($molecularProfileName: String, $first: Int) {
+    assertions(molecularProfileName: $molecularProfileName, first: $first) {
+        nodes {
+            id name ampLevel assertionType significance
+            therapies { name }
+            disease { name }
+            molecularProfile { name }
+            fdaCompanionTest
+            nccnGuideline { name }
+        }
+    }
+}
+```
+
+**AMP Level Mapping:**
+- `TIER_I_LEVEL_A` → Tier I, Level A (FDA-approved, guideline-backed)
+- `TIER_I_LEVEL_B` → Tier I, Level B (strong consensus)
+- `TIER_II_LEVEL_C` → Tier II, Level C (clinical trials)
+- `TIER_II_LEVEL_D` → Tier II, Level D (case studies)
+
+**Integration:**
+- Fetched in parallel with MyVariant, FDA, CGI, and VICC
+- Added to Evidence model as `civic_assertions` field
+- Displayed in evidence summary with TIER I/II breakdown
+- NCCN guideline references shown in output
+
+**Impact:** Provides authoritative tier classifications similar to ESMO ESCAT but using open-source data. Example for EGFR L858R:
+```
+CIViC AMP/ASCO/CAP TIER I ASSERTIONS (3):
+  *** EXPERT-CURATED - STRONG CLINICAL SIGNIFICANCE ***
+  • EGFR L858R: Erlotinib [SENSITIVITYRESPONSE] [FDA Companion Test] [NCCN: Non-Small Cell Lung Cancer]
+      AMP Level: TIER_I_LEVEL_A, Disease: Lung Non-small Cell Carcinoma
+```
+
+---
+
 ## Open Issues
 
 1. ~~**Mixed evidence weighting**~~ - ADDRESSED: Pre-processing now computes stats and dominant signal (Decision #1)
-2. **Pure resistance markers** - Need clearer Tier I criteria for well-established resistance markers
+2. ~~**Pure resistance markers**~~ - ADDRESSED: Enhanced evidence summary emphasis for FDA-approved resistance markers (Decision #16)
 3. ~~**Clinical trial integration**~~ - ADDRESSED: FDA search now includes clinical_studies section (Decision #14)
-4. **Tier IV detection** - Currently 0% accuracy on benign/VUS variants
+4. ~~**ESMO/ESCAT integration**~~ - ADDRESSED: CIViC Assertions provide equivalent AMP/ASCO/CAP tier classifications (Decision #17)
+5. **Tier IV detection** - Currently 0% accuracy on benign/VUS variants

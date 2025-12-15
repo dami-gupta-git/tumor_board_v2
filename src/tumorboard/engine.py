@@ -1,7 +1,7 @@
 """Core assessment engine combining API and LLM services.
 
 ARCHITECTURE:
-    VariantInput → Normalize → MyVariantClient + FDAClient + CGIClient → Evidence → LLMService → Assessment
+    VariantInput → Normalize → MyVariantClient + FDAClient + CGIClient + CIViCClient → Evidence → LLMService → Assessment
 
 Orchestrates the pipeline with async concurrency for single and batch processing.
 
@@ -13,6 +13,7 @@ Key Design:
 - Variant normalization before API calls for better evidence matching
 - FDA drug approval data fetched in parallel with MyVariant data
 - CGI biomarkers provide explicit FDA/NCCN approval status
+- CIViC Assertions provide curated AMP/ASCO/CAP tier classifications with NCCN guidelines
 """
 
 import asyncio
@@ -21,10 +22,11 @@ from tumorboard.api.fda import FDAClient
 from tumorboard.api.cgi import CGIClient
 from tumorboard.api.oncotree import OncoTreeClient
 from tumorboard.api.vicc import VICCClient
+from tumorboard.api.civic import CIViCClient
 from tumorboard.llm.service import LLMService
 from tumorboard.models.assessment import ActionabilityAssessment
 from tumorboard.models.variant import VariantInput
-from tumorboard.models.evidence import FDAApproval, CGIBiomarkerEvidence, VICCEvidence
+from tumorboard.models.evidence import FDAApproval, CGIBiomarkerEvidence, VICCEvidence, CIViCAssertionEvidence
 from tumorboard.utils import normalize_variant
 
 
@@ -36,13 +38,15 @@ class AssessmentEngine:
     significantly improving performance for batch assessments.
     """
 
-    def __init__(self, llm_model: str = "gpt-4o-mini", llm_temperature: float = 0.1, enable_logging: bool = True, enable_vicc: bool = True):
+    def __init__(self, llm_model: str = "gpt-4o-mini", llm_temperature: float = 0.1, enable_logging: bool = True, enable_vicc: bool = True, enable_civic_assertions: bool = True):
         self.myvariant_client = MyVariantClient()
         self.fda_client = FDAClient()
         self.cgi_client = CGIClient()
         self.oncotree_client = OncoTreeClient()
         self.vicc_client = VICCClient() if enable_vicc else None
+        self.civic_client = CIViCClient() if enable_civic_assertions else None
         self.enable_vicc = enable_vicc
+        self.enable_civic_assertions = enable_civic_assertions
         self.llm_service = LLMService(model=llm_model, temperature=llm_temperature, enable_logging=enable_logging)
 
     async def __aenter__(self):
@@ -56,6 +60,8 @@ class AssessmentEngine:
         await self.oncotree_client.__aenter__()
         if self.vicc_client:
             await self.vicc_client.__aenter__()
+        if self.civic_client:
+            await self.civic_client.__aenter__()
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
@@ -65,6 +71,8 @@ class AssessmentEngine:
         await self.oncotree_client.__aexit__(exc_type, exc_val, exc_tb)
         if self.vicc_client:
             await self.vicc_client.__aexit__(exc_type, exc_val, exc_tb)
+        if self.civic_client:
+            await self.civic_client.__aexit__(exc_type, exc_val, exc_tb)
 
     async def assess_variant(self, variant_input: VariantInput) -> ActionabilityAssessment:
         """Assess a single variant.
@@ -109,7 +117,7 @@ class AssessmentEngine:
                 print(f"  Warning: OncoTree resolution failed: {str(e)}")
                 resolved_tumor_type = variant_input.tumor_type
 
-        # Step 3: Fetch evidence from MyVariant, FDA, CGI, and optionally VICC APIs in parallel
+        # Step 3: Fetch evidence from MyVariant, FDA, CGI, VICC, and CIViC APIs in parallel
         # This improves performance by running all API calls concurrently
         async def fetch_vicc():
             if self.vicc_client:
@@ -121,7 +129,17 @@ class AssessmentEngine:
                 )
             return []
 
-        evidence, fda_approvals_raw, cgi_biomarkers_raw, vicc_associations_raw = await asyncio.gather(
+        async def fetch_civic_assertions():
+            if self.civic_client:
+                return await self.civic_client.fetch_assertions(
+                    gene=variant_input.gene,
+                    variant=normalized_variant,
+                    tumor_type=resolved_tumor_type,
+                    max_results=20,
+                )
+            return []
+
+        evidence, fda_approvals_raw, cgi_biomarkers_raw, vicc_associations_raw, civic_assertions_raw = await asyncio.gather(
             self.myvariant_client.fetch_evidence(
                 gene=variant_input.gene,
                 variant=normalized_variant,  # Use normalized variant for API query
@@ -137,6 +155,7 @@ class AssessmentEngine:
                 resolved_tumor_type,
             ),
             fetch_vicc(),
+            fetch_civic_assertions(),
             return_exceptions=True
         )
 
@@ -162,6 +181,10 @@ class AssessmentEngine:
         if isinstance(vicc_associations_raw, Exception):
             print(f"  Warning: VICC MetaKB API failed: {str(vicc_associations_raw)}")
             vicc_associations_raw = []
+
+        if isinstance(civic_assertions_raw, Exception):
+            print(f"  Warning: CIViC Assertions API failed: {str(civic_assertions_raw)}")
+            civic_assertions_raw = []
 
         # Parse FDA approval data and add to evidence
         if fda_approvals_raw:
@@ -212,6 +235,30 @@ class AssessmentEngine:
                     oncokb_level=assoc.get_oncokb_level(),
                 ))
             evidence.vicc = vicc_evidence
+
+        # Add CIViC Assertions to evidence (curated AMP/ASCO/CAP tier classifications)
+        if civic_assertions_raw:
+            civic_assertions_evidence = []
+            for assertion in civic_assertions_raw:
+                civic_assertions_evidence.append(CIViCAssertionEvidence(
+                    assertion_id=assertion.assertion_id,
+                    name=assertion.name,
+                    amp_level=assertion.amp_level,
+                    amp_tier=assertion.get_amp_tier(),
+                    amp_level_letter=assertion.get_amp_level(),
+                    assertion_type=assertion.assertion_type,
+                    significance=assertion.significance,
+                    status=assertion.status,
+                    molecular_profile=assertion.molecular_profile,
+                    disease=assertion.disease,
+                    therapies=assertion.therapies,
+                    fda_companion_test=assertion.fda_companion_test,
+                    nccn_guideline=assertion.nccn_guideline,
+                    description=assertion.description,
+                    is_sensitivity=assertion.is_sensitivity(),
+                    is_resistance=assertion.is_resistance(),
+                ))
+            evidence.civic_assertions = civic_assertions_evidence
 
         # Step 4: Assess with LLM (must run sequentially since it depends on evidence)
         # Use original variant notation for display/reporting

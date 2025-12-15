@@ -73,6 +73,26 @@ VICC MetaKB is particularly valuable for:
 - Finding sensitivity vs. resistance associations for drug-variant pairs
 - Accessing OncoKB-style evidence levels (1A = FDA-approved, 2A = standard care, etc.)
 
+## CIViC Assertions (AMP/ASCO/CAP Tier Classifications)
+
+CIViC Assertions provide expert-curated clinical interpretations with official AMP/ASCO/CAP tier assignments:
+
+- **AMP Level**: Official tier classification (TIER_I_LEVEL_A, TIER_I_LEVEL_B, TIER_II_LEVEL_C, TIER_II_LEVEL_D)
+- **Assertion Type**: PREDICTIVE (therapy response), PROGNOSTIC, DIAGNOSTIC, ONCOGENIC
+- **Significance**: SENSITIVITYRESPONSE, RESISTANCE, ONCOGENIC, etc.
+- **Therapies**: Associated drugs with clinical significance
+- **FDA Companion Test**: Boolean indicating FDA companion diagnostic status
+- **NCCN Guideline**: Reference to specific NCCN guideline (e.g., "Non-Small Cell Lung Cancer")
+- **Disease**: Cancer type for the assertion
+- **Status**: ACCEPTED or SUBMITTED
+
+CIViC Assertions are particularly valuable for:
+- Authoritative AMP/ASCO/CAP tier assignments (equivalent to ESMO ESCAT)
+- NCCN guideline references for regulatory context
+- FDA companion diagnostic status
+- Expert-curated clinical significance assessments
+- Open source (no licensing required, unlike OncoKB)
+
 ## Where Annotations Appear
 
 All annotations are included in:

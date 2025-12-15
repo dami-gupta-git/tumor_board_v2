@@ -241,6 +241,36 @@ class VICCEvidence(BaseModel):
     oncokb_level: str | None = None  # 1A, 1B, 2A, 2B, 3A, 3B, 4, R1, R2
 
 
+class CIViCAssertionEvidence(BaseModel):
+    """Evidence from CIViC Assertions (curated AMP/ASCO/CAP classifications).
+
+    CIViC Assertions provide expert-curated clinical interpretations with:
+    - AMP/ASCO/CAP tier assignments (Tier I/II/III/IV, Level A/B/C/D)
+    - FDA companion diagnostic status
+    - NCCN guideline references
+
+    This complements VICC/CGI by providing authoritative tier classifications
+    that align with professional guidelines (similar to ESCAT but open source).
+    """
+
+    assertion_id: int | None = None
+    name: str | None = None  # e.g., "AID5"
+    amp_level: str | None = None  # e.g., "TIER_I_LEVEL_A"
+    amp_tier: str | None = None  # e.g., "Tier I"
+    amp_level_letter: str | None = None  # e.g., "A"
+    assertion_type: str | None = None  # PREDICTIVE, PROGNOSTIC, DIAGNOSTIC, ONCOGENIC
+    significance: str | None = None  # SENSITIVITYRESPONSE, RESISTANCE, etc.
+    status: str | None = None  # ACCEPTED, SUBMITTED
+    molecular_profile: str | None = None  # e.g., "EGFR L858R"
+    disease: str | None = None
+    therapies: list[str] = Field(default_factory=list)
+    fda_companion_test: bool | None = None
+    nccn_guideline: str | None = None
+    description: str | None = None
+    is_sensitivity: bool = False
+    is_resistance: bool = False
+
+
 class Evidence(VariantAnnotations):
     """Aggregated evidence from multiple sources."""
 
@@ -255,11 +285,12 @@ class Evidence(VariantAnnotations):
     fda_approvals: list[FDAApproval] = Field(default_factory=list)
     cgi_biomarkers: list[CGIBiomarkerEvidence] = Field(default_factory=list)
     vicc: list[VICCEvidence] = Field(default_factory=list)
+    civic_assertions: list[CIViCAssertionEvidence] = Field(default_factory=list)
     raw_data: dict[str, Any] = Field(default_factory=dict)
 
     def has_evidence(self) -> bool:
         """Check if any evidence was found."""
-        return bool(self.civic or self.clinvar or self.cosmic or self.fda_approvals or self.cgi_biomarkers or self.vicc)
+        return bool(self.civic or self.clinvar or self.cosmic or self.fda_approvals or self.cgi_biomarkers or self.vicc or self.civic_assertions)
 
     @staticmethod
     def _tumor_matches(tumor_type: str | None, disease: str | None) -> bool:
@@ -423,8 +454,14 @@ class Evidence(VariantAnnotations):
         else:
             lines.append("No sensitivity/resistance evidence found in databases.")
 
-        # FDA status
-        if stats['has_fda_approved']:
+        # FDA status - check for resistance markers specifically
+        fda_resistance_markers = [b for b in self.cgi_biomarkers
+                                   if b.fda_approved and b.association and 'RESIST' in b.association.upper()]
+        if fda_resistance_markers:
+            drugs = list(set(b.drug for b in fda_resistance_markers if b.drug))[:3]
+            lines.append(f"FDA STATUS: This is an FDA-MANDATED RESISTANCE BIOMARKER - variant EXCLUDES use of: {', '.join(drugs)}")
+            lines.append("ACTIONABILITY: This is Tier II (or potentially Tier I) because it changes treatment decisions (do NOT use these drugs).")
+        elif stats['has_fda_approved']:
             lines.append("FDA STATUS: Has FDA-approved therapy associated with this gene.")
 
         # Conflicts
@@ -649,9 +686,46 @@ class Evidence(VariantAnnotations):
         if self.cgi_biomarkers:
             approved = [b for b in self.cgi_biomarkers if b.fda_approved]
             if approved:
-                lines.append(f"CGI FDA-Approved Biomarkers ({len(approved)}):")
-                for b in approved[:5]:
-                    lines.append(f"  • {b.drug} [{b.association}] in {b.tumor_type or 'solid tumors'}")
+                # Separate resistance and sensitivity markers - resistance markers are HIGHLY actionable
+                resistance_approved = [b for b in approved if b.association and 'RESIST' in b.association.upper()]
+                sensitivity_approved = [b for b in approved if b.association and 'RESIST' not in b.association.upper()]
+
+                if resistance_approved:
+                    lines.append(f"CGI FDA-APPROVED RESISTANCE MARKERS ({len(resistance_approved)}):")
+                    lines.append("  *** THESE VARIANTS EXCLUDE USE OF FDA-APPROVED THERAPIES ***")
+                    for b in resistance_approved[:5]:
+                        lines.append(f"  • {b.drug} [{b.association.upper()}] in {b.tumor_type or 'solid tumors'} - Evidence: {b.evidence_level}")
+                    lines.append("  → This variant causes RESISTANCE to the above drug(s), making it Tier I/II actionable as a NEGATIVE biomarker.")
+                    lines.append("")
+
+                if sensitivity_approved:
+                    lines.append(f"CGI FDA-Approved Sensitivity Biomarkers ({len(sensitivity_approved)}):")
+                    for b in sensitivity_approved[:5]:
+                        lines.append(f"  • {b.drug} [{b.association}] in {b.tumor_type or 'solid tumors'} - Evidence: {b.evidence_level}")
+                    lines.append("")
+
+        # CIViC Assertions - curated AMP/ASCO/CAP tier classifications
+        if self.civic_assertions:
+            # Filter to accepted or submitted assertions with AMP levels
+            tier_i = [a for a in self.civic_assertions if a.amp_tier == "Tier I"]
+            tier_ii = [a for a in self.civic_assertions if a.amp_tier == "Tier II"]
+
+            if tier_i:
+                lines.append(f"CIViC AMP/ASCO/CAP TIER I ASSERTIONS ({len(tier_i)}):")
+                lines.append("  *** EXPERT-CURATED - STRONG CLINICAL SIGNIFICANCE ***")
+                for a in tier_i[:5]:
+                    therapies = ", ".join(a.therapies) if a.therapies else "N/A"
+                    fda_note = " [FDA Companion Test]" if a.fda_companion_test else ""
+                    nccn_note = f" [NCCN: {a.nccn_guideline}]" if a.nccn_guideline else ""
+                    lines.append(f"  • {a.molecular_profile}: {therapies} [{a.significance}]{fda_note}{nccn_note}")
+                    lines.append(f"      AMP Level: {a.amp_level}, Disease: {a.disease}")
+                lines.append("")
+
+            if tier_ii:
+                lines.append(f"CIViC AMP/ASCO/CAP Tier II Assertions ({len(tier_ii)}):")
+                for a in tier_ii[:3]:
+                    therapies = ", ".join(a.therapies) if a.therapies else "N/A"
+                    lines.append(f"  • {a.molecular_profile}: {therapies} [{a.significance}]")
                 lines.append("")
 
         if self.clinvar:

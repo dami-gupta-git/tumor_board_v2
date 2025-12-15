@@ -46,6 +46,7 @@ TUMOR_TYPE_MAPPINGS: dict[str, list[str]] = {
     "crc": ["colorectal", "colon", "crc", "rectal", "rectum"],
     "coad": ["colon adenocarcinoma", "coad"],
     "read": ["rectal adenocarcinoma", "read", "rectum"],
+    "coread": ["colorectal", "colon", "rectal", "colorectal adenocarcinoma", "crc"],  # CGI uses COREAD
 
     # Melanoma
     "mel": ["melanoma", "mel", "cutaneous melanoma", "skin melanoma"],

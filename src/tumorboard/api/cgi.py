@@ -146,6 +146,8 @@ class CGIClient:
         - "EGFR:G719." matches G719S, G719A, G719C, etc.
         - "EGFR:G719A,G719S,G719C" matches any of these specific variants
         - "EGFR:L858R" matches exactly L858R
+        - "KRAS:.12.,.13." matches any mutation at position 12 or 13 (G12D, G13D, etc.)
+        - "KRAS:." matches any KRAS mutation
 
         Args:
             cgi_alteration: CGI alteration string (e.g., "EGFR:G719.,L858R")
@@ -179,9 +181,13 @@ class CGIClient:
             if part == variant_upper:
                 return True
 
+            # Wildcard for any mutation in gene: "." alone matches any variant
+            if part == ".":
+                return True
+
             # Pattern match: "G719." matches G719S, G719A, etc.
             # The dot represents a wildcard for any amino acid
-            if part.endswith("."):
+            if part.endswith(".") and not part.startswith("."):
                 # Extract base pattern (e.g., "G719" from "G719.")
                 base_pattern = part[:-1]
                 # Check if variant starts with base and has exactly one more character
@@ -189,6 +195,21 @@ class CGIClient:
                     base_pattern
                 ) + 1:
                     return True
+
+            # Position-based wildcard: ".13." matches any mutation at position 13
+            # Format: .{position}. where position is a number
+            # This matches variants like G13D, G13C, G13V, etc.
+            if part.startswith(".") and part.endswith(".") and len(part) > 2:
+                position_str = part[1:-1]  # Extract position number (e.g., "13" from ".13.")
+                if position_str.isdigit():
+                    position = position_str
+                    # Extract position from variant (e.g., "13" from "G13D")
+                    # Variant format: {ref_aa}{position}{alt_aa} like G13D
+                    variant_match = re.match(r'^([A-Z])(\d+)([A-Z])$', variant_upper)
+                    if variant_match:
+                        variant_position = variant_match.group(2)
+                        if variant_position == position:
+                            return True
 
         return False
 
