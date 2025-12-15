@@ -482,9 +482,9 @@ class Evidence(VariantAnnotations):
             if later_line_approvals and not first_line_approvals:
                 lines.append("")
                 lines.append("FDA APPROVAL CONTEXT:")
-                lines.append(f"  LATER-LINE ONLY: {', '.join(later_line_approvals)}")
-                lines.append("  → No first-line FDA approval for this variant+tumor. This typically indicates TIER II, not Tier I.")
-                lines.append("  → Tier I requires first-line therapy OR the biomarker being THE standard approach at that line.")
+                lines.append(f"  FDA-APPROVED FOR THIS BIOMARKER (later-line): {', '.join(later_line_approvals)}")
+                lines.append("  → IMPORTANT: Later-line FDA approval is STILL Tier I if the biomarker IS the therapeutic indication.")
+                lines.append("  → The question is: 'Does finding this biomarker tell me WHICH therapy to use?' If YES → Tier I.")
             elif first_line_approvals:
                 lines.append("")
                 lines.append(f"FDA FIRST-LINE APPROVAL: {', '.join(first_line_approvals)} → Strong Tier I signal")
