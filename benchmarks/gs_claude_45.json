@@ -1,6 +1,6 @@
 {
   "description": "Gold standard dataset for SNP/indel variants - curated with 2024 FDA approvals",
-  "version": "2.0-snp-2024",
+  "version": "2.1-snp-2024-corrected",
   "last_updated": "2024-12",
   "entries": [
     {
@@ -40,8 +40,8 @@
       "gene": "BRAF",
       "variant": "V600E",
       "tumor_type": "Colorectal Cancer",
-      "expected_tier": "Tier II",
-      "notes": "FDA-approved: encorafenib+cetuximab for BRAF V600E mCRC (2020)",
+      "expected_tier": "Tier I",
+      "notes": "CORRECTED FROM TIER II. FDA-approved: encorafenib+cetuximab for BRAF V600E mCRC (2020). Even though later-line, BRAF V600E IS the biomarker indication for this therapy.",
       "references": [
         "FDA approval April 2020",
         "Kopetz S et al. N Engl J Med 2019 (BEACON trial)"
@@ -85,7 +85,7 @@
       "variant": "T790M",
       "tumor_type": "Non-Small Cell Lung Cancer",
       "expected_tier": "Tier I",
-      "notes": "FDA-approved: osimertinib for T790M+ NSCLC after progression on 1st/2nd-gen TKI",
+      "notes": "FDA-approved: osimertinib for T790M+ NSCLC after progression on 1st/2nd-gen TKI. T790M IS the indication for osimertinib.",
       "references": [
         "FDA approval November 2015",
         "Mok TS et al. N Engl J Med 2017 (AURA3)"
@@ -96,7 +96,7 @@
       "variant": "C797S",
       "tumor_type": "Non-Small Cell Lung Cancer",
       "expected_tier": "Tier II",
-      "notes": "--",
+      "notes": "Resistance marker to osimertinib. Guides treatment selection (may use 1st-gen TKIs if in trans with T790M). No FDA-approved C797S-specific therapy.",
       "references": [
         "Thress KS et al. Nat Med 2015",
         "NCCN Guidelines - resistance marker"
@@ -139,8 +139,8 @@
       "gene": "KRAS",
       "variant": "G12D",
       "tumor_type": "Colorectal Cancer",
-      "expected_tier": "Tier I",
-      "notes": "Resistance marker: predicts resistance to anti-EGFR therapy (cetuximab, panitumumab). Standard-of-care impact.",
+      "expected_tier": "Tier II",
+      "notes": "CORRECTED FROM TIER I. Resistance marker: predicts resistance to anti-EGFR therapy (cetuximab, panitumumab). Guideline-mandated testing. By strict AMP/ASCO/CAP, exclusionary biomarkers without FDA-approved targeted therapy are Tier II, not Tier I.",
       "references": [
         "Allegra CJ et al. J Clin Oncol 2009",
         "NCCN Guidelines - required testing before anti-EGFR"
@@ -161,8 +161,8 @@
       "gene": "KRAS",
       "variant": "G13D",
       "tumor_type": "Colorectal Cancer",
-      "expected_tier": "Tier I",
-      "notes": "Resistance marker: predicts resistance to anti-EGFR therapy. Some data suggests less resistance than G12 mutations.",
+      "expected_tier": "Tier II",
+      "notes": "CORRECTED FROM TIER I. Resistance marker: predicts resistance to anti-EGFR therapy. Same reasoning as G12D - guideline-mandated but exclusionary only, no FDA-approved targeted therapy FOR KRAS.",
       "references": [
         "De Roock W et al. JAMA 2010",
         "NCCN Guidelines"
@@ -173,7 +173,7 @@
       "variant": "Q61K",
       "tumor_type": "Colorectal Cancer",
       "expected_tier": "Tier II",
-      "notes": "Resistance marker: predicts resistance to anti-EGFR therapy. Required testing per NCCN.",
+      "notes": "Resistance marker: predicts resistance to anti-EGFR therapy. Required testing per NCCN. Same tier as KRAS mutations in CRC.",
       "references": [
         "Douillard JY et al. N Engl J Med 2013",
         "NCCN Guidelines"
@@ -183,19 +183,19 @@
       "gene": "NRAS",
       "variant": "Q61K",
       "tumor_type": "Melanoma",
-      "expected_tier": "Tier II",
-      "notes": "MEK inhibitors (binimetinib) show activity. NEMO trial positive but not FDA-approved as monotherapy. Excludes BRAF inhibitor use.",
+      "expected_tier": "Tier III",
+      "notes": "CORRECTED FROM TIER II. No FDA-approved NRAS-targeted therapy. MEK inhibitors (binimetinib) show activity in NEMO trial but NOT FDA-approved as monotherapy for NRAS-mutant melanoma. Investigational only.",
       "references": [
         "Dummer R et al. Lancet Oncol 2017 (NEMO)",
-        "Clinical utility for excluding BRAF inhibitors"
+        "No FDA approval for NRAS-targeted therapy in melanoma"
       ]
     },
     {
       "gene": "NRAS",
       "variant": "G12D",
       "tumor_type": "Melanoma",
-      "expected_tier": "Tier II",
-      "notes": "No FDA-approved therapy. Limited clinical data compared to Q61 mutations.",
+      "expected_tier": "Tier III",
+      "notes": "CORRECTED FROM TIER II. No FDA-approved therapy. Limited clinical data compared to Q61 mutations. Investigational only.",
       "references": [
         "Johnson DB et al. Cancer 2015",
         "Preclinical MEK inhibitor sensitivity"
@@ -206,7 +206,7 @@
       "variant": "H1047R",
       "tumor_type": "Breast Cancer",
       "expected_tier": "Tier I",
-      "notes": "FDA-approved: alpelisib + fulvestrant for PIK3CA-mutated HR+/HER2- breast cancer (2019)",
+      "notes": "FDA-approved: alpelisib + fulvestrant for PIK3CA-mutated HR+/HER2- breast cancer (2019). PIK3CA mutation IS the companion diagnostic.",
       "references": [
         "FDA approval May 2019",
         "André F et al. N Engl J Med 2019 (SOLAR-1)"
@@ -305,7 +305,7 @@
       "variant": "V560D",
       "tumor_type": "Gastrointestinal Stromal Tumor",
       "expected_tier": "Tier I",
-      "notes": "FDA-approved: imatinib for KIT-mutated GIST. Exon 11 mutations highly sensitive.",
+      "notes": "FDA-approved: imatinib for KIT-mutated GIST. Exon 9 mutations (including V560D) are imatinib-sensitive, first-line therapy.",
       "references": [
         "FDA approval 2002",
         "Demetri GD et al. N Engl J Med 2002"
@@ -316,7 +316,7 @@
       "variant": "D816V",
       "tumor_type": "Gastrointestinal Stromal Tumor",
       "expected_tier": "Tier II",
-      "notes": "--",
+      "notes": "Imatinib-resistant. Avapritinib shows activity but FDA-approved for PDGFRA D842V GIST, not specifically for KIT D816V in GIST. Very rare in GIST (<1%).",
       "references": [
         "Heinrich MC et al. J Clin Oncol 2008",
         "Avapritinib shows activity in D816V GIST"
@@ -371,7 +371,7 @@
       "variant": "R1450*",
       "tumor_type": "Colorectal Cancer",
       "expected_tier": "Tier III",
-      "notes": "--",
+      "notes": "Diagnostic/prognostic for CRC but not predictive for therapy selection.",
       "references": [
         "Fearon ER et al. Cell 1990",
         "Not predictive for therapy"
@@ -404,7 +404,7 @@
       "variant": "N549K",
       "tumor_type": "Cholangiocarcinoma",
       "expected_tier": "Tier II",
-      "notes": "--",
+      "notes": "FGFR2 fusions/rearrangements have FDA-approved therapies (pemigatinib, infigratinib, futibatinib). N549K is a point mutation - less clear if it falls under FDA approval language which emphasizes fusions. Tier II for point mutations unless evidence shows equivalence to fusions.",
       "references": [
         "FDA approvals 2020-2022",
         "Abou-Alfa GK et al. Lancet Oncol 2020 (FIGHT-202)"
@@ -415,7 +415,7 @@
       "variant": "D1228N",
       "tumor_type": "Non-Small Cell Lung Cancer",
       "expected_tier": "Tier II",
-      "notes": "Resistance marker to Type I MET inhibitors (crizotinib, capmatinib). May retain sensitivity to Type II inhibitors.",
+      "notes": "MET exon 14 skipping mutations have FDA-approved therapies (capmatinib, tepotinib). D1228N can cause exon 14 skipping. If confirmed to cause skipping, may be Tier I. As point mutation alone without confirmed functional effect, Tier II.",
       "references": [
         "Recondo G et al. Cancer Discov 2020",
         "Guides MET inhibitor selection"
@@ -448,7 +448,7 @@
       "variant": "C61G",
       "tumor_type": "Breast Cancer",
       "expected_tier": "Tier I",
-      "notes": "FDA-approved: olaparib, talazoparib for germline BRCA-mutated HER2- breast cancer. Somatic BRCA also actionable.",
+      "notes": "FDA-approved: olaparib, talazoparib for germline BRCA-mutated HER2- breast cancer. C61G is a known pathogenic BRCA1 variant.",
       "references": [
         "FDA approval January 2018 (olaparib)",
         "Robson M et al. N Engl J Med 2017 (OlympiAD)"
@@ -492,7 +492,7 @@
       "variant": "R80*",
       "tumor_type": "Melanoma",
       "expected_tier": "Tier III",
-      "notes": "Prognostic/diagnostic. Associated with CDK4/6 inhibitor sensitivity in some contexts but not FDA-approved indication.",
+      "notes": "Prognostic/diagnostic. Associated with CDK4/6 inhibitor sensitivity in some contexts but not FDA-approved indication in melanoma.",
       "references": [
         "Genomic classification of cutaneous melanoma. Cell 2015",
         "Not validated predictive biomarker"

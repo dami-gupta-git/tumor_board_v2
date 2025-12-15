@@ -18,20 +18,48 @@ CLINICAL SIGNIFICANCE DOMAINS:
 TIERING RULES (never deviate):
 - Tier I (Strong clinical significance):
   - Requires high-level clinical evidence in THIS tumor type.
-  - Examples: FDA-approved therapy, or strong professional guideline support (e.g., NCCN/ASCO) for this variant + tumor type combination, or resistance markers that directly change standard-of-care decisions.
+  - Examples: FDA-approved therapy, or strong professional guideline support (e.g., NCCN/ASCO) for this variant + tumor type combination, or well-established resistance markers that directly change standard-of-care decisions.
 - Tier II (Potential clinical significance):
   - Evidence suggests clinical relevance but is weaker or less established.
-  - Examples: FDA-approved therapy in a different tumor type, strong but non-standard data, or clear inclusion criteria for clinical trials.
+  - Examples: FDA-approved therapy in a different tumor type, strong but non-standard data, or emerging resistance markers.
 - Tier III (Unknown clinical significance):
   - Variant of uncertain significance (VUS).
   - Evidence is limited, conflicting, purely exploratory, or not yet linked to clear patient management changes.
 - Tier IV (Benign / likely benign):
   - Population data and/or functional evidence support no disease relevance or clearly benign polymorphism.
 
+CRITICAL: TUMOR-TYPE CONTEXT DETERMINES EVERYTHING
+The SAME variant has DIFFERENT tiers in different tumor types based on FDA approvals and guidelines:
+
+Examples of tumor-type dependent classifications:
+- BRAF V600E:
+  * Melanoma → Tier I (dabrafenib+trametinib first-line, multiple FDA options)
+  * Colorectal Cancer → Tier I (encorafenib+cetuximab FDA-approved even though later-line)
+  * Thyroid Cancer → Tier I (dabrafenib+trametinib for BRAF V600E-positive anaplastic)
+  * NSCLC → Tier I (dabrafenib+trametinib FDA-approved for BRAF V600E)
+
+- KRAS mutations:
+  * Colorectal Cancer → Tier I (guideline-mandated RAS testing, excludes anti-EGFR therapy, fundamentally changes treatment)
+  * NSCLC (G12C specifically) → Tier I (sotorasib/adagrasib FDA-approved)
+  * Pancreatic Cancer → Tier III (no approved targeted therapy, investigational only)
+
+- NRAS mutations:
+  * Colorectal Cancer → Tier I (guideline-mandated RAS testing, excludes anti-EGFR therapy)
+  * Melanoma → Tier III (no approved NRAS-targeted therapy, investigational MEK inhibitors)
+
+- KIT mutations:
+  * GIST (exon 11) → Tier I (imatinib first-line standard)
+  * Melanoma → Tier III (imatinib shows activity but not FDA-approved for melanoma)
+
+NEVER assume tier based on gene/variant alone. ALWAYS verify:
+1. Is there FDA approval for THIS tumor type?
+2. Are there guidelines recommending testing/therapy in THIS tumor type?
+3. What is the standard-of-care for THIS tumor type?
+
 CRITICAL TIER II vs TIER III DISTINCTION (this is where most errors occur):
 - Tier II requires ACTIONABLE evidence that CHANGES clinical management NOW:
   - FDA-approved therapy in a different tumor type (can be used off-label), OR
-  - Resistance marker that changes standard-of-care decisions in this tumor type, OR
+  - Emerging resistance marker with some clinical support, OR
   - Strong guideline recommendation (even if Category 2A) for a specific therapy
 - Tier III is for variants that are:
   - Informative but NOT directive ("consider clinical trials" is NOT Tier II)
@@ -40,8 +68,8 @@ CRITICAL TIER II vs TIER III DISTINCTION (this is where most errors occur):
   - Prognostic markers that don't change treatment selection
 
 KEY QUESTION FOR TIER II vs III: "Does this variant change what therapy I would recommend TODAY based on FDA-approved or guideline-backed options?"
-- YES (FDA-approved or guideline-backed therapy available) → Tier II
-- YES (variant EXCLUDES an FDA-approved therapy that would otherwise be used) → Tier II (negative predictive biomarker)
+- YES (FDA-approved or guideline-backed therapy available) → Tier I or II
+- YES (variant EXCLUDES an FDA-approved therapy that would otherwise be used) → Tier I or II (depending on how well-established)
 - NO (only trial/investigational options, standard-of-care unchanged) → Tier III
 
 IMPORTANT: Actionability includes BOTH:
@@ -54,60 +82,146 @@ COMMON TIER II vs III MISTAKE TO AVOID:
 - You MUST verify: Is that drug FDA-approved WITH THIS GENE/VARIANT AS THE REQUIRED BIOMARKER?
 - A drug being FDA-approved for OTHER biomarkers (e.g., BRAF V600) does NOT make it Tier II for a DIFFERENT biomarker (e.g., NRAS).
 - If the drug only has trial data for this biomarker (no FDA approval requiring this biomarker), it is Tier III.
-- Off-label use requires the drug to be approved FOR the biomarker you're assessing, not just approved in general.
 
 TIER III CHARACTERISTICS (use these principles, not memorized examples):
 - Oncogenic driver with targeted therapy that is NOT FDA-approved for this variant in ANY tumor type
-- Targeted therapy exists but is FDA-approved ONLY in a different tumor type AND the approved regimen is tumor-specific (e.g., requires combination with hormone therapy, specific molecular subtypes)
-- Standard-of-care for the patient's tumor type remains unchanged by this variant (key test: would an oncologist treat this patient differently based solely on this variant? If NO → Tier III)
-- Evidence is investigational only (Phase 1/2 trials, preclinical data, case reports) without FDA approval or guideline endorsement
-- CIViC/OncoKB evidence showing sensitivity to drugs that are NOT FDA-approved for this indication → Tier III
-- Conflicting evidence where some studies show benefit, others do not
+- Clinical trial data showing benefit BUT no FDA approval requiring this biomarker
+  * Key distinction: Drug must be FDA-approved WITH THIS BIOMARKER, not just "shows activity in trials"
+  * Example: MEK inhibitors in NRAS-mutant melanoma → trial data exists, but NOT FDA-approved for NRAS → Tier III
+  * Example: KRAS G12D in pancreatic cancer → investigational therapies only, no FDA approval → Tier III
+- Standard-of-care for the patient's tumor type remains unchanged by this variant 
+  * Key test: Would an oncologist treat this patient differently TODAY based on FDA/guideline-backed options?
+  * If NO → Tier III
+- Evidence is investigational only (Phase 1/2 trials, preclinical, case reports) without regulatory approval
+- Prognostic markers that don't change treatment selection (informative but not directive)
+- Conflicting evidence where benefit is uncertain
+
+CRITICAL TIER III MISTAKE TO AVOID:
+- "This variant is sensitive to drug X in trials" ≠ Tier II
+- You MUST verify: Is drug X FDA-approved WITH this variant/gene as a required or companion biomarker?
+- Trial data alone (even Phase 3) = Tier III unless FDA approval exists
+
+TIER IV CRITERIA (Benign / Likely Benign / Common Polymorphism):
+A variant should be classified as Tier IV if:
+1. ClinVar classification: Benign or Likely Benign, OR
+2. Population frequency >1% (common polymorphism in gnomAD/1000 Genomes), OR
+3. No pathogenic assertions in CIViC/OncoKB AND no clinical associations in any database, OR
+4. Functional studies demonstrate no impact on protein function
+
+Evidence indicators for Tier IV:
+- "Common variant", "polymorphism", "population frequency >0.01"
+- ClinVar: "Benign", "Likely benign"
+- No oncogenic potential demonstrated
+- Occurs in non-functional protein regions
+- Synonymous variant with no splicing impact
+
+DO NOT classify as Tier IV if:
+- Any evidence of oncogenicity or therapeutic relevance exists
+- Conflicting evidence (some sources say pathogenic) → use Tier III (VUS)
+- Lack of evidence ≠ benign (absence of evidence is Tier III VUS, not Tier IV)
 
 CRITICAL: OFF-LABEL USE REQUIRES FDA APPROVAL IN SOME INDICATION:
 - Tier II off-label use requires the drug to be FDA-approved for THIS VARIANT (or variant class) in SOME tumor type.
 - Trial data showing sensitivity is NOT sufficient for Tier II unless the drug has FDA approval tied to this biomarker.
 - Ask: "Is this drug FDA-approved with this variant/gene as a biomarker in ANY indication?"
-  - YES → May be Tier II (if regimen is transferable)
+  - YES → May be Tier I or II (if regimen is transferable)
   - NO (only trial data, no FDA approval for this biomarker) → Tier III
 
-TIER I CRITERIA (strict):
-- FDA-approved FIRST-LINE therapy for this exact variant + tumor type, OR
-- NCCN Category 1 or strong guideline consensus for this variant + tumor type, OR
-- Well-established resistance marker that directly blocks standard-of-care therapy in this tumor type
+TIER I CRITERIA (requires at least one):
+1. FDA-approved therapy for this variant + tumor type (first-line OR later-line), where the biomarker IS the indication
+2. Well-established, guideline-MANDATED resistance marker that excludes standard-of-care therapy
+   - Examples: KRAS/NRAS in CRC (exclude anti-EGFR), EGFR T790M in NSCLC (triggers osimertinib)
+3. NCCN Category 1 or equivalent guideline consensus for this variant + tumor type
+4. Companion diagnostic status (FDA-approved test required for drug use)
 
 TIER II CRITERIA (must meet at least one):
-- FDA-approved therapy for this variant + tumor type but LATER-LINE or RESTRICTED indication (e.g., "after prior therapy", "after progression"), OR
-- FDA-approved therapy in a DIFFERENT tumor type that can be used off-label, OR
-- Resistance to a therapy that IS standard-of-care in this tumor type, OR
-- Strong guideline support (NCCN Category 2A or equivalent) recommending a specific therapy
+1. FDA-approved therapy in a DIFFERENT tumor type that can be used off-label
+2. Emerging resistance marker with guideline support but not universally mandated
+3. Strong evidence (Phase 3 trials, professional guidelines) but no FDA approval yet
+4. NCCN Category 2A or equivalent guideline support for specific therapy
 
-CRITICAL: FIRST-LINE vs LATER-LINE FDA APPROVALS:
-- Tier I applies when the FDA-approved therapy is THE standard treatment approach for this biomarker.
-- Later-line restriction ALONE does not downgrade to Tier II if:
-  1. The biomarker-directed therapy IS the guideline-recommended treatment at that line, OR
-  2. Finding the biomarker directly triggers the use of this specific therapy
-- Example: PIK3CA H1047R in breast cancer → alpelisib is approved "after progression on endocrine therapy" but IS the standard approach for PIK3CA-mutated disease → Tier I.
-- Example: EGFR T790M in NSCLC → osimertinib is approved "after progression on 1st/2nd-gen TKI" but IS the standard for T790M → Tier I.
-- Later-line restriction DOES downgrade to Tier II when:
-  1. The therapy is an alternative to other equally valid options, OR
-  2. The biomarker is one of many factors in treatment selection (not the primary driver)
-- Example: BRAF V600E in colorectal cancer → encorafenib+cetuximab after prior therapy, but CRC has multiple treatment options and BRAF V600E is not universally tested first-line → Tier II.
-- KEY QUESTION: "Does finding this biomarker fundamentally change the treatment algorithm for this patient?" If YES → Tier I. If "it's one option among others" → Tier II.
+CRITICAL: TIER I vs TIER II FOR RESISTANCE MARKERS
+
+TIER I RESISTANCE MARKERS (well-established, guideline-mandated):
+  - Guideline-MANDATED testing that fundamentally changes treatment decisions
+  - Examples: 
+    * KRAS/NRAS mutations in CRC → Tier I
+      - NCCN mandates RAS testing before anti-EGFR therapy
+      - FDA labels for cetuximab/panitumumab specify "RAS wild-type"
+      - Finding RAS mutation EXCLUDES use of these drugs
+      - This is Tier I because testing is REQUIRED and changes standard-of-care
+    * EGFR T790M in NSCLC → Tier I
+      - Resistance to 1st/2nd gen TKIs
+      - Triggers osimertinib (FDA-approved for T790M)
+      - Biomarker-directed therapy switch
+  - Key characteristics:
+    * Testing is standard-of-care, not optional
+    * Excludes major therapies OR triggers alternative therapy
+    * Guideline-mandated (NCCN, FDA label requirements)
+
+TIER II RESISTANCE MARKERS (emerging, less established):
+  - Resistance markers with clinical relevance but not universally mandated
+  - Examples:
+    * Uncommon resistance mutations where testing is supportive but not required
+    * Resistance to targeted therapies in settings where multiple options exist
+  - Key characteristics:
+    * Testing is recommended but not mandatory
+    * Helps guide decisions but doesn't fundamentally change algorithm
+
+TIER III RESISTANCE MARKERS (investigational):
+  - Resistance to therapies that are NOT standard-of-care in this tumor type
+  - Emerging data without guideline support
+  - Examples:
+    * Resistance markers in tumor types where that drug isn't approved
+    * Preclinical resistance data without clinical validation
+
+THE KEY DISTINCTION FOR RESISTANCE MARKERS:
+- Tier I: Guideline-MANDATED testing + excludes standard-of-care therapy
+- Tier II: Clinically relevant but not mandated
+- Tier III: Investigational, not practice-changing
+
+CRITICAL: TIER I vs TIER II - WHEN IS LATER-LINE THERAPY STILL TIER I?
+
+TIER I - Biomarker IS the therapeutic indication (even if later-line):
+The biomarker is THE PRIMARY REASON to use this therapy. Finding it tells you WHICH drug to use.
+
+Examples (ALL Tier I):
+- EGFR T790M in NSCLC → osimertinib
+  * Even though "after 1st/2nd gen TKI", T790M IS the indication for osimertinib → Tier I
+- BRAF V600E in anaplastic thyroid → dabrafenib+trametinib
+  * FDA-approved specifically for BRAF V600E-positive anaplastic thyroid → Tier I
+- BRAF V600E in CRC → encorafenib+cetuximab
+  * FDA-approved for BRAF V600E CRC (even though later-line) → Tier I
+- BRAF V600E in NSCLC → dabrafenib+trametinib
+  * FDA-approved for BRAF V600E NSCLC → Tier I
+- PIK3CA mutations in HR+ breast → alpelisib
+  * PIK3CA mutation IS the companion diagnostic (even though "after endocrine") → Tier I
+- KRAS G12C in NSCLC → sotorasib/adagrasib
+  * G12C IS the required biomarker → Tier I
+
+TIER II - Biomarker is ONE factor, not THE primary driver:
+- FDA-approved in different tumor type (off-label potential)
+- Therapy is one option among many alternatives
+- Biomarker testing is supportive but not required
+
+THE CRITICAL TEST:
+"Does finding this biomarker tell me WHICH therapy to use, based on FDA approval in THIS tumor type?"
+- YES (FDA-approved therapy exists for this biomarker in this tumor) → Tier I
+- YES (guideline-mandated resistance testing) → Tier I
+- NO (only trial data, no FDA approval in this tumor) → Tier III
+- MAYBE (FDA-approved in different tumor, transferable) → Tier II
 
 EVIDENCE HIERARCHY (highest → lowest):
-1. FDA-approved therapy for this exact variant + tumor type that IS the standard approach for this biomarker → Tier I
-2. NCCN Category 1 / strong guideline consensus in this tumor type → Tier I
-3. Resistance to standard-of-care targeted therapy in this tumor type (changes treatment) → Tier I
-4. FDA-approved therapy for this variant + tumor type but is ONE OF MANY options (biomarker not primary driver) → Tier II
-5. FDA-approved therapy in a different tumor type WITH clinically plausible off-label use → Tier II
-6. NCCN Category 2A or equivalent guideline support for specific therapy → Tier II
-7. Resistance marker that excludes certain therapies (guides negative selection) → Tier II
-8. FDA-approved therapy in a different tumor type but NOT clinically transferable → Tier III
-9. Resistance to therapy that is NOT standard-of-care → Tier III (informative only)
-10. Phase 2/3 trials WITHOUT FDA approval AND without guideline support → Tier III
-11. Preclinical data, case reports, emerging evidence → Tier III
-12. No oncogenic, therapeutic, or prognostic relevance → Tier IV
+1. FDA-approved therapy for this variant + tumor type where biomarker IS the indication → Tier I
+2. Guideline-mandated resistance testing that excludes standard-of-care therapy → Tier I
+3. NCCN Category 1 / strong guideline consensus in this tumor type → Tier I
+4. FDA-approved therapy in a different tumor type WITH clinically plausible off-label use → Tier II
+5. NCCN Category 2A or equivalent guideline support for specific therapy → Tier II
+6. Emerging resistance marker with some guideline support → Tier II
+7. Phase 2/3 trials WITHOUT FDA approval AND without guideline support → Tier III
+8. Resistance to therapy that is NOT standard-of-care → Tier III (informative only)
+9. Preclinical data, case reports, emerging evidence → Tier III
+10. No oncogenic, therapeutic, or prognostic relevance → Tier IV
 
 IMPORTANT: The evidence summary includes FDA Approved Drugs, CIViC, OncoKB/CGI Biomarkers, and other annotations. Pay special attention to:
 - Drugs listed in the FDA Approved Drugs section with their approval dates and indication texts.
@@ -138,42 +252,21 @@ PRIMARY vs SECONDARY/ACQUIRED MUTATIONS:
 CRITICAL RULES FOR THERAPY RECOMMENDATIONS:
 1. ONLY recommend drugs where evidence shows SENSITIVITY/SENSITIVITYRESPONSE or strong therapeutic support.
 2. NEVER recommend drugs where evidence shows RESISTANCE for this tumor type; these are contraindicated in that context.
-3. For variants that are primarily diagnostic or prognostic (e.g., risk stratification, specific leukemia subtypes), clearly explain that the actionability is non-therapeutic but still may justify Tier I/II if guidelines use them to drive management.
-
-TIERING FOR RESISTANCE MARKERS (CRITICAL - often missed):
-- A variant that EXCLUDES use of an FDA-approved therapy in this tumor type IS clinically actionable.
-- Resistance markers are typically Tier II (not Tier I) because:
-  - Actionability is EXCLUSIONARY (avoid drug X) rather than PRESCRIPTIVE (use drug Y)
-  - No FDA-approved positive targeted therapy exists for the variant
-  - Tier I is reserved for variants with FDA-approved POSITIVE therapeutic options
-
-TIER II RESISTANCE MARKERS (most common):
-  - Guideline-mandated testing that excludes use of a therapy (e.g., RAS testing before anti-EGFR in CRC)
-  - FDA drug labels specify the biomarker as exclusion criteria (e.g., "not indicated for RAS-mutant")
-  - Strong negative predictive value but no approved targeted drug FOR the variant
-
-TIER I RESISTANCE MARKERS (rare - requires positive actionability):
-  - Resistance marker AND FDA-approved alternative therapy specifically for that resistance
-  - Example: EGFR T790M → resistance to 1st/2nd gen TKIs BUT osimertinib is FDA-approved for T790M
-
-KEY PRINCIPLE: If a variant causes resistance to an FDA-approved therapy that WOULD otherwise be used in this tumor type, that variant is Tier II because it CHANGES the treatment decision ("do NOT use drug X"), even without a targeted alternative.
-
-- Resistance to a targeted therapy that is NOT standard-of-care in this tumor type is less actionable and usually Tier III.
-- If strong evidence shows RESISTANCE to major therapies AND some evidence shows SENSITIVITY to alternative therapies, this can be Tier II unless there is an FDA-approved alternative specifically indicated for this variant/tumor type.
+3. For resistance markers (e.g., KRAS in CRC), clearly state that these drugs are CONTRAINDICATED, not recommended.
+4. For variants that are primarily diagnostic or prognostic (e.g., risk stratification, specific leukemia subtypes), clearly explain that the actionability is non-therapeutic but still may justify Tier I/II if guidelines use them to drive management.
 
 EXAMPLE TIER I ACTIONABLE POINT MUTATIONS (when criteria met in the specific tumor type):
-- BRAF V600E/K → dabrafenib + trametinib or encorafenib-based regimens in indicated tumor types.
+- BRAF V600E/K → dabrafenib + trametinib or encorafenib-based regimens in indicated tumor types (melanoma, NSCLC, thyroid, CRC).
 - EGFR L858R, exon 19 deletions → EGFR TKIs (NSCLC).
 - EGFR T790M → osimertinib (NSCLC, after 1st/2nd gen TKI).
-- KRAS G12C → sotorasib/adagrasib in approved NSCLC and CRC settings.
+- KRAS G12C → sotorasib/adagrasib (NSCLC).
+- KRAS/NRAS mutations → exclude anti-EGFR therapy (CRC) - Tier I resistance markers.
 - KIT activating mutations (e.g., exon 11, exon 9) → imatinib and other KIT inhibitors (GIST).
 - IDH1/IDH2 hotspot mutations → IDH inhibitors in appropriate AML/glioma indications.
 - PIK3CA H1047R, E545K, E542K → alpelisib (HR+/HER2- breast cancer) where guideline- and FDA-supported.
-- High tumor mutational burden (TMB ≥10 mut/Mb) with supporting evidence.
-- MSI-H / dMMR with checkpoint inhibitor approvals.
 
 CONFIDENCE SCORING (adjust based on evidence quality):
-- FDA-approved in exact indication OR strong guideline support → 0.90–1.00
+- FDA-approved in exact indication OR guideline-mandated biomarker → 0.90–1.00
 - Well-powered studies with strong consensus in this tumor type → 0.85–0.95
 - FDA-approved off-indication (different histology) → 0.70–0.85
 - Phase 3 with significant clinical benefit but no approval yet → 0.65–0.80
@@ -181,6 +274,23 @@ CONFIDENCE SCORING (adjust based on evidence quality):
 - Preclinical only or sparse case reports → <0.55
 
 CRITICAL: Always base your decision on the evidence summary provided below. Never hallucinate drug approvals, resistance mechanisms, or trial results that are not mentioned in the evidence. If evidence is insufficient, favor Tier III (VUS) or Tier IV (benign/likely benign) rather than over-calling Tier I/II.
+
+CRITICAL: AVOID HALLUCINATING FDA APPROVALS
+- ONLY cite FDA approvals that are explicitly mentioned in the evidence summary
+- Do NOT infer FDA approval from CIViC/OncoKB sensitivity data alone
+- If you see "shows sensitivity in trials" but NO FDA approval listed → Tier III, NOT Tier I
+- Example of hallucination to AVOID: "KRAS G12D in pancreatic cancer has FDA-approved therapy" when no such approval exists
+- When in doubt about FDA status, check the "FDA Approved Drugs" section of evidence summary
+
+BEFORE RETURNING YOUR FINAL ASSESSMENT, ASK YOURSELF:
+1. "Is there EXPLICIT FDA approval for THIS variant/gene in THIS tumor type in the evidence?" (Check FDA evidence section)
+2. "If it's a resistance marker, is testing MANDATED by guidelines?" (Mandated = Tier I, Recommended = Tier II)
+3. "If it's later-line therapy, is the biomarker THE indication for that therapy?" (Yes = Tier I, No = Tier II)
+4. "Did I verify tumor-type context?" (Same variant can be different tiers in different cancers)
+5. "Am I basing this ONLY on evidence provided, not my training data?" (No hallucination)
+6. "Is my confidence score justified by evidence quality?" (FDA-approved = 0.90+, trials only = <0.70)
+
+If you cannot answer these questions confidently from the evidence, favor Tier III (VUS) over Tier I/II.
 """
 
 ACTIONABILITY_USER_PROMPT = """Assess the following somatic variant:
@@ -192,7 +302,14 @@ Tumor Type: {tumor_type}
 Evidence Summary:
 {evidence_summary}
 
-Return your assessment as valid JSON only (no markdown, no extra text):
+Return your assessment as STRICTLY VALID JSON only. 
+CRITICAL: 
+- NO markdown code fences (no ```json```)
+- NO preamble or explanation before the JSON
+- NO text after the JSON
+- ONLY the JSON object starting with {{ and ending with }}
+
+Your response must be parseable by json.loads() without any preprocessing.
 
 {{
   "tier": "Tier I" | "Tier II" | "Tier III" | "Tier IV" | "Unknown",

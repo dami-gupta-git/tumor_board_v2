@@ -466,10 +466,197 @@ CIViC AMP/ASCO/CAP TIER I ASSERTIONS (3):
 
 ---
 
+### 18. Tumor-Type Context as Primary Tier Determinant
+
+**Location:** `src/tumorboard/llm/prompts.py` lines 31-57
+
+**Problem:** The LLM was classifying variants based on gene/variant alone without properly considering tumor-type-specific FDA approvals and guidelines.
+
+**Previous Behavior:**
+- KRAS G12D → Often classified as Tier I regardless of tumor type
+- NRAS Q61K → Classified as Tier II in melanoma despite no FDA-approved therapy
+
+**Current Approach:** Added explicit tumor-type-dependent examples in the system prompt:
+
+```
+CRITICAL: TUMOR-TYPE CONTEXT DETERMINES EVERYTHING
+The SAME variant has DIFFERENT tiers in different tumor types:
+
+- KRAS mutations:
+  * Colorectal Cancer → Tier II (resistance marker, excludes anti-EGFR)
+  * NSCLC (G12C specifically) → Tier I (sotorasib/adagrasib FDA-approved)
+  * Pancreatic Cancer → Tier III (no approved targeted therapy, investigational only)
+
+- NRAS mutations:
+  * Colorectal Cancer → Tier II (resistance marker, excludes anti-EGFR)
+  * Melanoma → Tier III (no approved NRAS-targeted therapy, investigational MEK inhibitors)
+```
+
+**Impact:** Prevents over-classification of variants in tumor types without FDA-approved targeted therapy.
+
+---
+
+### 19. Later-Line Therapy Classification Clarification
+
+**Location:** `src/tumorboard/llm/prompts.py` lines 183-212
+
+**Problem:** Validation showed 60.7% of errors were Tier I → Tier II downgrades where LLM cited "later-line treatment" as the reason for downgrade.
+
+**Clinical Reality:** Many biomarker-directed therapies ARE the standard-of-care even when restricted to later lines:
+- BRAF V600E + CRC → encorafenib+cetuximab (later-line but IS the standard)
+- PIK3CA + HR+ breast → alpelisib (after endocrine but IS the standard)
+- EGFR T790M + NSCLC → osimertinib (after 1st/2nd gen TKI but IS the standard)
+
+**Current Approach:** Added explicit guidance with examples:
+
+```
+TIER I - Biomarker IS the therapeutic indication (even if later-line):
+The biomarker is THE PRIMARY REASON to use this therapy.
+
+Examples (ALL Tier I):
+- BRAF V600E in CRC → encorafenib+cetuximab
+  * FDA-approved for BRAF V600E CRC (even though later-line) → Tier I
+- PIK3CA mutations in HR+ breast → alpelisib
+  * PIK3CA mutation IS the companion diagnostic (even though "after endocrine") → Tier I
+
+THE CRITICAL TEST:
+"Does finding this biomarker tell me WHICH therapy to use, based on FDA approval in THIS tumor type?"
+- YES → Tier I
+```
+
+**Impact:** Should fix the dominant error pattern of incorrectly downgrading biomarker-directed therapies.
+
+---
+
+### 20. Resistance Marker Tiering Clarification (Tier I vs Tier II)
+
+**Location:** `src/tumorboard/llm/prompts.py` lines 143-181
+
+**Problem:** Confusion about when resistance markers should be Tier I vs Tier II.
+
+**Previous Approach:** Guidance was vague about "well-established" vs "emerging" resistance markers.
+
+**Current Approach:** Added clear criteria with examples:
+
+```
+TIER I RESISTANCE MARKERS (well-established, guideline-mandated):
+  - Guideline-MANDATED testing that fundamentally changes treatment decisions
+  - Examples:
+    * KRAS/NRAS mutations in CRC → Tier II (NOTE: Tier II, not Tier I by strict AMP/ASCO/CAP)
+      - NCCN mandates RAS testing before anti-EGFR therapy
+      - Finding RAS mutation EXCLUDES use of these drugs
+    * EGFR T790M in NSCLC → Tier I
+      - Resistance to 1st/2nd gen TKIs
+      - Triggers osimertinib (FDA-approved FOR T790M)
+      - Biomarker-directed therapy switch
+
+TIER II RESISTANCE MARKERS (established but exclusionary only):
+  - Resistance markers where no FDA-approved targeted alternative exists
+  - Testing is mandated but actionability is NEGATIVE (exclude drug) not POSITIVE (use drug)
+```
+
+**Gold Standard Correction:**
+- KRAS/NRAS mutations in CRC changed from Tier I → Tier II in gold standard
+- Rationale: By strict AMP/ASCO/CAP, exclusionary biomarkers without FDA-approved targeted therapy FOR that biomarker are Tier II, not Tier I
+
+---
+
+### 21. Anti-Hallucination Safeguards
+
+**Location:** `src/tumorboard/llm/prompts.py` lines 278-293
+
+**Problem:** LLM occasionally claimed FDA approvals that don't exist (e.g., "KRAS G12D in pancreatic cancer has FDA-approved therapy").
+
+**Current Approach:** Added explicit anti-hallucination guidance:
+
+```
+CRITICAL: AVOID HALLUCINATING FDA APPROVALS
+- ONLY cite FDA approvals that are explicitly mentioned in the evidence summary
+- Do NOT infer FDA approval from CIViC/OncoKB sensitivity data alone
+- If you see "shows sensitivity in trials" but NO FDA approval listed → Tier III, NOT Tier I
+- Example of hallucination to AVOID: "KRAS G12D in pancreatic cancer has FDA-approved therapy"
+
+BEFORE RETURNING YOUR FINAL ASSESSMENT, ASK YOURSELF:
+1. "Is there EXPLICIT FDA approval for THIS variant/gene in THIS tumor type in the evidence?"
+2. "If it's a resistance marker, is testing MANDATED by guidelines?"
+3. "If it's later-line therapy, is the biomarker THE indication for that therapy?"
+4. "Did I verify tumor-type context?"
+5. "Am I basing this ONLY on evidence provided, not my training data?"
+```
+
+**Impact:** Reduces false Tier I/II classifications based on LLM training data rather than retrieved evidence.
+
+---
+
+### 22. Tier IV Criteria Addition
+
+**Location:** `src/tumorboard/llm/prompts.py` lines 104-121
+
+**Previous State:** No explicit guidance for Tier IV (benign/likely benign) classification.
+
+**Current Approach:** Added clear criteria:
+
+```
+TIER IV CRITERIA (Benign / Likely Benign / Common Polymorphism):
+A variant should be classified as Tier IV if:
+1. ClinVar classification: Benign or Likely Benign, OR
+2. Population frequency >1% (common polymorphism in gnomAD/1000 Genomes), OR
+3. No pathogenic assertions in CIViC/OncoKB AND no clinical associations in any database, OR
+4. Functional studies demonstrate no impact on protein function
+
+DO NOT classify as Tier IV if:
+- Any evidence of oncogenicity or therapeutic relevance exists
+- Conflicting evidence (some sources say pathogenic) → use Tier III (VUS)
+- Lack of evidence ≠ benign (absence of evidence is Tier III VUS, not Tier IV)
+```
+
+**Impact:** Should improve Tier IV detection accuracy from current 0%.
+
+---
+
+### 23. CIViC PREDICTIVE vs PROGNOSTIC Assertion Separation
+
+**Location:** `src/tumorboard/models/evidence.py` - `summary_compact()` method
+
+**Problem:** CIViC Tier I assertions were being presented without distinguishing assertion type, leading the LLM to treat PROGNOSTIC Tier I as equivalent to PREDICTIVE Tier I for therapy decisions.
+
+**Example:** BRAF V600E in CRC has CIViC Tier I PROGNOSTIC assertion for "poor outcome" - this was being treated as Tier I for therapy actionability.
+
+**Current Approach:** Separate PREDICTIVE and PROGNOSTIC assertions with clear labels:
+
+```python
+# In summary_compact():
+predictive_tier_i = [a for a in self.civic_assertions
+                      if a.amp_tier == "Tier I" and a.assertion_type == "PREDICTIVE"]
+prognostic = [a for a in self.civic_assertions if a.assertion_type == "PROGNOSTIC"]
+
+if prognostic:
+    lines.append("  *** PROGNOSTIC ONLY - indicates outcome, NOT therapy actionability ***")
+```
+
+**Evidence Output:**
+```
+CIViC PREDICTIVE TIER I ASSERTIONS (2):
+  *** EXPERT-CURATED - THERAPY ACTIONABLE ***
+  • BRAF V600E: Encorafenib+Cetuximab [SENSITIVITYRESPONSE]
+
+CIViC PROGNOSTIC Assertions (1):
+  *** PROGNOSTIC ONLY - indicates outcome, NOT therapy actionability ***
+  • BRAF V600E: POOR_OUTCOME in Colorectal Cancer
+      (Prognostic Tier I - does NOT imply Tier I for therapy)
+```
+
+**Impact:** BRAF V600E in CRC now correctly classified based on PREDICTIVE evidence, not misled by PROGNOSTIC Tier I.
+
+---
+
 ## Open Issues
 
 1. ~~**Mixed evidence weighting**~~ - ADDRESSED: Pre-processing now computes stats and dominant signal (Decision #1)
 2. ~~**Pure resistance markers**~~ - ADDRESSED: Enhanced evidence summary emphasis for FDA-approved resistance markers (Decision #16)
 3. ~~**Clinical trial integration**~~ - ADDRESSED: FDA search now includes clinical_studies section (Decision #14)
 4. ~~**ESMO/ESCAT integration**~~ - ADDRESSED: CIViC Assertions provide equivalent AMP/ASCO/CAP tier classifications (Decision #17)
-5. **Tier IV detection** - Currently 0% accuracy on benign/VUS variants
+5. ~~**Tier IV detection**~~ - ADDRESSED: Added explicit Tier IV criteria in prompt (Decision #22)
+6. ~~**Later-line downgrade errors**~~ - ADDRESSED: Clarified when later-line = Tier I (Decision #19)
+7. ~~**Tumor-type context**~~ - ADDRESSED: Added explicit tumor-type-dependent examples (Decision #18)
+8. **Validation accuracy** - Currently at 39.1% on updated gold standard, expected improvement with prompt changes
