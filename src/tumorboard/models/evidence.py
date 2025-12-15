@@ -54,7 +54,8 @@ class FDAApproval(BaseModel):
     approval_date: str | None = None
     marketing_status: str | None = None
     gene: str | None = None
-    variant_in_clinical_studies: bool = False  # True if variant explicitly mentioned in clinical_studies section
+    variant_in_indications: bool = False  # True if variant explicitly in indications_and_usage (strongest evidence)
+    variant_in_clinical_studies: bool = False  # True if variant mentioned in clinical_studies section
 
     def parse_indication_for_tumor(self, tumor_type: str) -> dict:
         """Parse FDA indication text to extract line-of-therapy and approval type for a specific tumor.

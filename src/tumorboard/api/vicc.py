@@ -188,7 +188,14 @@ class VICCClient:
 
         # Check tumor type mappings
         for abbrev, full_names in TUMOR_TYPE_MAPPINGS.items():
-            if tumor_lower == abbrev or any(tumor_lower in name for name in full_names):
+            # Check if tumor matches this mapping (either as abbrev or substring match)
+            tumor_matches_mapping = (
+                tumor_lower == abbrev or
+                any(tumor_lower in name for name in full_names) or
+                any(name in tumor_lower for name in full_names)
+            )
+            if tumor_matches_mapping:
+                # Check if VICC disease matches any full name
                 if any(name in vicc_lower for name in full_names):
                     return True
 

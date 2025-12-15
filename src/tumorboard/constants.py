@@ -36,8 +36,8 @@ GENE_ALIASES: dict[str, list[str]] = {
 
 TUMOR_TYPE_MAPPINGS: dict[str, list[str]] = {
     # Lung
-    "nsclc": ["non-small cell lung", "nsclc", "lung non-small cell", "lung adenocarcinoma", "lung squamous"],
-    "l": ["lung", "non-small cell lung", "nsclc", "small cell lung"],
+    "nsclc": ["non-small cell lung", "nsclc", "lung non-small cell", "lung adenocarcinoma", "lung squamous", "lung non-small cell carcinoma"],
+    "l": ["lung", "non-small cell lung", "nsclc", "small cell lung", "lung carcinoma"],
     "sclc": ["small cell lung", "sclc"],
     "luad": ["lung adenocarcinoma", "luad"],
     "lusc": ["lung squamous", "lusc", "squamous cell lung"],

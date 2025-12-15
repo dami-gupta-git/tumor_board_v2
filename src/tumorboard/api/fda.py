@@ -252,6 +252,27 @@ class FDAClient:
             else:
                 indication_text = str(indications)
 
+            # Check if variant is explicitly mentioned in indications (e.g., T790M for TAGRISSO)
+            variant_in_indications = False
+            indication_variant_note = None
+            if variant:
+                import re
+                variant_upper = variant.upper()
+                indication_upper = indication_text.upper()
+
+                if variant_upper in indication_upper:
+                    variant_in_indications = True
+                    # Extract the specific indication sentence for this variant
+                    idx = indication_upper.find(variant_upper)
+                    # Find the bullet point or sentence containing this variant
+                    start = indication_text.rfind("•", 0, idx)
+                    if start == -1:
+                        start = max(0, idx - 100)
+                    end = indication_text.find("•", idx + len(variant_upper))
+                    if end == -1:
+                        end = min(len(indication_text), idx + 300)
+                    indication_variant_note = f"[FDA APPROVED FOR {variant_upper}: {indication_text[start:end].strip()}]"
+
             # Check clinical_studies for variant-specific approval info
             # This is important for variants like G719X, S768I, L861Q that are mentioned
             # in clinical studies but not in the generic indications text
@@ -299,19 +320,29 @@ class FDAClient:
 
             # Only return if we have minimum required data (drug name)
             if brand_name or generic_name:
-                # Combine indication with clinical studies note if variant was found there
-                full_indication = indication_text[:1500] if indication_text else ""
-                if clinical_studies_note:
+                # Build indication text with variant-specific context prominently displayed
+                full_indication = ""
+
+                # If variant is in indications (strongest evidence), put that first
+                if indication_variant_note:
+                    full_indication = indication_variant_note + "\n\n"
+
+                # Add truncated full indication
+                full_indication += indication_text[:1500] if indication_text else ""
+
+                # Add clinical studies note if variant was found there (but not in indications)
+                if clinical_studies_note and not variant_in_indications:
                     full_indication = f"{full_indication}\n\n{clinical_studies_note}"
 
                 return {
                     "drug_name": brand_name or generic_name,
                     "brand_name": brand_name,
                     "generic_name": generic_name,
-                    "indication": full_indication[:2000] if full_indication else None,
+                    "indication": full_indication[:2500] if full_indication else None,
                     "approval_date": approval_date,  # Not available in label endpoint
                     "marketing_status": marketing_status,
                     "gene": gene,
+                    "variant_in_indications": variant_in_indications,
                     "variant_in_clinical_studies": clinical_studies_note is not None,
                 }
 
