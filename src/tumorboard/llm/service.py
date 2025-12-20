@@ -222,6 +222,15 @@ Be STRICT only about tumor type:
 - A paper about KIT D816V in mastocytosis is NOT relevant if we're asking about GIST
 - A paper about a completely different gene is NOT relevant
 
+CRITICAL - Distinguish PREDICTIVE vs PROGNOSTIC signals:
+- PREDICTIVE (resistance/sensitivity): Paper shows variant PREDICTS response or resistance to a SPECIFIC drug
+  → "Patients with KRAS mutations should not receive cetuximab" = PREDICTIVE resistance
+  → "EGFR L858R predicts response to erlotinib" = PREDICTIVE sensitivity
+- PROGNOSTIC: Paper shows variant is associated with OUTCOMES (survival, recurrence) but NOT specific drug response
+  → "SMAD4 loss associated with worse survival" = PROGNOSTIC (not resistance!)
+  → "TP53 mutations predict poor prognosis" = PROGNOSTIC
+  → "Patients with X had shorter median survival on chemotherapy" = PROGNOSTIC (not drug-specific)
+
 Return valid JSON only, no markdown."""
 
         user_prompt = f"""Evaluate this paper's relevance to {gene} {variant} in {tumor_context}:
@@ -233,11 +242,19 @@ CONTENT: {text_content[:1500]}
 Return JSON with these exact fields:
 {{
     "relevance_score": <float 0-1, see scoring guide below>,
-    "signal_type": "<'resistance' if variant causes drug resistance, 'sensitivity' if variant predicts response, 'mixed' if both, 'prognostic' if about outcomes not treatment, 'unclear' if not determinable>",
+    "signal_type": "<see definitions below>",
+    "is_predictive_biomarker": <true if paper shows this variant predicts response to a SPECIFIC targeted therapy, false otherwise>,
     "drugs_mentioned": [<list of specific drug names mentioned in relation to this gene/variant>],
     "key_finding": "<one sentence: what does this paper say that's relevant to {gene} {variant} in {tumor_context}?>",
     "confidence": <float 0-1 for how confident you are in this assessment>
 }}
+
+signal_type definitions:
+- "resistance": Variant causes PREDICTIVE resistance to a specific drug (e.g., "should not receive", "no benefit from", "contraindicated")
+- "sensitivity": Variant PREDICTS response to a specific drug (e.g., "responds to", "sensitive to")
+- "mixed": Both resistance to some drugs and sensitivity to others
+- "prognostic": About outcomes/survival but NOT specific drug response (e.g., "worse prognosis", "shorter survival")
+- "unclear": Cannot determine from abstract
 
 Scoring guide:
 - 1.0: Directly studies {gene} {variant} in {tumor_context}
@@ -361,6 +378,21 @@ Content: {content[:1000]}
 
 Your task is to extract structured, clinically actionable information about a specific gene variant from research papers.
 
+CRITICAL DISTINCTION - PREDICTIVE vs PROGNOSTIC:
+- PREDICTIVE resistance: Variant causes lack of response to a SPECIFIC TARGETED THERAPY
+  → Example: "KRAS mutations predict no response to cetuximab" (cetuximab targets EGFR, KRAS bypasses it)
+  → Example: "EGFR T790M causes resistance to erlotinib" (acquired mutation in drug target)
+  → These affect treatment SELECTION - clinically actionable (Tier II)
+
+- PROGNOSTIC markers: Variant associated with worse OUTCOMES but not specific drug response
+  → Example: "SMAD4 loss associated with worse survival" (tumor suppressor loss = aggressive disease)
+  → Example: "TP53 mutations predict poor prognosis"
+  → Example: "Patients with X had shorter survival on chemotherapy" (not drug-specific!)
+  → These do NOT affect treatment SELECTION - NOT actionable (Tier III)
+
+A TRUE resistance marker means: "Do NOT give Drug X to patients with this variant"
+A prognostic marker means: "Patients with this variant have worse outcomes regardless of treatment"
+
 Be PRECISE and EVIDENCE-BASED:
 - Only report findings that are directly supported by the papers provided
 - Distinguish between in vitro/preclinical and clinical evidence
@@ -377,8 +409,10 @@ Return JSON with these exact fields:
 {{
     "mutation_type": "<'primary' if this is a driver mutation, 'secondary' if it's an acquired resistance mutation, 'both' if it can be either, 'unknown' if unclear>",
 
+    "is_prognostic_only": <true if this variant is ONLY prognostic (affects survival prediction) but does NOT predict response to specific drugs, false if it affects drug selection>,
+
     "resistant_to": [
-        {{"drug": "<drug name>", "evidence": "<in vitro|preclinical|clinical|FDA-labeled>", "mechanism": "<brief mechanism if known>"}}
+        {{"drug": "<drug name>", "evidence": "<in vitro|preclinical|clinical|FDA-labeled>", "mechanism": "<brief mechanism if known>", "is_predictive": <true if this is PREDICTIVE resistance to a targeted therapy, false if just prognostic association>}}
     ],
 
     "sensitive_to": [
@@ -390,7 +424,7 @@ Return JSON with these exact fields:
     "evidence_level": "<'FDA-approved' if there's FDA approval for this variant in this tumor, 'Phase 3' if phase 3 trial data, 'Phase 2', 'Preclinical', 'Case reports', or 'None'>",
 
     "tier_recommendation": {{
-        "tier": "<'I' if FDA-approved therapy exists FOR this variant in this tumor, 'II' if resistance marker or off-label evidence, 'III' if unknown significance, 'IV' if benign>",
+        "tier": "<see tier guide below>",
         "rationale": "<one sentence explaining the tier recommendation based on AMP/ASCO/CAP guidelines>"
     }},
 
@@ -404,10 +438,17 @@ Return JSON with these exact fields:
     "confidence": <0.0-1.0 based on how confident you are in these extractions>
 }}
 
-CRITICAL for {gene} {variant} in {tumor_type}:
+TIER GUIDE for {gene} {variant} in {tumor_type}:
+- Tier I: FDA-approved therapy exists FOR this variant in this tumor
+- Tier II: PREDICTIVE resistance marker (affects which targeted therapy to use) OR off-label evidence of benefit
+- Tier III: PROGNOSTIC only (affects prognosis prediction but not drug selection), OR unknown significance
+- Tier IV: Benign variant
+
+CRITICAL:
 - Focus ONLY on evidence relevant to {tumor_type}, not other cancer types
-- If this variant is known to cause resistance to standard therapies, that's clinically significant (Tier II)
-- If there's no FDA-approved therapy FOR this specific variant in this tumor, it cannot be Tier I"""
+- "Worse survival on chemotherapy" is PROGNOSTIC, not resistance (Tier III, not II)
+- Only classify as Tier II resistance if papers show this variant specifically EXCLUDES a targeted therapy option
+- Tumor suppressors (TP53, SMAD4, PTEN loss) are usually PROGNOSTIC, not resistance markers"""
 
         messages = [
             {"role": "system", "content": system_prompt},

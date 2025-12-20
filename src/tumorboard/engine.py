@@ -548,12 +548,21 @@ class AssessmentEngine:
                     LiteratureKnowledge, DrugResistance, DrugSensitivity, TierRecommendation
                 )
 
+                # Build DrugResistance objects, handling both dict and string formats
+                resistant_to = []
+                for r in knowledge_data.get("resistant_to", []):
+                    if isinstance(r, dict):
+                        # Ensure is_predictive has a default if not provided
+                        if "is_predictive" not in r:
+                            r["is_predictive"] = True
+                        resistant_to.append(DrugResistance(**r))
+                    else:
+                        resistant_to.append(DrugResistance(drug=str(r), is_predictive=True))
+
                 evidence.literature_knowledge = LiteratureKnowledge(
                     mutation_type=knowledge_data.get("mutation_type", "unknown"),
-                    resistant_to=[
-                        DrugResistance(**r) if isinstance(r, dict) else DrugResistance(drug=str(r))
-                        for r in knowledge_data.get("resistant_to", [])
-                    ],
+                    is_prognostic_only=knowledge_data.get("is_prognostic_only", False),
+                    resistant_to=resistant_to,
                     sensitive_to=[
                         DrugSensitivity(**s) if isinstance(s, dict) else DrugSensitivity(drug=str(s))
                         for s in knowledge_data.get("sensitive_to", [])

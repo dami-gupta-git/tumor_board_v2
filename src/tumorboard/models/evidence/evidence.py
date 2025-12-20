@@ -394,6 +394,14 @@ class Evidence(VariantAnnotations):
     def is_resistance_marker_without_targeted_therapy(self, tumor_type: str | None = None) -> tuple[bool, list[str]]:
         """Detect resistance-only markers WITHOUT FDA-approved therapy FOR the variant.
 
+        A TRUE resistance marker (Tier II) must:
+        1. Cause resistance to a therapy that IS FDA-approved/standard for the tumor type
+        2. Not just be "associated with worse outcomes" (that's prognostic, Tier III)
+
+        Examples:
+        - KRAS G12D in CRC → Tier II (excludes anti-EGFR which IS approved for CRC)
+        - SMAD4 loss in pancreatic → Tier III (no targeted therapy requires wild-type SMAD4)
+
         Uses multiple evidence sources including:
         - Curated databases (CGI, VICC, CIViC)
         - PubMed literature (research papers)
@@ -420,18 +428,21 @@ class Evidence(VariantAnnotations):
 
         drugs_excluded = []
 
-        # From PubMed literature (highest priority for emerging evidence)
-        if lit_drugs:
-            drugs_excluded.extend(lit_drugs)
-            logger.info(f"Literature resistance evidence found: {lit_drugs} (PMIDs: {lit_pmids})")
+        # Literature-only resistance is NOT sufficient for Tier II
+        # The drug must also be FDA-approved/standard for this tumor type
+        # (Prognostic associations like "SMAD4 loss = worse survival" are Tier III, not II)
+        # We'll collect lit_drugs but only include them if validated below
+        literature_candidate_drugs = lit_drugs if lit_drugs else []
+        if literature_candidate_drugs:
+            logger.debug(f"Literature resistance candidates: {literature_candidate_drugs} (PMIDs: {lit_pmids})")
 
-        # Check FDA labels for wild-type requirements
+        # Check FDA labels for wild-type requirements (strongest evidence)
         if tumor_type:
             requires_wt, wt_drugs = self._check_fda_requires_wildtype(tumor_type)
             if requires_wt:
                 drugs_excluded.extend(wt_drugs)
 
-        # From CGI resistance markers
+        # From CGI FDA-approved resistance markers
         for biomarker in self.cgi_biomarkers:
             if (biomarker.fda_approved and
                 biomarker.association and
@@ -443,24 +454,36 @@ class Evidence(VariantAnnotations):
                 elif not tumor_type and biomarker.drug:
                     drugs_excluded.append(biomarker.drug)
 
-        # From VICC resistance evidence
+        # From VICC resistance evidence (Level A/B only for Tier II)
         if tumor_type:
             for ev in self.vicc:
-                if ev.is_resistance:
+                if ev.is_resistance and ev.evidence_level in ['A', 'B']:
                     if self._tumor_matches(tumor_type, ev.disease):
                         drugs_excluded.extend(ev.drugs)
 
-        # From CIViC resistance evidence
+        # From CIViC resistance evidence (Level A/B only for Tier II)
         if tumor_type:
             for ev in self.civic:
-                if ev.evidence_type == 'PREDICTIVE':
+                if ev.evidence_type == 'PREDICTIVE' and ev.evidence_level in ['A', 'B']:
                     sig = (ev.clinical_significance or '').upper()
                     if 'RESISTANCE' in sig:
                         if self._tumor_matches(tumor_type, ev.disease):
                             drugs_excluded.extend(ev.drugs)
 
+        # Only include literature drugs if they match a drug from curated sources
+        # This prevents prognostic associations from being misclassified as resistance markers
+        if literature_candidate_drugs and drugs_excluded:
+            curated_drug_names = {d.lower() for d in drugs_excluded}
+            for lit_drug in literature_candidate_drugs:
+                if lit_drug.lower() in curated_drug_names:
+                    # Literature confirms curated evidence - already included
+                    pass
+                # Don't add literature-only drugs without curated backing
+
         drugs_excluded = list(set(d for d in drugs_excluded if d))[:5]
 
+        # Final check: only return True if we have drugs from curated sources
+        # Literature-only "resistance" (like SMAD4 prognostic) doesn't count
         return bool(drugs_excluded), drugs_excluded
 
     def is_prognostic_or_diagnostic_only(self) -> bool:
@@ -506,19 +529,12 @@ class Evidence(VariantAnnotations):
             lit = self.literature_knowledge
             tier_rec = lit.tier_recommendation
 
-            # If literature strongly indicates resistance, that takes precedence
-            if lit.is_resistance_marker() and tier_rec.tier == "II":
-                resistant_drugs = ", ".join(lit.get_resistance_drugs()[:3])
-                sensitive_drugs = lit.get_sensitivity_drugs()
-                refs = ", ".join(lit.references[:3]) if lit.references else "literature"
-
-                if sensitive_drugs:
-                    alt_drugs = ", ".join(sensitive_drugs[:2])
-                    logger.info(f"Tier II (literature): {self.gene} {self.variant} resistant to {resistant_drugs}, may respond to {alt_drugs}")
-                    return f"TIER II INDICATOR (LITERATURE): Resistant to {resistant_drugs}. Potential alternatives: {alt_drugs}. Evidence: {refs}"
-                else:
-                    logger.info(f"Tier II (literature): {self.gene} {self.variant} resistant to {resistant_drugs}")
-                    return f"TIER II INDICATOR (LITERATURE): Resistant to {resistant_drugs} - no FDA-approved alternative. Evidence: {refs}"
+            # IMPORTANT: Literature-based resistance ALONE is NOT sufficient for Tier II
+            # Literature can incorrectly classify prognostic markers (e.g., SMAD4 loss)
+            # as "resistance" when they're really just associated with worse outcomes.
+            # True Tier II resistance requires the drug to be FDA-approved/standard for the tumor.
+            # We check this via is_resistance_marker_without_targeted_therapy() later.
+            # So we skip literature resistance classification here and let the curated check handle it.
 
             # If literature says Tier I and has sensitivity evidence with high confidence
             if tier_rec.tier == "I" and lit.has_therapeutic_options():

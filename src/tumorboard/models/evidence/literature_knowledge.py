@@ -8,6 +8,7 @@ class DrugResistance(BaseModel):
     drug: str = Field(..., description="Drug name")
     evidence: str = Field("unknown", description="Evidence level: in vitro, preclinical, clinical, FDA-labeled")
     mechanism: str | None = Field(None, description="Mechanism of resistance if known")
+    is_predictive: bool = Field(True, description="True if PREDICTIVE resistance (affects drug selection), False if just prognostic")
 
 
 class DrugSensitivity(BaseModel):
@@ -33,6 +34,11 @@ class LiteratureKnowledge(BaseModel):
     mutation_type: str = Field(
         "unknown",
         description="primary (driver), secondary (acquired/resistance), both, or unknown"
+    )
+
+    is_prognostic_only: bool = Field(
+        False,
+        description="True if variant is ONLY prognostic (affects survival) but does NOT predict response to specific drugs"
     )
 
     resistant_to: list[DrugResistance] = Field(
@@ -75,16 +81,32 @@ class LiteratureKnowledge(BaseModel):
         description="Confidence score 0-1 for extraction quality"
     )
 
-    def get_resistance_drugs(self) -> list[str]:
-        """Get list of drug names this variant is resistant to."""
+    def get_resistance_drugs(self, predictive_only: bool = False) -> list[str]:
+        """Get list of drug names this variant is resistant to.
+
+        Args:
+            predictive_only: If True, only return drugs with PREDICTIVE resistance
+                           (affects drug selection), not prognostic associations.
+        """
+        if predictive_only:
+            return [r.drug for r in self.resistant_to if r.is_predictive]
         return [r.drug for r in self.resistant_to]
 
     def get_sensitivity_drugs(self) -> list[str]:
         """Get list of drug names this variant may respond to."""
         return [s.drug for s in self.sensitive_to]
 
-    def is_resistance_marker(self) -> bool:
-        """Check if this variant is primarily a resistance marker."""
+    def is_resistance_marker(self, predictive_only: bool = True) -> bool:
+        """Check if this variant is primarily a resistance marker.
+
+        Args:
+            predictive_only: If True (default), only count PREDICTIVE resistance
+                           (affects drug selection), not prognostic associations.
+        """
+        if self.is_prognostic_only:
+            return False
+        if predictive_only:
+            return any(r.is_predictive for r in self.resistant_to)
         return len(self.resistant_to) > 0
 
     def has_therapeutic_options(self) -> bool:
