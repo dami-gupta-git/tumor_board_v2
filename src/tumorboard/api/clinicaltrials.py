@@ -52,23 +52,68 @@ class ClinicalTrial:
             'NOT_YET_RECRUITING'
         ]
 
-    def mentions_variant(self, variant: str) -> bool:
-        """Check if trial mentions the specific variant."""
+    def mentions_variant(self, variant: str, gene: str | None = None) -> bool:
+        """Check if trial mentions the specific variant for the given gene.
+
+        Args:
+            variant: Variant notation (e.g., "G12D", "V600E")
+            gene: Gene symbol (e.g., "NRAS", "BRAF"). If provided, ensures
+                  the variant is mentioned in context of this gene to avoid
+                  false positives (e.g., KRAS G12D trial matching NRAS G12D query).
+        """
         variant_upper = variant.upper()
+        gene_upper = gene.upper() if gene else None
 
-        # Check in title
-        if variant_upper in self.title.upper():
-            return True
+        # Combine all text to search
+        search_texts = [self.title.upper()]
+        if self.eligibility_criteria:
+            search_texts.append(self.eligibility_criteria.upper())
+        if self.brief_summary:
+            search_texts.append(self.brief_summary.upper())
 
-        # Check in eligibility criteria
-        if self.eligibility_criteria and variant_upper in self.eligibility_criteria.upper():
-            return True
+        full_text = " ".join(search_texts)
 
-        # Check in brief summary
-        if self.brief_summary and variant_upper in self.brief_summary.upper():
-            return True
+        # If gene is provided, check for gene+variant pattern to avoid cross-gene matches
+        # e.g., "KRAS G12D" should not match for NRAS G12D query
+        if gene_upper:
+            # Check for explicit gene+variant pattern (e.g., "NRAS G12D", "NRAS-G12D", "NRAS:G12D")
+            gene_variant_patterns = [
+                f"{gene_upper} {variant_upper}",
+                f"{gene_upper}-{variant_upper}",
+                f"{gene_upper}:{variant_upper}",
+                f"{gene_upper}({variant_upper})",
+            ]
 
-        return False
+            for pattern in gene_variant_patterns:
+                if pattern in full_text:
+                    return True
+
+            # Also check if the gene is mentioned AND the variant is mentioned
+            # but make sure no OTHER gene is mentioned with this variant
+            if gene_upper in full_text and variant_upper in full_text:
+                # Check for other common genes that might have the same variant
+                other_genes = ['KRAS', 'NRAS', 'HRAS', 'BRAF', 'EGFR', 'PIK3CA']
+                other_genes = [g for g in other_genes if g != gene_upper]
+
+                # If another gene is explicitly paired with this variant, don't match
+                for other_gene in other_genes:
+                    other_patterns = [
+                        f"{other_gene} {variant_upper}",
+                        f"{other_gene}-{variant_upper}",
+                        f"{other_gene}:{variant_upper}",
+                        f"{other_gene}({variant_upper})",
+                    ]
+                    if any(p in full_text for p in other_patterns):
+                        # Another gene is paired with this variant - don't match
+                        return False
+
+                # Gene and variant both present, no conflicting gene-variant pair found
+                return True
+
+            return False
+
+        # Legacy behavior when no gene specified - just check for variant
+        return variant_upper in full_text
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
@@ -290,7 +335,8 @@ class ClinicalTrialsClient:
                 continue
 
             # Filter by variant mention if variant specified
-            if variant and not trial.mentions_variant(variant):
+            # Pass gene to avoid false positives (e.g., KRAS G12D matching NRAS G12D query)
+            if variant and not trial.mentions_variant(variant, gene=gene):
                 # Still include if it mentions the gene prominently
                 if gene.upper() not in trial.title.upper():
                     continue
@@ -332,10 +378,10 @@ class ClinicalTrialsClient:
             max_results=max_results * 3,  # Fetch more to filter
         )
 
-        # Filter to only those mentioning the variant
+        # Filter to only those mentioning the variant for this gene
         variant_specific = [
             t for t in all_trials
-            if t.mentions_variant(variant)
+            if t.mentions_variant(variant, gene=gene)
         ]
 
         return variant_specific[:max_results]

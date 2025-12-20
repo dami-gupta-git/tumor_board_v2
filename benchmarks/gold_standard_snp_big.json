@@ -73,7 +73,7 @@
       "gene": "EGFR",
       "variant": "L861Q",
       "tumor_type": "Lung Adenocarcinoma",
-      "expected_tier": "Tier II",
+      "expected_tier": "Tier I",
       "notes": "FDA-approved afatinib for uncommon EGFR mutations",
       "references": ["Yang JC et al. Lancet Oncol 2015"]
     },
@@ -97,7 +97,7 @@
       "gene": "EGFR",
       "variant": "C797S",
       "tumor_type": "Lung Adenocarcinoma",
-      "expected_tier": "Tier I",
+      "expected_tier": "Tier II",
       "notes": "Resistance to osimertinib; third-generation TKI resistance marker",
       "references": ["Thress KS et al. Nat Med 2015"]
     },
@@ -137,7 +137,7 @@
       "gene": "KRAS",
       "variant": "G13D",
       "tumor_type": "Colorectal Cancer",
-      "expected_tier": "Tier I",
+      "expected_tier": "Tier II",
       "notes": "Resistance to anti-EGFR therapy",
       "references": ["De Roock W et al. Lancet Oncol 2010"]
     },
@@ -145,7 +145,7 @@
       "gene": "KRAS",
       "variant": "Q61H",
       "tumor_type": "Colorectal Cancer",
-      "expected_tier": "Tier I",
+      "expected_tier": "Tier II",
       "notes": "Resistance to anti-EGFR therapy",
       "references": ["De Roock W et al. Lancet Oncol 2010"]
     },
@@ -161,7 +161,7 @@
       "gene": "NRAS",
       "variant": "Q61R",
       "tumor_type": "Colorectal Cancer",
-      "expected_tier": "Tier III",
+      "expected_tier": "Tier II",
       "notes": "Resistance to anti-EGFR therapy",
       "references": ["De Roock W et al. Lancet Oncol 2010"]
     },
@@ -233,7 +233,7 @@
       "gene": "PIK3CA",
       "variant": "H1047L",
       "tumor_type": "Colorectal Cancer",
-      "expected_tier": "Tier III",
+      "expected_tier": "Tier II",
       "notes": "No approved therapies; under investigation",
       "references": ["Liao X et al. Mol Cancer Ther 2012"]
     },
@@ -289,7 +289,7 @@
       "gene": "ERBB2",
       "variant": "V777L",
       "tumor_type": "Lung Adenocarcinoma",
-      "expected_tier": "Tier II",
+      "expected_tier": "Tier I",
       "notes": "HER2 TKIs show activity in HER2 mutant NSCLC",
       "references": ["Li BT et al. Lancet Oncol 2018"]
     },
@@ -297,7 +297,7 @@
       "gene": "ERBB2",
       "variant": "G776delinsVC",
       "tumor_type": "Lung Adenocarcinoma",
-      "expected_tier": "Tier II",
+      "expected_tier": "Tier I",
       "notes": "HER2 TKIs show activity",
       "references": ["Li BT et al. Lancet Oncol 2018"]
     },
@@ -489,7 +489,7 @@
       "gene": "SMO",
       "variant": "W281C",
       "tumor_type": "Basal Cell Carcinoma",
-      "expected_tier": "Tier I",
+      "expected_tier": "Tier II",
       "notes": "Resistance to vismodegib; alternative hedgehog inhibitors",
       "references": ["Atwood SX et al. Cancer Cell 2015"]
     },
@@ -841,7 +841,7 @@
       "gene": "MAP2K1",
       "variant": "K57N",
       "tumor_type": "Melanoma",
-      "expected_tier": "Tier I",
+      "expected_tier": "Tier II",
       "notes": "Resistance to BRAF inhibitors; trametinib shows activity",
       "references": ["Emery CM et al. Cancer Discov 2009"]
     },

@@ -14,7 +14,7 @@
 ## System Overview
 
 TumorBoard is designed to automate cancer variant actionability assessment by combining:
-1. **Evidence Aggregation** from multiple genomic databases (CIViC, ClinVar, COSMIC, VICC MetaKB, CGI) and FDA drug approvals
+1. **Evidence Aggregation** from multiple genomic databases (CIViC, ClinVar, COSMIC, VICC MetaKB, CGI), FDA drug approvals, PubMed literature, and ClinicalTrials.gov
 2. **Variant Normalization** for standardized representation across formats
 3. **LLM Assessment** to interpret evidence and assign AMP/ASCO/CAP tier classifications
 4. **Validation Framework** for benchmarking accuracy against gold standards
@@ -86,11 +86,15 @@ User Input (gene, variant, tumor_type)
 ┌─────────────────────────────────┐
 │  2. Evidence Fetching (Parallel)│
 │  MyVariant API Query +          │
-│  FDA openFDA API Query:         │
+│  FDA openFDA API Query +        │
+│  PubMed API Query +             │
+│  ClinicalTrials.gov Query:      │
 │  • Multiple search strategies   │
 │  • CIViC fallback (GraphQL)     │
 │  • ClinVar fallback (E-utilities)│
 │  • FDA drug approvals by gene   │
+│  • PubMed resistance literature │
+│  • Active clinical trials       │
 │  • Connection pooling (httpx)   │
 │  • Retry w/ exponential backoff │
 └────────────┬────────────────────┘
@@ -102,6 +106,8 @@ User Input (gene, variant, tumor_type)
 │  • ClinVar clinical significance│
 │  • COSMIC mutation data         │
 │  • FDA drug approvals           │
+│  • PubMed resistance articles   │
+│  • Clinical trial matches       │
 │  • Functional annotations       │
 │  • Tumor-type prioritization    │
 └────────────┬────────────────────┘
@@ -365,6 +371,52 @@ VariantInput → Normalize → MyVariantClient → Evidence → LLMService → A
 **API Endpoint:**
 - `GET /api/v1/associations?q=GENE+VARIANT&size=N`
 
+### 4d. Semantic Scholar Client (`api/semantic_scholar.py`)
+**Purpose:** Research literature search with built-in citation metrics and AI summaries
+
+**Data Sources:**
+- **Semantic Scholar Academic Graph API:** Full-text search with citation counts, influential citations, TLDR summaries
+
+**Features:**
+- Resistance-focused literature search for variants not in curated databases
+- Built-in citation metrics (total and influential citations)
+- TLDR (AI-generated paper summaries) included in search results
+- Open access PDF detection and direct links
+- Impact score calculation for evidence prioritization
+- Automatic resistance/sensitivity signal classification
+- Drug mention extraction from abstracts and TLDR
+
+**Use Case:**
+- EGFR C797S: Curated databases may lack resistance annotation, but Semantic Scholar finds highly-cited papers documenting osimertinib resistance
+- Citation metrics help prioritize high-impact literature evidence
+- TLDR summaries provide quick evidence assessment
+
+**Rate Limiting:**
+- 1 request per second without API key
+- Higher limits available with API key
+- Graceful degradation if search fails
+
+**API Endpoints:**
+- `GET https://api.semanticscholar.org/graph/v1/paper/search`
+- `GET https://api.semanticscholar.org/graph/v1/paper/PMID:{pmid}`
+- `POST https://api.semanticscholar.org/graph/v1/paper/batch`
+
+### 4f. Clinical Trials Client (`api/clinicaltrials.py`)
+**Purpose:** Active clinical trial matching for variant-drug combinations
+
+**Data Sources:**
+- **ClinicalTrials.gov API v2:** Real-time trial search
+
+**Features:**
+- Variant-specific trial detection (explicit mention in eligibility or arms)
+- Gene-level trial search as fallback
+- Phase filtering (Phase 1-4)
+- Recruiting/active status filtering
+- Geographic and sponsor information
+
+**API Endpoint:**
+- `GET https://clinicaltrials.gov/api/v2/studies`
+
 ### 5. LLM Service (`llm/service.py`)
 **Purpose:** LLM-based variant assessment
 
@@ -399,7 +451,9 @@ VariantInput → Normalize → MyVariantClient → Evidence → LLMService → A
 - `FDAApproval`: FDA drug approval information (brand name, generic name, indication, approval date, marketing status)
 - `CGIBiomarkerEvidence`: CGI variant-drug associations with FDA/NCCN approval status
 - `VICCEvidence`: Harmonized interpretations from VICC MetaKB with sensitivity/resistance classification
-- `Evidence`: Aggregated multi-source evidence including FDA approvals, CGI biomarkers, and VICC associations
+- `PubMedEvidence`: Research article with resistance/sensitivity signal and drug mentions
+- `ClinicalTrialEvidence`: Active trial information with variant-specific matching
+- `Evidence`: Aggregated multi-source evidence including FDA approvals, CGI biomarkers, VICC associations, PubMed articles, and clinical trials
 
 **Evidence Summary Method:**
 - Prioritizes PREDICTIVE evidence with drugs
@@ -462,6 +516,8 @@ Gold Standard JSON → Load → Assess Each Variant → Compare Tiers → Metric
 - **FDA openFDA API:** Drug approval data with biomarker indications
 - **CGI Biomarkers:** Cancer Genome Interpreter variant-drug associations
 - **VICC MetaKB:** Harmonized evidence from CIViC, CGI, JAX-CKB, OncoKB, PMKB, MolecularMatch
+- **Semantic Scholar:** Research literature with citation metrics and AI-generated paper summaries (TLDR)
+- **ClinicalTrials.gov:** Active clinical trial matching (API v2)
 
 ### Development Tools
 - **pytest:** Testing framework
@@ -706,7 +762,9 @@ tumor_board_v2/
 │   │   ├── myvariant_models.py  # API response models
 │   │   ├── fda.py            # FDA openFDA API client
 │   │   ├── cgi.py            # CGI biomarkers client
-│   │   └── vicc.py           # VICC MetaKB client
+│   │   ├── vicc.py           # VICC MetaKB client
+│   │   ├── semantic_scholar.py # Semantic Scholar literature search
+│   │   └── clinicaltrials.py # ClinicalTrials.gov client
 │   │
 │   ├── llm/                  # LLM integration
 │   │   ├── service.py        # LLM assessment service

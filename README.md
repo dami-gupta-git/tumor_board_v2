@@ -18,8 +18,8 @@ Note: Currently, this tool supports only single nucleotide polymorphisms (SNPs) 
 It is a research prototype exploring AI-assisted decision-making and is not intended for clinical use.  
 
 **Coming Soon TL;DR – The Real AI Tumor Board**
-- Full RAG stack (PubMed, ClinicalTrials.gov, NCCN/ESMO guidelines,..)
-- New evidence sources: SpliceAI, TCGA prevalence, ClinicalTrials.gov integration
+- Full RAG stack (NCCN/ESMO guidelines, semantic search over literature)
+- New evidence sources: SpliceAI, TCGA prevalence
 - Patient VCF Files:
 Supports analysis from single variants to whole patient exomes/genomes by uploading VCF files, performing 
 variant prioritization, and generating comprehensive clinical reports with trial matching.
@@ -65,8 +65,10 @@ Available in two interfaces:
 
 ### Key Features
 
-- **Evidence Aggregation**: Fetches from CIViC, ClinVar, COSMIC, FDA drug approvals, CGI Biomarkers, VICC MetaKB, and AlphaMissense
+- **Evidence Aggregation**: Fetches from CIViC, ClinVar, COSMIC, FDA drug approvals, CGI Biomarkers, VICC MetaKB, Semantic Scholar, ClinicalTrials.gov, and AlphaMissense
 - **VICC MetaKB Integration**: Harmonized evidence from 6 major cancer variant knowledgebases (CIViC, CGI, JAX-CKB, OncoKB, PMKB, MolecularMatch)
+- **Semantic Scholar Literature Search**: Research literature with citation metrics, influential citations, and AI-generated paper summaries (TLDR) for resistance mutations and emerging evidence
+- **Clinical Trials Matching**: Active trial search from ClinicalTrials.gov with variant-specific enrollment detection
 - **LLM Tiering**: Assigns AMP/ASCO/CAP tiers with confidence scores and rationale
 - **Smart Evidence Prioritization**: Surfaces tumor-specific sensitivity evidence first; correctly interprets resistance markers
 - **Validation Framework**: Built-in benchmarking against gold standard datasets
@@ -103,13 +105,13 @@ AI, aiming to improve speed, coverage, and transparency.
 **This tool is for research purposes only.** Clinical decisions should always
 be made by qualified healthcare professionals.
 
-## Summary Roadmap 
+## Summary Roadmap
 
 ### Enhanced Evidence Sources
-SpliceAI, TCGA prevalence data, and ClinicalTrials.gov integration. AlphaMissense pathogenicity predictions are now integrated.
+SpliceAI and TCGA prevalence data. AlphaMissense pathogenicity predictions, PubMed literature search, and ClinicalTrials.gov matching are now integrated.
 
 ### RAG Pipeline
-Indexed PubMed abstracts, clinical trial matching, NCCN/ESMO guideline retrieval, and variant lookups for rare mutations.
+Semantic search over indexed literature, NCCN/ESMO guideline retrieval, and variant lookups for rare mutations.
 
 ### Agentic AI Architecture
 A two-phase multi-agent system that first performs collaborative evidence gathering through specialized agents 
@@ -262,6 +264,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, testing, and code 
 - [MyVariant.info](https://myvariant.info/) | [CIViC](https://civicdb.org/) | [ClinVar](https://www.ncbi.nlm.nih.gov/clinvar/) | [COSMIC](https://cancer.sanger.ac.uk/cosmic)
 - [FDA openFDA API](https://open.fda.gov/) | [Drugs@FDA](https://www.fda.gov/drugs/drug-approvals-and-databases/drugsfda-data-files)
 - [VICC MetaKB](https://search.cancervariants.org/) | [CGI Biomarkers](https://www.cancergenomeinterpreter.org/biomarkers)
+- [Semantic Scholar API](https://www.semanticscholar.org/product/api) | [ClinicalTrials.gov API](https://clinicaltrials.gov/data-api/api)
 
 ---
 

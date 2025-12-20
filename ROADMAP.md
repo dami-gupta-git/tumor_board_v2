@@ -17,12 +17,23 @@ Splice variant impact predictions to better assess variants affecting RNA splici
 - Distance to splice site predictions
 - Visualization of splicing impact
 
-### LLM-Powered Literature Search
-Automated PubMed searches with LLM-based evidence synthesis for real-time literature review:
-- Query formulation based on variant context
+### Semantic Scholar Literature Search ✅ COMPLETED
+Research literature search with built-in citation metrics and AI summaries (replaced PubMed):
+- Resistance-focused literature search using Semantic Scholar API
+- Built-in citation counts and influential citation counts
+- TLDR (AI-generated concise summaries) included in search results
+- Open access PDF detection and direct links
+- Automatic resistance/sensitivity signal classification
+- Drug mention extraction from abstracts and TLDR
+- Impact score calculation for evidence prioritization
+- Example: EGFR C797S correctly classified as Tier II resistance marker via Semantic Scholar evidence
+
+### LLM-Powered Literature Synthesis (Future)
+Enhanced literature analysis with LLM-based evidence synthesis:
 - Relevance ranking of retrieved abstracts
 - Automated evidence extraction and summarization
 - Citation tracking and reference generation
+- Semantic search over indexed literature
 
 ### ESMFold Integration
 Protein structure predictions and visualization:
@@ -30,12 +41,15 @@ Protein structure predictions and visualization:
 - Visualization of variant location in protein structure
 - Structural impact assessment
 
-### Clinical Trials Matching
-Integration with ClinicalTrials.gov API to identify relevant ongoing trials:
+### Clinical Trials Matching ✅ COMPLETED
+Integration with ClinicalTrials.gov API v2 for active trial identification:
 - Real-time trial search based on variant and tumor type
-- Eligibility criteria matching
-- Geographic filtering
-- Phase and status filtering
+- Variant-specific trial detection (explicit mention in eligibility or study arms)
+- Gene-level trial search as fallback
+- Phase filtering (Phase 1-4)
+- Recruiting/active status filtering
+- Geographic and sponsor information
+- Tier II classification support for variants with active trials
 
 ### gnomAD Integration
 Filter out population noise:

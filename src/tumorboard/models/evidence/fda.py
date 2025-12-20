@@ -35,6 +35,10 @@ class FDAApproval(BaseModel):
             'thyroid': ['thyroid', 'atc', 'anaplastic thyroid'],
             'gist': ['gist', 'gastrointestinal stromal tumor', 'gastrointestinal stromal'],
             'gastrointestinal stromal tumor': ['gist', 'gastrointestinal stromal tumor', 'gastrointestinal stromal'],
+            'bladder': ['bladder', 'urothelial', 'transitional cell'],
+            'bladder cancer': ['bladder', 'urothelial', 'transitional cell', 'urothelial carcinoma'],
+            'urothelial': ['urothelial', 'bladder', 'transitional cell'],
+            'cholangiocarcinoma': ['cholangiocarcinoma', 'bile duct', 'biliary'],
         }
 
         tumor_match = False

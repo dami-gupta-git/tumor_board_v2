@@ -13,6 +13,7 @@ from tumorboard.models.evidence.clinical_trials import ClinicalTrialEvidence
 from tumorboard.models.evidence.clinvar import ClinVarEvidence
 from tumorboard.models.evidence.cosmic import COSMICEvidence
 from tumorboard.models.evidence.fda import FDAApproval
+from tumorboard.models.evidence.pubmed import PubMedEvidence
 from tumorboard.models.evidence.vicc import VICCEvidence
 
 logger = logging.getLogger(__name__)
@@ -36,13 +37,14 @@ class Evidence(VariantAnnotations):
     vicc: list[VICCEvidence] = Field(default_factory=list)
     civic_assertions: list[CIViCAssertionEvidence] = Field(default_factory=list)
     clinical_trials: list[ClinicalTrialEvidence] = Field(default_factory=list)
+    pubmed_articles: list[PubMedEvidence] = Field(default_factory=list)
     raw_data: dict[str, Any] = Field(default_factory=dict)
 
     def has_evidence(self) -> bool:
         """Check if any evidence was found."""
         return bool(self.civic or self.clinvar or self.cosmic or self.fda_approvals or
                    self.cgi_biomarkers or self.vicc or self.civic_assertions or
-                   self.clinical_trials)
+                   self.clinical_trials or self.pubmed_articles)
 
     @staticmethod
     def _tumor_matches(tumor_type: str | None, disease: str | None) -> bool:
@@ -288,6 +290,43 @@ class Evidence(VariantAnnotations):
 
             return False
 
+        elif gene_lower in ['fgfr2', 'fgfr3']:
+            # FGFR inhibitors like erdafitinib (BALVERSA) and pemigatinib (Pemazyre) are approved for
+            # "susceptible FGFR genetic alterations" which includes multiple variants
+            # Known susceptible FGFR3 mutations include: S249C, R248C, G370C, Y373C, etc.
+            susceptible_fgfr3_mutations = [
+                'S249C', 'R248C', 'G370C', 'Y373C', 'G380R', 'K650E', 'K650M', 'K650N', 'K650Q', 'K650T',
+                # Fusions are handled separately, but these are common point mutations
+            ]
+            # Known susceptible FGFR2 mutations (pemigatinib/futibatinib in cholangiocarcinoma)
+            susceptible_fgfr2_mutations = [
+                'N549H', 'N549K', 'N549S', 'E565A', 'K659E', 'K659M', 'K659N',
+                'V564F', 'V564I', 'V564L', 'L617V', 'L617M',
+                # These are kinase domain mutations known to respond to FGFR inhibitors
+            ]
+
+            # Check for explicit variant mention
+            if variant.lower() in indication_text:
+                return True
+
+            # Check for "susceptible FGFR" or "FGFR genetic alterations" language
+            if any(phrase in indication_text for phrase in [
+                'susceptible fgfr3', 'fgfr3 genetic alteration', 'fgfr3 alteration',
+                'susceptible fgfr2', 'fgfr2 genetic alteration', 'fgfr2 alteration',
+                f'{gene_lower} mutation', f'{gene_lower}-mutated', f'{gene_lower}-positive',
+                'fgfr2 fusion', 'fgfr2 rearrangement',  # Fusions also qualify
+            ]):
+                # If the variant is a known susceptible mutation, approve it
+                if gene_lower == 'fgfr3' and variant_upper in susceptible_fgfr3_mutations:
+                    return True
+                if gene_lower == 'fgfr2' and variant_upper in susceptible_fgfr2_mutations:
+                    return True
+                # For other variants, still approve under broad "genetic alterations" language
+                # unless it's a known resistance mutation
+                return True
+
+            return False
+
         # Default for other genes - tentatively approve if mentioned without exclusions
         return True
 
@@ -382,6 +421,62 @@ class Evidence(VariantAnnotations):
         drugs = list(set(drugs))[:5]
 
         return True, drugs
+
+    def has_literature_resistance_evidence(self) -> tuple[bool, list[str], list[str]]:
+        """Check if PubMed literature indicates this is a resistance mutation.
+
+        Returns:
+            Tuple of (has_resistance_evidence, list of drugs causing resistance, list of PMIDs)
+        """
+        if not self.pubmed_articles:
+            return False, [], []
+
+        resistance_articles = [a for a in self.pubmed_articles if a.is_resistance_evidence()]
+
+        if not resistance_articles:
+            return False, [], []
+
+        # Collect drugs mentioned in resistance articles
+        drugs = []
+        pmids = []
+        for article in resistance_articles:
+            drugs.extend(article.drugs_mentioned)
+            pmids.append(article.pmid)
+
+        drugs = list(set(drugs))[:5]
+        pmids = list(set(pmids))[:5]
+
+        return True, drugs, pmids
+
+    def get_pubmed_summary(self) -> str:
+        """Get a summary of PubMed literature for the LLM prompt."""
+        if not self.pubmed_articles:
+            return ""
+
+        lines = []
+        resistance_articles = [a for a in self.pubmed_articles if a.is_resistance_evidence()]
+        other_articles = [a for a in self.pubmed_articles if not a.is_resistance_evidence()]
+
+        if resistance_articles:
+            lines.append(f"PUBMED LITERATURE - RESISTANCE EVIDENCE ({len(resistance_articles)} articles):")
+            lines.append("  *** PEER-REVIEWED LITERATURE SUPPORTS RESISTANCE CLASSIFICATION ***")
+            for article in resistance_articles[:3]:
+                drugs_str = f" [Drugs: {', '.join(article.drugs_mentioned)}]" if article.drugs_mentioned else ""
+                lines.append(f"  • PMID {article.pmid}: {article.title[:100]}...{drugs_str}")
+                lines.append(f"      {article.format_citation()}")
+                if article.abstract:
+                    # Show first 200 chars of abstract
+                    abstract_preview = article.abstract[:200].replace('\n', ' ')
+                    lines.append(f"      Abstract: {abstract_preview}...")
+            lines.append("")
+
+        if other_articles and not resistance_articles:
+            lines.append(f"PubMed Literature ({len(other_articles)} articles):")
+            for article in other_articles[:2]:
+                lines.append(f"  • PMID {article.pmid}: {article.title[:80]}...")
+            lines.append("")
+
+        return "\n".join(lines)
 
     def get_clinical_trial_summary(self) -> str:
         """Get a summary of active clinical trials for the LLM prompt."""
@@ -508,21 +603,38 @@ class Evidence(VariantAnnotations):
         return False
 
     def is_resistance_marker_without_targeted_therapy(self, tumor_type: str | None = None) -> tuple[bool, list[str]]:
-        """Detect resistance-only markers WITHOUT FDA-approved therapy FOR the variant."""
+        """Detect resistance-only markers WITHOUT FDA-approved therapy FOR the variant.
+
+        Uses multiple evidence sources including:
+        - Curated databases (CGI, VICC, CIViC)
+        - PubMed literature (research papers)
+        """
         stats = self.compute_evidence_stats(tumor_type)
 
-        if stats['resistance_count'] == 0:
+        # Check for literature-based resistance evidence
+        has_lit_resistance, lit_drugs, lit_pmids = self.has_literature_resistance_evidence()
+
+        # If no resistance evidence from databases AND no literature evidence, return False
+        if stats['resistance_count'] == 0 and not has_lit_resistance:
             return False, []
 
-        if stats['dominant_signal'] not in ['resistance_only', 'resistance_dominant']:
-            if stats['resistance_count'] < 3:
-                return False, []
+        # If we have literature resistance evidence, that's strong support
+        # even if database evidence is limited
+        if not has_lit_resistance:
+            if stats['dominant_signal'] not in ['resistance_only', 'resistance_dominant']:
+                if stats['resistance_count'] < 3:
+                    return False, []
 
         # Check if there's FDA-approved therapy FOR this variant (sensitivity)
         if self.has_fda_for_variant_in_tumor(tumor_type):
             return False, []
 
         drugs_excluded = []
+
+        # From PubMed literature (highest priority for emerging evidence)
+        if lit_drugs:
+            drugs_excluded.extend(lit_drugs)
+            logger.info(f"Literature resistance evidence found: {lit_drugs} (PMIDs: {lit_pmids})")
 
         # Check FDA labels for wild-type requirements
         if tumor_type:
@@ -607,12 +719,22 @@ class Evidence(VariantAnnotations):
             logger.info(f"Tier III: {self.gene} {self.variant} in {tumor_type} is investigational-only")
             return "TIER III INDICATOR: Known investigational-only (no approved therapy exists)"
 
-        # Check for resistance-only marker
+        # Check for resistance-only marker (excludes therapy but no targeted alternative)
+        # Per AMP/ASCO/CAP: Resistance markers that affect treatment selection are Tier II
+        # (e.g., NRAS mutations exclude anti-EGFR therapy in CRC - this IS clinically actionable)
+        # Also checks PubMed literature for resistance evidence
         is_resistance_only, drugs = self.is_resistance_marker_without_targeted_therapy(tumor_type)
         if is_resistance_only:
             drugs_str = ', '.join(drugs) if drugs else 'standard therapies'
-            logger.info(f"Tier II: {self.gene} {self.variant} in {tumor_type} is resistance marker excluding {drugs_str}")
-            return f"TIER II INDICATOR: Resistance marker that EXCLUDES {drugs_str} (no FDA-approved therapy FOR this variant)"
+            # Check if evidence comes from literature
+            has_lit_evidence, lit_drugs, lit_pmids = self.has_literature_resistance_evidence()
+            if has_lit_evidence:
+                pmid_str = ', '.join(lit_pmids[:3])
+                logger.info(f"Tier II: {self.gene} {self.variant} in {tumor_type} is resistance marker (literature evidence: PMIDs {pmid_str})")
+                return f"TIER II INDICATOR: Resistance marker that EXCLUDES {drugs_str} - supported by peer-reviewed literature (PMIDs: {pmid_str})"
+            else:
+                logger.info(f"Tier II: {self.gene} {self.variant} in {tumor_type} is resistance marker excluding {drugs_str}")
+                return f"TIER II INDICATOR: Resistance marker that EXCLUDES {drugs_str} (no FDA-approved therapy FOR this variant)"
 
         # Check for prognostic/diagnostic only
         if self.is_prognostic_or_diagnostic_only():
@@ -810,6 +932,12 @@ class Evidence(VariantAnnotations):
         if trial_summary:
             lines.append("")
             lines.append(trial_summary)
+
+        # Add PubMed literature summary
+        pubmed_summary = self.get_pubmed_summary()
+        if pubmed_summary:
+            lines.append("")
+            lines.append(pubmed_summary)
 
         lines.append("=" * 60)
         lines.append("")
@@ -1046,6 +1174,21 @@ class Evidence(VariantAnnotations):
             sig = self.clinvar[0].clinical_significance if self.clinvar else None
             if sig:
                 lines.append(f"ClinVar: {sig}")
+                lines.append("")
+
+        # Add PubMed literature evidence
+        if self.pubmed_articles:
+            resistance_articles = [a for a in self.pubmed_articles if a.is_resistance_evidence()]
+            if resistance_articles:
+                lines.append(f"PUBMED RESISTANCE LITERATURE ({len(resistance_articles)} articles):")
+                lines.append("  *** PEER-REVIEWED EVIDENCE FOR RESISTANCE ***")
+                for article in resistance_articles[:3]:
+                    drugs_str = f" [Drugs: {', '.join(article.drugs_mentioned[:3])}]" if article.drugs_mentioned else ""
+                    lines.append(f"  • PMID {article.pmid}: {article.title[:100]}...{drugs_str}")
+                    lines.append(f"      {article.format_citation()}")
+                    if article.abstract:
+                        abstract_preview = article.abstract[:250].replace('\n', ' ')
+                        lines.append(f"      Abstract: {abstract_preview}...")
                 lines.append("")
 
         return "\n".join(lines) if len(lines) > 1 else ""
