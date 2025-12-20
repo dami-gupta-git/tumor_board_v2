@@ -81,6 +81,7 @@ class LLMService:
 
             raw_content = response.choices[0].message.content.strip()
 
+            print(raw_content)
             # Robust markdown/code-block handling (your code was already great)
             content = raw_content
             if content.startswith("```"):

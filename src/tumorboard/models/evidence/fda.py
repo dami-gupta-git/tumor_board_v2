@@ -40,38 +40,60 @@ class FDAApproval(BaseModel):
         tumor_match = False
         matched_section = ""
 
-        tumor_keys = []
-        for key, keywords in tumor_keywords.items():
-            if any(kw in tumor_lower for kw in keywords):
-                tumor_keys = keywords
-                break
-        if not tumor_keys:
-            tumor_keys = [tumor_lower]
+        # Priority 1: If indication has a variant-specific section at the start (from fda.py),
+        # use that section for line-of-therapy detection. This handles cases like TAGRISSO
+        # where T790M has its own later-line indication separate from L858R/exon19del first-line.
+        if self.indication.startswith('[FDA APPROVED FOR'):
+            # Extract the variant-specific section
+            bracket_end = self.indication.find(']')
+            if bracket_end > 0:
+                variant_section = self.indication[:bracket_end + 1]
+                # Check if this variant section mentions the tumor type
+                variant_section_lower = variant_section.lower()
+                for key, keywords in tumor_keywords.items():
+                    if any(kw in tumor_lower for kw in keywords):
+                        if any(kw in variant_section_lower for kw in keywords):
+                            tumor_match = True
+                            matched_section = variant_section
+                            break
+                if not tumor_match and tumor_lower in variant_section_lower:
+                    tumor_match = True
+                    matched_section = variant_section
 
-        for kw in tumor_keys:
-            if kw in indication_lower:
-                tumor_match = True
-                idx = indication_lower.find(kw)
-                start = max(0, idx - 50)
-                next_section_markers = [
-                    'non-small cell lung cancer',
-                    'nsclc)',
-                    'melanoma •',
-                    'breast cancer',
-                    'thyroid cancer',
-                    'limitations of use',
-                    '1.1 braf',
-                    '1.2 braf',
-                    '1.3 braf',
-                    '1.4 ',
-                ]
-                end = len(self.indication)
-                for next_sec in next_section_markers:
-                    next_idx = indication_lower.find(next_sec, idx + len(kw) + 100)
-                    if next_idx > idx and next_idx < end:
-                        end = next_idx
-                matched_section = self.indication[start:end]
-                break
+        # Priority 2: Standard tumor type matching in full indication
+        if not tumor_match:
+            tumor_keys = []
+            for key, keywords in tumor_keywords.items():
+                if any(kw in tumor_lower for kw in keywords):
+                    tumor_keys = keywords
+                    break
+            if not tumor_keys:
+                tumor_keys = [tumor_lower]
+
+            for kw in tumor_keys:
+                if kw in indication_lower:
+                    tumor_match = True
+                    idx = indication_lower.find(kw)
+                    start = max(0, idx - 50)
+                    next_section_markers = [
+                        'non-small cell lung cancer',
+                        'nsclc)',
+                        'melanoma •',
+                        'breast cancer',
+                        'thyroid cancer',
+                        'limitations of use',
+                        '1.1 braf',
+                        '1.2 braf',
+                        '1.3 braf',
+                        '1.4 ',
+                    ]
+                    end = len(self.indication)
+                    for next_sec in next_section_markers:
+                        next_idx = indication_lower.find(next_sec, idx + len(kw) + 100)
+                        if next_idx > idx and next_idx < end:
+                            end = next_idx
+                    matched_section = self.indication[start:end]
+                    break
 
         if not tumor_match:
             return {
@@ -86,6 +108,8 @@ class FDAApproval(BaseModel):
             'after progression',
             'following progression',
             'following recurrence',
+            'has progressed',  # "whose disease has progressed on or after"
+            'progressed on or after',
             'second-line',
             'second line',
             'third-line',

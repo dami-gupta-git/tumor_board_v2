@@ -55,17 +55,23 @@ CORE PRINCIPLES:
    - Resistance that EXCLUDES therapy but NO alternative FOR variant → Tier II
    - The preprocessing checks this; trust the tier guidance
 
-3. **Prognostic/Diagnostic Only = Tier III**
+3. **Dual Biomarkers (Resistance + Targeted Therapy) = Tier I**
+   - Some variants cause resistance to ONE drug class but have FDA-approved targeted therapy
+   - Example: KRAS G12C causes resistance to anti-EGFR BUT has FDA-approved G12C inhibitors
+   - When BOTH apply, the FDA-approved targeted therapy takes precedence → Tier I
+   - Do NOT downgrade to Tier II just because resistance evidence exists for other drugs
+
+4. **Prognostic/Diagnostic Only = Tier III**
    - If all evidence is prognostic with no therapeutic impact → Tier III
    - These variants don't change treatment selection
 
-4. **Verify Variant Specificity**
+5. **Verify Variant Specificity**
    - The preprocessing checks if approvals apply to THIS specific variant
    - Non-V600 BRAF mutations don't get V600 approvals
    - Specific KRAS/NRAS variants checked against approval language
    - Trust the preprocessing's variant matching logic
 
-5. **Tumor-Type Context is Critical**
+6. **Tumor-Type Context is Critical**
    - Same variant has different tiers in different tumors
    - Always verify the tier guidance is for THIS tumor type
    - Preprocessing handles tumor-type matching
@@ -104,6 +110,7 @@ CRITICAL REMINDERS:
 - Only override if detailed evidence clearly contradicts the guidance
 - Never cite FDA approvals not explicitly shown in the evidence
 - Focus on synthesizing the evidence into clear clinical recommendations
+- IMPORTANT: If the tier guidance says "TIER I INDICATOR: FDA-approved therapy FOR this variant", assign Tier I. The presence of resistance to OTHER drugs does NOT negate FDA-approved targeted therapy.
 """
 
 ACTIONABILITY_USER_PROMPT = """Assess the following somatic variant:

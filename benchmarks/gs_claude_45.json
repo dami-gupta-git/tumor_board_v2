@@ -150,7 +150,7 @@
       "gene": "KRAS",
       "variant": "G12D",
       "tumor_type": "Pancreatic Cancer",
-      "expected_tier": "Tier III",
+      "expected_tier": "Tier II",
       "notes": "No FDA-approved targeted therapy. KRAS G12D inhibitors in early trials only.",
       "references": [
         "Hallin J et al. Cancer Discov 2022 (preclinical)",
@@ -238,7 +238,7 @@
       "gene": "PIK3CA",
       "variant": "H1047R",
       "tumor_type": "Colorectal Cancer",
-      "expected_tier": "Tier III",
+      "expected_tier": "Tier II",
       "notes": "No FDA-approved PI3K inhibitor in CRC. Alpelisib approved only in breast cancer.",
       "references": [
         "Rodon J et al. Nat Rev Clin Oncol 2013",
@@ -348,7 +348,7 @@
       "gene": "TP53",
       "variant": "R175H",
       "tumor_type": "Colorectal Cancer",
-      "expected_tier": "Tier III",
+      "expected_tier": "Tier II",
       "notes": "Prognostic but not predictive. No FDA-approved TP53-targeted therapy. Poor prognosis marker.",
       "references": [
         "Olivier M et al. Hum Mutat 2010",

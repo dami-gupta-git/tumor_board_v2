@@ -278,7 +278,6 @@ class FDAClient:
                 indication_upper = indication_text.upper()
 
                 if variant_upper in indication_upper:
-                    variant_in_indications = True
                     # Extract the specific indication sentence for this variant
                     idx = indication_upper.find(variant_upper)
                     # Find the bullet point or sentence containing this variant
@@ -288,7 +287,24 @@ class FDAClient:
                     end = indication_text.find("•", idx + len(variant_upper))
                     if end == -1:
                         end = min(len(indication_text), idx + 300)
-                    indication_variant_note = f"[FDA APPROVED FOR {variant_upper}: {indication_text[start:end].strip()}]"
+                    context_snippet = indication_text[start:end].strip().lower()
+
+                    # Check for exclusion patterns - if variant is mentioned in exclusion context,
+                    # it is NOT approved for that variant (e.g., "without the D816V mutation")
+                    exclusion_patterns = [
+                        f'without the {variant_upper.lower()}',
+                        f'without {variant_upper.lower()}',
+                        f'no {variant_upper.lower()}',
+                        f'not {variant_upper.lower()}',
+                        f'excluding {variant_upper.lower()}',
+                        f'absence of {variant_upper.lower()}',
+                    ]
+                    is_exclusion = any(pattern in context_snippet for pattern in exclusion_patterns)
+
+                    if not is_exclusion:
+                        variant_in_indications = True
+                        indication_variant_note = f"[FDA APPROVED FOR {variant_upper}: {indication_text[start:end].strip()}]"
+                    # If it's an exclusion, don't set variant_in_indications or add the prefix
 
             # Check clinical_studies for variant-specific approval info
             # This is important for variants like G719X, S768I, L861Q that are mentioned

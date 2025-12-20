@@ -9,6 +9,7 @@ from tumorboard.constants import TUMOR_TYPE_MAPPINGS
 from tumorboard.models.annotations import VariantAnnotations
 from tumorboard.models.evidence.cgi import CGIBiomarkerEvidence
 from tumorboard.models.evidence.civic import CIViCEvidence, CIViCAssertionEvidence
+from tumorboard.models.evidence.clinical_trials import ClinicalTrialEvidence
 from tumorboard.models.evidence.clinvar import ClinVarEvidence
 from tumorboard.models.evidence.cosmic import COSMICEvidence
 from tumorboard.models.evidence.fda import FDAApproval
@@ -34,12 +35,14 @@ class Evidence(VariantAnnotations):
     cgi_biomarkers: list[CGIBiomarkerEvidence] = Field(default_factory=list)
     vicc: list[VICCEvidence] = Field(default_factory=list)
     civic_assertions: list[CIViCAssertionEvidence] = Field(default_factory=list)
+    clinical_trials: list[ClinicalTrialEvidence] = Field(default_factory=list)
     raw_data: dict[str, Any] = Field(default_factory=dict)
 
     def has_evidence(self) -> bool:
         """Check if any evidence was found."""
         return bool(self.civic or self.clinvar or self.cosmic or self.fda_approvals or
-                   self.cgi_biomarkers or self.vicc or self.civic_assertions)
+                   self.cgi_biomarkers or self.vicc or self.civic_assertions or
+                   self.clinical_trials)
 
     @staticmethod
     def _tumor_matches(tumor_type: str | None, disease: str | None) -> bool:
@@ -61,16 +64,19 @@ class Evidence(VariantAnnotations):
         return False
 
     def _variant_matches_approval_class(self, gene: str, variant: str,
-                                       indication_text: str, approval: FDAApproval) -> bool:
+                                       indication_text: str, approval: FDAApproval,
+                                       tumor_type: str | None = None) -> bool:
         """Determine if this specific variant falls under the approval.
 
         This prevents:
         - BRAF G469A claiming BRAF V600E approvals
         - KRAS G12D claiming broad "KRAS" mentions
         - Non-specific matches
+        - KIT D816V matching generic GIST approvals (D816V causes imatinib resistance in GIST)
         """
         gene_lower = gene.lower()
         variant_upper = variant.upper()
+        tumor_lower = (tumor_type or '').lower()
 
         # Check for exclusion patterns
         exclusion_patterns = [
@@ -113,7 +119,7 @@ class Evidence(VariantAnnotations):
             # Exon 9: codons 503-510 (extracellular domain)
             # Exon 11: codons 550-591 (juxtamembrane domain) - most common in GIST
             # Exon 13: codons 627-664 (ATP binding)
-            # Exon 17: codons 788-828 (activation loop)
+            # Exon 17: codons 788-828 (activation loop) - D816 mutations cause imatinib resistance
 
             # Map specific variants to exons
             exon_map = {
@@ -126,7 +132,7 @@ class Evidence(VariantAnnotations):
                 'L576P': 11, 'P585P': 11,
                 # Exon 13
                 'K642E': 13,
-                # Exon 17
+                # Exon 17 (activation loop - causes imatinib resistance)
                 'D816V': 17, 'D816H': 17, 'D816Y': 17, 'D820Y': 17, 'N822K': 17,
             }
 
@@ -149,6 +155,45 @@ class Evidence(VariantAnnotations):
                     elif 788 <= position <= 828:
                         variant_exon = 17
 
+            # CRITICAL: D816 mutations (exon 17) cause imatinib resistance in GIST
+            # These should NOT match on generic "Kit-positive GIST" approvals
+            # However, in Systemic Mastocytosis, avapritinib/midostaurin ARE approved for D816V
+            is_d816_mutation = variant_upper.startswith('D816') or variant_exon == 17
+            is_gist = any(term in tumor_lower for term in ['gist', 'gastrointestinal stromal'])
+
+            if is_d816_mutation and is_gist:
+                # D816 mutations in GIST: only match if the variant is EXPLICITLY mentioned
+                # in the indication IN A POSITIVE context (not generic Kit-positive/GIST approvals)
+                # because D816 causes resistance to imatinib/sunitinib (standard GIST therapies)
+
+                variant_lower = variant.lower()
+
+                # Check if variant is explicitly mentioned - but ALSO check for exclusion context
+                if variant_lower in indication_text:
+                    # Check if it's in an exclusion context (e.g., "without the D816V mutation")
+                    exclusion_patterns = [
+                        f'without the {variant_lower}',
+                        f'without {variant_lower}',
+                        f'no {variant_lower}',
+                        f'not {variant_lower}',
+                        f'excluding {variant_lower}',
+                        f'absence of {variant_lower}',
+                    ]
+                    is_exclusion = any(pattern in indication_text for pattern in exclusion_patterns)
+                    if not is_exclusion:
+                        return True
+                    # If it's an exclusion, fall through to return False
+
+                # Check for explicit exon 17 mention (only if it's a positive mention)
+                if 'exon 17' in indication_text:
+                    # Check that exon 17 is not mentioned in an exclusion context
+                    if 'without exon 17' not in indication_text and 'excluding exon 17' not in indication_text:
+                        return True
+
+                # Do NOT match on generic Kit-positive or GIST phrases for D816 in GIST
+                logger.debug(f"KIT {variant} in GIST: NOT matching generic Kit-positive/GIST approval (D816 causes imatinib resistance)")
+                return False
+
             if variant.lower() in indication_text:
                 return True
 
@@ -156,6 +201,7 @@ class Evidence(VariantAnnotations):
                 return True
 
             # Broad "KIT-mutated" or "KIT-positive" - common in GIST approvals
+            # Note: D816 mutations in GIST are excluded above (they cause imatinib resistance)
             if any(phrase in indication_text for phrase in [
                 'kit-positive', 'kit-mutated', 'kit mutation', 'kit (cd117)',
                 'kit-expressing', 'cd117-positive', 'cd117 positive',
@@ -178,8 +224,41 @@ class Evidence(VariantAnnotations):
             uncommon_mutations = ['G719A', 'G719C', 'G719S', 'L861Q', 'S768I']
             resistance_mutations = ['T790M', 'C797S']
 
-            if variant.lower() in indication_text:
-                return True
+            # Check for explicit variant mention in positive context
+            variant_lower = variant.lower()
+            if variant_lower in indication_text:
+                # Check if it's an exclusion context ("no T790M", "without T790M", etc.)
+                exclusion_patterns = [
+                    f'no {variant_lower}',
+                    f'without {variant_lower}',
+                    f'not {variant_lower}',
+                    f'excluding {variant_lower}',
+                    f'absence of {variant_lower}',
+                    f'no known {variant_lower}',
+                    f'no known egfr {variant_lower}',
+                ]
+                is_exclusion = any(p in indication_text for p in exclusion_patterns)
+
+                # For T790M specifically, require explicit positive indication
+                # Don't match just because T790M is mentioned (e.g., in clinical studies population)
+                if variant_upper == 'T790M':
+                    positive_patterns = [
+                        't790m mutation-positive',
+                        't790m-positive',
+                        'approved for t790m',
+                        'egfr t790m mutation-positive',
+                        'metastatic egfr t790m mutation-positive',
+                    ]
+                    is_positive = any(p in indication_text for p in positive_patterns)
+                    # For T790M, only return True if explicitly positive (not just absence of exclusion)
+                    # This prevents matching on drugs where T790M is just mentioned in study population
+                    if is_positive and not is_exclusion:
+                        return True
+                    # If T790M is just mentioned in clinical studies but not as an indication, don't match
+                    return False
+
+                if not is_exclusion:
+                    return True
 
             if variant_upper in common_mutations or any(v in variant_upper for v in ['DEL19', 'E746']):
                 if 'common' in indication_text or 'exon 19' in indication_text or 'l858r' in indication_text:
@@ -189,13 +268,19 @@ class Evidence(VariantAnnotations):
                 if 'uncommon' in indication_text or 'g719' in indication_text:
                     return True
 
+            # For T790M/C797S resistance mutations - only match if explicitly indicated FOR the variant
+            # Don't match on generic "resistance" mentions as those typically mean resistance TO a drug
             if variant_upper in resistance_mutations:
-                if 't790m' in indication_text or 'resistance' in indication_text:
-                    return True
+                # Only return True if we already matched above on positive patterns
+                # Don't match on generic patterns here
+                pass
 
             if 'egfr mutation' in indication_text or 'egfr-mutated' in indication_text:
-                if 'specific' not in indication_text and 'particular' not in indication_text:
-                    return True
+                # Generic EGFR mutation approval - but NOT for resistance mutations
+                # T790M/C797S require specific approval, not generic EGFR mutation approval
+                if variant_upper not in resistance_mutations:
+                    if 'specific' not in indication_text and 'particular' not in indication_text:
+                        return True
 
             return False
 
@@ -265,6 +350,117 @@ class Evidence(VariantAnnotations):
 
         return False
 
+    def check_fda_biomarker_status(self, tumor_type: str | None = None) -> dict:
+        """Check FDA biomarker approval status using curated drug-biomarker mappings.
+
+        This uses a curated lookup of known oncology drugs and their biomarker associations
+        to definitively determine if a variant is approved or excluded for a tumor type.
+
+        Returns:
+            Dict with 'approved_drugs', 'excluded_drugs', 'has_approval', 'is_excluded'
+        """
+        from tumorboard.api.fda_labels import FDALabelClient
+
+        gene_upper = self.gene.upper()
+        variant_upper = self.variant.upper()
+        tumor_lower = (tumor_type or '').lower()
+
+        approved_drugs: list[str] = []
+        excluded_drugs: list[str] = []
+
+        # Use the curated lookup from FDALabelClient
+        for drug_name, info in FDALabelClient.ONCOLOGY_DRUG_BIOMARKERS.items():
+            if info.get("gene") != gene_upper:
+                continue
+
+            # Check if variant matches
+            variants = info.get("variants", [])
+            variant_match = any(
+                v.upper() in variant_upper or variant_upper.startswith(v.upper())
+                for v in variants
+            )
+            if not variant_match:
+                continue
+
+            # Check if tumor type matches
+            drug_tumors = info.get("tumor_types", [])
+            tumor_match = any(
+                t in tumor_lower or tumor_lower in t
+                for t in drug_tumors
+            )
+            if not tumor_match:
+                continue
+
+            # Determine if approved or excluded
+            if info.get("biomarker_excluded"):
+                excluded_drugs.append(drug_name)
+            elif info.get("biomarker_approved"):
+                approved_drugs.append(drug_name)
+
+        return {
+            "approved_drugs": approved_drugs,
+            "excluded_drugs": excluded_drugs,
+            "has_approval": len(approved_drugs) > 0,
+            "is_excluded": len(excluded_drugs) > 0 and len(approved_drugs) == 0,
+        }
+
+    def has_active_clinical_trials(self, variant_specific_only: bool = False) -> tuple[bool, list[str]]:
+        """Check if there are active clinical trials for this variant.
+
+        Args:
+            variant_specific_only: If True, only count trials that explicitly mention the variant
+
+        Returns:
+            Tuple of (has_trials, list of trial drug names)
+        """
+        if not self.clinical_trials:
+            return False, []
+
+        trials = self.clinical_trials
+        if variant_specific_only:
+            trials = [t for t in trials if t.variant_specific]
+
+        if not trials:
+            return False, []
+
+        # Extract drug names from trials
+        drugs = []
+        for trial in trials:
+            drugs.extend(trial.get_drug_names())
+
+        # Deduplicate
+        drugs = list(set(drugs))[:5]
+
+        return True, drugs
+
+    def get_clinical_trial_summary(self) -> str:
+        """Get a summary of active clinical trials for the LLM prompt."""
+        if not self.clinical_trials:
+            return ""
+
+        lines = []
+        variant_specific = [t for t in self.clinical_trials if t.variant_specific]
+        gene_level = [t for t in self.clinical_trials if not t.variant_specific]
+
+        if variant_specific:
+            lines.append(f"ACTIVE CLINICAL TRIALS FOR {self.variant.upper()} ({len(variant_specific)}):")
+            lines.append("  *** VARIANT-SPECIFIC TRIALS - supports Tier II classification ***")
+            for trial in variant_specific[:3]:
+                phase_str = f" [{trial.phase}]" if trial.phase else ""
+                drugs = ', '.join(trial.get_drug_names()[:3]) or 'N/A'
+                lines.append(f"  • {trial.nct_id}{phase_str}: {drugs}")
+                lines.append(f"      {trial.title[:100]}...")
+            lines.append("")
+
+        if gene_level and not variant_specific:
+            lines.append(f"Active {self.gene.upper()} trials (gene-level, not variant-specific): {len(gene_level)}")
+            for trial in gene_level[:2]:
+                drugs = ', '.join(trial.get_drug_names()[:2]) or 'N/A'
+                lines.append(f"  • {trial.nct_id}: {drugs}")
+            lines.append("")
+
+        return "\n".join(lines)
+
     def has_fda_for_variant_in_tumor(self, tumor_type: str | None = None) -> bool:
         """Check if FDA approval exists FOR this specific variant in this tumor type."""
         if not tumor_type:
@@ -274,21 +470,47 @@ class Evidence(VariantAnnotations):
         if self.is_investigational_only(tumor_type):
             return False
 
+        # PRIORITY 1: Check curated FDA biomarker lookup (most authoritative)
+        # This handles known complex cases like KIT D816V in GIST vs Systemic Mastocytosis
+        biomarker_status = self.check_fda_biomarker_status(tumor_type)
+        if biomarker_status["has_approval"]:
+            logger.info(f"FDA approval found via curated lookup: {biomarker_status['approved_drugs']}")
+            return True
+        if biomarker_status["is_excluded"]:
+            logger.info(f"Variant explicitly excluded in curated lookup: {biomarker_status['excluded_drugs']}")
+            return False
+
         variant_is_approved = False
 
-        # Check FDA labels with variant-specific matching
+        # PRIORITY 2: Check FDA labels with variant-specific matching
         for approval in self.fda_approvals:
             parsed = approval.parse_indication_for_tumor(tumor_type)
             if not parsed['tumor_match']:
                 continue
 
             indication_lower = (approval.indication or '').lower()
+            variant_lower = self.variant.lower()
 
-            # Strategy 1: Explicit variant mention
-            if self.variant.lower() in indication_lower:
-                variant_is_approved = True
-                logger.debug(f"FDA approval found via explicit variant mention: {approval.drug_name}")
-                break
+            # Strategy 1: Explicit variant mention (but check for exclusion context)
+            if variant_lower in indication_lower:
+                # Check for exclusion patterns around the variant mention
+                # e.g., "without the D816V mutation" means NOT approved for D816V
+                exclusion_patterns = [
+                    f'without the {variant_lower}',
+                    f'without {variant_lower}',
+                    f'no {variant_lower}',
+                    f'not {variant_lower}',
+                    f'excluding {variant_lower}',
+                    f'absence of {variant_lower}',
+                ]
+                is_exclusion = any(pattern in indication_lower for pattern in exclusion_patterns)
+
+                if not is_exclusion:
+                    variant_is_approved = True
+                    logger.debug(f"FDA approval found via explicit variant mention: {approval.drug_name}")
+                    break
+                else:
+                    logger.debug(f"Variant {self.variant} found in exclusion context for {approval.drug_name}")
 
             # Strategy 2: Gene mention with variant class validation
             if self.gene.lower() in indication_lower:
@@ -296,7 +518,8 @@ class Evidence(VariantAnnotations):
                     gene=self.gene,
                     variant=self.variant,
                     indication_text=indication_lower,
-                    approval=approval
+                    approval=approval,
+                    tumor_type=tumor_type
                 )
                 if variant_is_approved:
                     logger.debug(f"FDA approval found via gene+class validation: {approval.drug_name}")
@@ -427,15 +650,22 @@ class Evidence(VariantAnnotations):
     def get_tier_hint(self, tumor_type: str | None = None) -> str:
         """Generate explicit tier guidance based on evidence structure."""
 
-        # Check investigational-only FIRST
-        if self.is_investigational_only(tumor_type):
-            logger.info(f"Tier III: {self.gene} {self.variant} in {tumor_type} is investigational-only")
-            return "TIER III INDICATOR: Known investigational-only (no approved therapy exists)"
-
-        # Check for FDA approval FOR variant in tumor
+        # Check for FDA approval FOR variant in tumor FIRST (highest priority = Tier I)
         if self.has_fda_for_variant_in_tumor(tumor_type):
             logger.info(f"Tier I: {self.gene} {self.variant} in {tumor_type} has FDA approval")
             return "TIER I INDICATOR: FDA-approved therapy FOR this variant in this tumor type"
+
+        # Check for active clinical trials - overrides investigational-only (Tier II)
+        has_trials, trial_drugs = self.has_active_clinical_trials(variant_specific_only=True)
+        if has_trials:
+            drugs_str = ', '.join(trial_drugs[:3]) if trial_drugs else 'investigational agents'
+            logger.info(f"Tier II: {self.gene} {self.variant} has variant-specific clinical trials ({drugs_str})")
+            return f"TIER II INDICATOR: Active clinical trials specifically enrolling {self.variant} patients ({drugs_str})"
+
+        # Check investigational-only (but no active variant-specific trials)
+        if self.is_investigational_only(tumor_type):
+            logger.info(f"Tier III: {self.gene} {self.variant} in {tumor_type} is investigational-only")
+            return "TIER III INDICATOR: Known investigational-only (no approved therapy exists)"
 
         # Check for resistance-only marker
         is_resistance_only, drugs = self.is_resistance_marker_without_targeted_therapy(tumor_type)
@@ -594,24 +824,38 @@ class Evidence(VariantAnnotations):
         if tumor_type and self.fda_approvals:
             later_line_approvals = []
             first_line_approvals = []
+            variant_specific_approvals = []
             for approval in self.fda_approvals:
                 parsed = approval.parse_indication_for_tumor(tumor_type)
                 if parsed['tumor_match']:
                     drug = approval.brand_name or approval.generic_name or approval.drug_name
-                    if parsed['line_of_therapy'] == 'later-line':
-                        accel_note = " (ACCELERATED)" if parsed['approval_type'] == 'accelerated' else ""
-                        later_line_approvals.append(f"{drug}{accel_note}")
-                    elif parsed['line_of_therapy'] == 'first-line':
-                        first_line_approvals.append(drug)
+                    indication_lower = (approval.indication or '').lower()
 
-            if later_line_approvals and not first_line_approvals:
-                lines.append("")
-                lines.append("FDA APPROVAL CONTEXT:")
-                lines.append(f"  FDA-APPROVED FOR THIS BIOMARKER (later-line): {', '.join(later_line_approvals)}")
-                lines.append("  → IMPORTANT: Later-line FDA approval is STILL Tier I if the biomarker IS the therapeutic indication.")
-            elif first_line_approvals:
-                lines.append("")
-                lines.append(f"FDA FIRST-LINE APPROVAL: {', '.join(first_line_approvals)} → Strong Tier I signal")
+                    # Check if this approval is specifically for the variant being queried
+                    # variant_in_indications is authoritative (FDA label explicitly mentions variant)
+                    # For clinical_studies, use _variant_matches_approval_class which checks for exclusions
+                    is_variant_specific = (
+                        approval.variant_in_indications or
+                        self._variant_matches_approval_class(self.gene, self.variant, indication_lower, approval, tumor_type)
+                    )
+
+                    if is_variant_specific:
+                        variant_specific_approvals.append(drug)
+                        if parsed['line_of_therapy'] == 'later-line':
+                            accel_note = " (ACCELERATED)" if parsed['approval_type'] == 'accelerated' else ""
+                            later_line_approvals.append(f"{drug}{accel_note}")
+                        elif parsed['line_of_therapy'] == 'first-line':
+                            first_line_approvals.append(drug)
+
+            if variant_specific_approvals:
+                if later_line_approvals and not first_line_approvals:
+                    lines.append("")
+                    lines.append("FDA APPROVAL CONTEXT:")
+                    lines.append(f"  FDA-APPROVED FOR THIS VARIANT (later-line): {', '.join(later_line_approvals)}")
+                    lines.append("  → IMPORTANT: Later-line FDA approval is STILL Tier I if the biomarker IS the therapeutic indication.")
+                elif first_line_approvals:
+                    lines.append("")
+                    lines.append(f"FDA FIRST-LINE APPROVAL FOR THIS VARIANT: {', '.join(first_line_approvals)} → Strong Tier I signal")
 
         if stats['conflicts']:
             lines.append("")
@@ -620,6 +864,12 @@ class Evidence(VariantAnnotations):
                 lines.append(f"  - {conflict['drug']}: "
                            f"SENSITIVITY in {conflict['sensitivity_context']} ({conflict['sensitivity_count']} entries) "
                            f"vs RESISTANCE in {conflict['resistance_context']} ({conflict['resistance_count']} entries)")
+
+        # Add clinical trial summary
+        trial_summary = self.get_clinical_trial_summary()
+        if trial_summary:
+            lines.append("")
+            lines.append(trial_summary)
 
         lines.append("=" * 60)
         lines.append("")
@@ -755,12 +1005,26 @@ class Evidence(VariantAnnotations):
 
                 if tumor_type:
                     parsed = approval.parse_indication_for_tumor(tumor_type)
-                    if parsed['tumor_match'] or variant_explicit:
-                        line_info = parsed['line_of_therapy'].upper() if parsed['tumor_match'] else "UNSPECIFIED"
-                        approval_info = parsed['approval_type'].upper() if parsed['tumor_match'] else "UNSPECIFIED"
+                    if parsed['tumor_match']:
+                        # FDA approval matches the tumor type
+                        line_info = parsed['line_of_therapy'].upper()
+                        approval_info = parsed['approval_type'].upper()
+
+                        # Check if this variant is actually approved for this tumor type
+                        # (not just mentioned in clinical studies as resistant/not sensitive)
+                        indication_lower = (approval.indication or '').lower()
+                        is_variant_approved = (
+                            approval.variant_in_indications or
+                            self._variant_matches_approval_class(self.gene, self.variant, indication_lower, approval, tumor_type)
+                        )
+
                         variant_note = ""
-                        if variant_explicit:
+                        if variant_explicit and is_variant_approved:
                             variant_note = " *** VARIANT EXPLICITLY IN FDA LABEL ***"
+                        elif variant_explicit and not is_variant_approved:
+                            # Variant mentioned in clinical studies but NOT as sensitivity indication
+                            # (e.g., D816V mentioned as resistant in GIST context)
+                            variant_note = " [variant mentioned but NOT approved for this tumor type]"
 
                         lines.append(f"  • {drug} [FOR {tumor_type.upper()}]{variant_note}:")
                         lines.append(f"      Line of therapy: {line_info}")
@@ -774,8 +1038,9 @@ class Evidence(VariantAnnotations):
                         else:
                             lines.append(f"      Excerpt: {parsed['indication_excerpt'][:200]}...")
                     else:
+                        # FDA approval is for a DIFFERENT tumor type
                         indication = (approval.indication or "")[:300]
-                        lines.append(f"  • {drug} [OTHER INDICATIONS]: {indication}...")
+                        lines.append(f"  • {drug} [DIFFERENT TUMOR TYPE - NOT {tumor_type.upper()}]: {indication}...")
                 else:
                     indication = (approval.indication or "")[:300]
                     date_str = f" (Approved: {approval.approval_date})" if approval.approval_date else ""

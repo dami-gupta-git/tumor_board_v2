@@ -23,10 +23,12 @@ from tumorboard.api.cgi import CGIClient
 from tumorboard.api.oncotree import OncoTreeClient
 from tumorboard.api.vicc import VICCClient
 from tumorboard.api.civic import CIViCClient
+from tumorboard.api.clinicaltrials import ClinicalTrialsClient
 from tumorboard.llm.service import LLMService
 from tumorboard.models.assessment import ActionabilityAssessment
 from tumorboard.models.evidence.cgi import CGIBiomarkerEvidence
 from tumorboard.models.evidence.civic import CIViCAssertionEvidence
+from tumorboard.models.evidence.clinical_trials import ClinicalTrialEvidence
 from tumorboard.models.evidence.fda import FDAApproval
 from tumorboard.models.evidence.vicc import VICCEvidence
 from tumorboard.models.variant import VariantInput
@@ -41,15 +43,17 @@ class AssessmentEngine:
     significantly improving performance for batch assessments.
     """
 
-    def __init__(self, llm_model: str = "gpt-4o-mini", llm_temperature: float = 0.1, enable_logging: bool = True, enable_vicc: bool = True, enable_civic_assertions: bool = True):
+    def __init__(self, llm_model: str = "gpt-4o-mini", llm_temperature: float = 0.1, enable_logging: bool = True, enable_vicc: bool = True, enable_civic_assertions: bool = True, enable_clinical_trials: bool = True):
         self.myvariant_client = MyVariantClient()
         self.fda_client = FDAClient()
         self.cgi_client = CGIClient()
         self.oncotree_client = OncoTreeClient()
         self.vicc_client = VICCClient() if enable_vicc else None
         self.civic_client = CIViCClient() if enable_civic_assertions else None
+        self.clinical_trials_client = ClinicalTrialsClient() if enable_clinical_trials else None
         self.enable_vicc = enable_vicc
         self.enable_civic_assertions = enable_civic_assertions
+        self.enable_clinical_trials = enable_clinical_trials
         self.llm_service = LLMService(model=llm_model, temperature=llm_temperature, enable_logging=enable_logging)
 
     async def __aenter__(self):
@@ -65,6 +69,8 @@ class AssessmentEngine:
             await self.vicc_client.__aenter__()
         if self.civic_client:
             await self.civic_client.__aenter__()
+        if self.clinical_trials_client:
+            await self.clinical_trials_client.__aenter__()
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
@@ -76,6 +82,8 @@ class AssessmentEngine:
             await self.vicc_client.__aexit__(exc_type, exc_val, exc_tb)
         if self.civic_client:
             await self.civic_client.__aexit__(exc_type, exc_val, exc_tb)
+        if self.clinical_trials_client:
+            await self.clinical_trials_client.__aexit__(exc_type, exc_val, exc_tb)
 
     async def assess_variant(self, variant_input: VariantInput) -> ActionabilityAssessment:
         """Assess a single variant.
@@ -142,7 +150,18 @@ class AssessmentEngine:
                 )
             return []
 
-        evidence, fda_approvals_raw, cgi_biomarkers_raw, vicc_associations_raw, civic_assertions_raw = await asyncio.gather(
+        async def fetch_clinical_trials():
+            if self.clinical_trials_client:
+                return await self.clinical_trials_client.search_trials(
+                    gene=variant_input.gene,
+                    variant=normalized_variant,
+                    tumor_type=resolved_tumor_type,
+                    recruiting_only=True,
+                    max_results=10,
+                )
+            return []
+
+        evidence, fda_approvals_raw, cgi_biomarkers_raw, vicc_associations_raw, civic_assertions_raw, clinical_trials_raw = await asyncio.gather(
             self.myvariant_client.fetch_evidence(
                 gene=variant_input.gene,
                 variant=normalized_variant,  # Use normalized variant for API query
@@ -159,6 +178,7 @@ class AssessmentEngine:
             ),
             fetch_vicc(),
             fetch_civic_assertions(),
+            fetch_clinical_trials(),
             return_exceptions=True
         )
 
@@ -188,6 +208,10 @@ class AssessmentEngine:
         if isinstance(civic_assertions_raw, Exception):
             print(f"  Warning: CIViC Assertions API failed: {str(civic_assertions_raw)}")
             civic_assertions_raw = []
+
+        if isinstance(clinical_trials_raw, Exception):
+            print(f"  Warning: ClinicalTrials.gov API failed: {str(clinical_trials_raw)}")
+            clinical_trials_raw = []
 
         # Parse FDA approval data and add to evidence
         if fda_approvals_raw:
@@ -262,6 +286,25 @@ class AssessmentEngine:
                     is_resistance=assertion.is_resistance(),
                 ))
             evidence.civic_assertions = civic_assertions_evidence
+
+        # Add clinical trials to evidence
+        if clinical_trials_raw:
+            clinical_trials_evidence = []
+            for trial in clinical_trials_raw:
+                # Check if trial mentions the specific variant
+                variant_specific = trial.mentions_variant(normalized_variant)
+                clinical_trials_evidence.append(ClinicalTrialEvidence(
+                    nct_id=trial.nct_id,
+                    title=trial.title,
+                    status=trial.status,
+                    phase=trial.phase,
+                    conditions=trial.conditions,
+                    interventions=trial.interventions,
+                    sponsor=trial.sponsor,
+                    url=trial.url,
+                    variant_specific=variant_specific,
+                ))
+            evidence.clinical_trials = clinical_trials_evidence
 
         # Step 4: Assess with LLM (must run sequentially since it depends on evidence)
         # Use original variant notation for display/reporting
