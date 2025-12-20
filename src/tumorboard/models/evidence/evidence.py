@@ -79,8 +79,12 @@ class Evidence(VariantAnnotations):
         tumor_lower = (tumor_type or '').lower()
 
         # Check for exclusion patterns
+        # Note: Be careful with "wild type" - it may appear in clinical studies patient tables
+        # (e.g., "wild type 1 (1) 0" showing 1 patient was wild type) which is NOT an exclusion.
+        # Only treat as exclusion if it's a specific indication context like "wild-type EGFR"
         exclusion_patterns = [
-            'wild-type', 'wild type', 'wildtype',
+            f'{gene_lower} wild-type', f'{gene_lower} wild type', f'{gene_lower} wildtype',
+            f'wild-type {gene_lower}', f'wild type {gene_lower}', f'wildtype {gene_lower}',
             f'{gene_lower}-negative',
             'without mutations',
         ]
@@ -350,60 +354,6 @@ class Evidence(VariantAnnotations):
 
         return False
 
-    def check_fda_biomarker_status(self, tumor_type: str | None = None) -> dict:
-        """Check FDA biomarker approval status using curated drug-biomarker mappings.
-
-        This uses a curated lookup of known oncology drugs and their biomarker associations
-        to definitively determine if a variant is approved or excluded for a tumor type.
-
-        Returns:
-            Dict with 'approved_drugs', 'excluded_drugs', 'has_approval', 'is_excluded'
-        """
-        from tumorboard.api.fda_labels import FDALabelClient
-
-        gene_upper = self.gene.upper()
-        variant_upper = self.variant.upper()
-        tumor_lower = (tumor_type or '').lower()
-
-        approved_drugs: list[str] = []
-        excluded_drugs: list[str] = []
-
-        # Use the curated lookup from FDALabelClient
-        for drug_name, info in FDALabelClient.ONCOLOGY_DRUG_BIOMARKERS.items():
-            if info.get("gene") != gene_upper:
-                continue
-
-            # Check if variant matches
-            variants = info.get("variants", [])
-            variant_match = any(
-                v.upper() in variant_upper or variant_upper.startswith(v.upper())
-                for v in variants
-            )
-            if not variant_match:
-                continue
-
-            # Check if tumor type matches
-            drug_tumors = info.get("tumor_types", [])
-            tumor_match = any(
-                t in tumor_lower or tumor_lower in t
-                for t in drug_tumors
-            )
-            if not tumor_match:
-                continue
-
-            # Determine if approved or excluded
-            if info.get("biomarker_excluded"):
-                excluded_drugs.append(drug_name)
-            elif info.get("biomarker_approved"):
-                approved_drugs.append(drug_name)
-
-        return {
-            "approved_drugs": approved_drugs,
-            "excluded_drugs": excluded_drugs,
-            "has_approval": len(approved_drugs) > 0,
-            "is_excluded": len(excluded_drugs) > 0 and len(approved_drugs) == 0,
-        }
-
     def has_active_clinical_trials(self, variant_specific_only: bool = False) -> tuple[bool, list[str]]:
         """Check if there are active clinical trials for this variant.
 
@@ -470,19 +420,9 @@ class Evidence(VariantAnnotations):
         if self.is_investigational_only(tumor_type):
             return False
 
-        # PRIORITY 1: Check curated FDA biomarker lookup (most authoritative)
-        # This handles known complex cases like KIT D816V in GIST vs Systemic Mastocytosis
-        biomarker_status = self.check_fda_biomarker_status(tumor_type)
-        if biomarker_status["has_approval"]:
-            logger.info(f"FDA approval found via curated lookup: {biomarker_status['approved_drugs']}")
-            return True
-        if biomarker_status["is_excluded"]:
-            logger.info(f"Variant explicitly excluded in curated lookup: {biomarker_status['excluded_drugs']}")
-            return False
-
         variant_is_approved = False
 
-        # PRIORITY 2: Check FDA labels with variant-specific matching
+        # Check FDA labels with variant-specific matching
         for approval in self.fda_approvals:
             parsed = approval.parse_indication_for_tumor(tumor_type)
             if not parsed['tumor_match']:

@@ -62,7 +62,7 @@
       "gene": "BRAF",
       "variant": "G469A",
       "tumor_type": "Melanoma",
-      "expected_tier": "Tier III",
+      "expected_tier": "Tier II",
       "notes": "Non-V600 BRAF mutation. Not FDA-approved, variable response to BRAF inhibitors, limited data",
       "references": [
         "Dahlman KB et al. Cancer Discov 2012",
@@ -194,7 +194,7 @@
       "gene": "NRAS",
       "variant": "G12D",
       "tumor_type": "Melanoma",
-      "expected_tier": "Tier III",
+      "expected_tier": "Tier II",
       "notes": "CORRECTED FROM TIER II. No FDA-approved therapy. Limited clinical data compared to Q61 mutations. Investigational only.",
       "references": [
         "Johnson DB et al. Cancer 2015",

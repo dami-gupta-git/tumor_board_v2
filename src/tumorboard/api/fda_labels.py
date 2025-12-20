@@ -13,8 +13,11 @@ Key Design:
 - Async HTTP with connection pooling (httpx.AsyncClient)
 """
 
+import asyncio
+import json
 from dataclasses import dataclass
 from typing import Any
+
 import httpx
 
 
@@ -31,9 +34,7 @@ class DrugLabelResult:
     generic_name: str | None
     indications: str
     biomarker_context: str | None
-    biomarker_approved: bool  # True if biomarker is in positive context
-    biomarker_excluded: bool  # True if biomarker is in exclusion context
-    tumor_types: list[str]  # Tumor types mentioned in indications
+    effective_date: str | None
     full_label: dict[str, Any]
 
     def mentions_biomarker(self, biomarker: str) -> bool:
@@ -67,84 +68,25 @@ class FDALabelClient:
 
     BASE_URL = "https://api.fda.gov/drug/label.json"
     DEFAULT_TIMEOUT = 15.0
+    DEFAULT_RETRIES = 3
+    DEFAULT_BACKOFF = 1.0
 
-    # Known oncology drugs with their biomarker associations
-    # This serves as a curated lookup for common queries
-    ONCOLOGY_DRUG_BIOMARKERS: dict[str, dict] = {
-        # KIT D816V drugs
-        "AYVAKIT": {
-            "gene": "KIT",
-            "variants": ["D816V", "D816"],
-            "tumor_types": ["systemic mastocytosis", "asm", "sm-ahn", "mcl"],
-            "biomarker_approved": True,
-        },
-        "RYDAPT": {
-            "gene": "KIT",
-            "variants": ["D816V", "D816"],
-            "tumor_types": ["systemic mastocytosis", "asm"],
-            "biomarker_approved": True,
-        },
-        "GLEEVEC": {
-            "gene": "KIT",
-            "variants": ["D816V"],
-            "tumor_types": ["gist", "gastrointestinal stromal"],
-            "biomarker_excluded": True,  # "without D816V"
-            "note": "Approved for GIST but EXCLUDES D816V mutations",
-        },
-        "IMATINIB": {
-            "gene": "KIT",
-            "variants": ["D816V"],
-            "tumor_types": ["gist", "gastrointestinal stromal", "systemic mastocytosis"],
-            "biomarker_excluded": True,  # "without D816V" for SM
-        },
-        # EGFR T790M drugs
-        "TAGRISSO": {
-            "gene": "EGFR",
-            "variants": ["T790M"],
-            "tumor_types": ["nsclc", "non-small cell lung cancer"],
-            "biomarker_approved": True,
-        },
-        # BRAF V600 drugs
-        "TAFINLAR": {
-            "gene": "BRAF",
-            "variants": ["V600E", "V600K"],
-            "tumor_types": ["melanoma", "nsclc", "anaplastic thyroid"],
-            "biomarker_approved": True,
-        },
-        "ZELBORAF": {
-            "gene": "BRAF",
-            "variants": ["V600E"],
-            "tumor_types": ["melanoma"],
-            "biomarker_approved": True,
-        },
-        "BRAFTOVI": {
-            "gene": "BRAF",
-            "variants": ["V600E", "V600K"],
-            "tumor_types": ["melanoma", "colorectal"],
-            "biomarker_approved": True,
-        },
-        # KRAS G12C drugs
-        "LUMAKRAS": {
-            "gene": "KRAS",
-            "variants": ["G12C"],
-            "tumor_types": ["nsclc", "non-small cell lung cancer"],
-            "biomarker_approved": True,
-        },
-        "KRAZATI": {
-            "gene": "KRAS",
-            "variants": ["G12C"],
-            "tumor_types": ["nsclc", "non-small cell lung cancer"],
-            "biomarker_approved": True,
-        },
-    }
-
-    def __init__(self, timeout: float = DEFAULT_TIMEOUT):
+    def __init__(
+        self,
+        timeout: float = DEFAULT_TIMEOUT,
+        retries: int = DEFAULT_RETRIES,
+        backoff: float = DEFAULT_BACKOFF,
+    ):
         """Initialize the FDA Label client.
 
         Args:
             timeout: Request timeout in seconds
+            retries: Number of retry attempts per search term
+            backoff: Base backoff time in seconds (exponential)
         """
         self.timeout = timeout
+        self.retries = retries
+        self.backoff = backoff
         self._client: httpx.AsyncClient | None = None
 
     async def __aenter__(self) -> "FDALabelClient":
@@ -164,263 +106,111 @@ class FDALabelClient:
             self._client = httpx.AsyncClient(timeout=self.timeout)
         return self._client
 
-    def _extract_tumor_types(self, indications: str) -> list[str]:
-        """Extract tumor types mentioned in indications."""
-        tumor_keywords = [
-            "non-small cell lung cancer", "nsclc",
-            "melanoma",
-            "colorectal cancer", "colorectal",
-            "breast cancer",
-            "gastrointestinal stromal tumor", "gist",
-            "systemic mastocytosis", "asm", "sm-ahn", "mcl",
-            "thyroid cancer", "anaplastic thyroid",
-            "renal cell carcinoma",
-            "hepatocellular carcinoma",
-            "pancreatic cancer",
-            "ovarian cancer",
-            "prostate cancer",
-            "acute myeloid leukemia", "aml",
-        ]
-
-        indications_lower = indications.lower()
-        found = []
-        for tumor in tumor_keywords:
-            if tumor in indications_lower:
-                found.append(tumor)
-
-        return list(set(found))
-
-    def _check_biomarker_context(
-        self,
-        indications: str,
-        biomarker: str
-    ) -> tuple[bool, bool, str | None]:
-        """Check if biomarker is approved or excluded in indications.
-
-        Args:
-            indications: Full indications text
-            biomarker: Biomarker to check (e.g., "D816V")
-
-        Returns:
-            Tuple of (is_approved, is_excluded, context_snippet)
-        """
-        indications_lower = indications.lower()
-        biomarker_lower = biomarker.lower()
-
-        if biomarker_lower not in indications_lower:
-            return False, False, None
-
-        # Find the biomarker mention
-        idx = indications_lower.find(biomarker_lower)
-        context_start = max(0, idx - 150)
-        context_end = min(len(indications), idx + len(biomarker) + 150)
-        context = indications[context_start:context_end]
-        context_lower = context.lower()
-
-        # Check for exclusion patterns
-        exclusion_patterns = [
-            f"without the {biomarker_lower}",
-            f"without {biomarker_lower}",
-            f"no {biomarker_lower}",
-            f"not {biomarker_lower}",
-            f"excluding {biomarker_lower}",
-            f"absence of {biomarker_lower}",
-            f"negative for {biomarker_lower}",
-            f"{biomarker_lower} mutation-negative",
-            f"{biomarker_lower}-negative",
-        ]
-
-        is_excluded = any(pattern in context_lower for pattern in exclusion_patterns)
-
-        # Check for positive/approval patterns
-        approval_patterns = [
-            f"with {biomarker_lower}",
-            f"{biomarker_lower} mutation-positive",
-            f"{biomarker_lower}-positive",
-            f"positive for {biomarker_lower}",
-            f"harboring {biomarker_lower}",
-            f"expressing {biomarker_lower}",
-        ]
-
-        is_approved = any(pattern in context_lower for pattern in approval_patterns)
-
-        # If mentioned but not explicitly excluded, consider it approved
-        # (some labels just state the indication without "positive" language)
-        if not is_excluded and not is_approved:
-            # Check if it's in a resistance context
-            resistance_patterns = [
-                "not considered sensitive",
-                "resistant to",
-                "resistance to",
-                "lack of response",
-                "poor response",
-            ]
-            is_resistance = any(pattern in context_lower for pattern in resistance_patterns)
-            if not is_resistance:
-                is_approved = True
-
-        return is_approved, is_excluded, context
-
     async def query_drug_label(
         self,
-        brand_name: str,
+        brand_name: str | None = None,
+        generic_name: str | None = None,
         biomarker: str | None = None,
+        limit: int = 5,
     ) -> DrugLabelResult | None:
-        """Query FDA label for a specific drug by brand name.
+        """Query openFDA Drug Labeling API.
+
+        Provide either brand_name (e.g., "Tibsovo" or "TIBSOVO") or generic_name
+        (e.g., "ivosidenib").
 
         Args:
-            brand_name: Drug brand name (e.g., "AYVAKIT", "TAGRISSO")
-            biomarker: Optional biomarker to check context for (e.g., "D816V")
+            brand_name: Drug brand name
+            generic_name: Drug generic name
+            biomarker: Optional biomarker to extract context for
+            limit: Maximum number of results
 
         Returns:
             DrugLabelResult or None if not found
         """
         client = self._get_client()
 
-        params = {
-            "search": f'openfda.brand_name:"{brand_name}"',
-            "limit": 1
-        }
+        # Build search query - try multiple variations
+        search_terms = []
+        if brand_name:
+            search_terms.extend([
+                f'openfda.brand_name:"{brand_name}"',
+                f'openfda.brand_name:{brand_name}',  # Partial match
+                f'openfda.brand_name.exact:"{brand_name.upper()}"'
+            ])
+        if generic_name:
+            search_terms.extend([
+                f'openfda.generic_name:"{generic_name}"',
+                f'openfda.generic_name:{generic_name}'
+            ])
 
-        try:
-            response = await client.get(self.BASE_URL, params=params)
-            response.raise_for_status()
-            data = response.json()
-        except httpx.HTTPStatusError as e:
-            if e.response.status_code == 404:
-                return None
-            raise FDALabelError(f"FDA API error: {e}")
-        except Exception as e:
-            raise FDALabelError(f"Failed to query FDA API: {e}")
+        if not search_terms:
+            raise ValueError("Provide at least brand_name or generic_name.")
 
-        if "results" not in data or len(data["results"]) == 0:
-            return None
+        # Try each search term until one works
+        for search_query in search_terms:
+            params = {"search": search_query, "limit": limit}
 
-        label = data["results"][0]
+            for attempt in range(self.retries):
+                try:
+                    response = await client.get(self.BASE_URL, params=params)
+                    if response.status_code != 200:
+                        raise httpx.HTTPStatusError(
+                            f"HTTP {response.status_code}",
+                            request=response.request,
+                            response=response
+                        )
 
-        # Extract indications
-        indications_raw = label.get("indications_and_usage", [])
-        if isinstance(indications_raw, list):
-            indications = " ".join(str(item) for item in indications_raw)
-        else:
-            indications = str(indications_raw)
+                    data = response.json()
+                    if 'results' not in data or len(data['results']) == 0:
+                        raise ValueError("No results for this search term.")
 
-        # Get generic name
-        openfda = label.get("openfda", {})
-        generic_names = openfda.get("generic_name", [])
-        generic_name = generic_names[0] if generic_names else None
+                    # Success - process the latest/most relevant label
+                    label = data['results'][0]
+                    indications_raw = label.get('indications_and_usage', ['No indications found'])
 
-        # Extract tumor types
-        tumor_types = self._extract_tumor_types(indications)
+                    indications_text = ""
+                    for item in indications_raw:
+                        if isinstance(item, str):
+                            indications_text += item + "\n"
+                        elif isinstance(item, dict):
+                            indications_text += json.dumps(item) + "\n"
 
-        # Check biomarker context if provided
-        biomarker_context = None
-        biomarker_approved = False
-        biomarker_excluded = False
+                    indications_text = indications_text.strip()
 
-        if biomarker:
-            biomarker_approved, biomarker_excluded, biomarker_context = \
-                self._check_biomarker_context(indications, biomarker)
+                    # Extract biomarker context if provided
+                    biomarker_context = None
+                    if biomarker:
+                        lower_text = indications_text.lower()
+                        if biomarker.lower() in lower_text:
+                            start = max(0, lower_text.find(biomarker.lower()) - 150)
+                            end = min(len(indications_text), lower_text.find(biomarker.lower()) + len(biomarker) + 150)
+                            biomarker_context = indications_text[start:end]
+                        else:
+                            biomarker_context = f"No direct mention of {biomarker} (may be covered broadly under gene name)."
 
-        return DrugLabelResult(
-            brand_name=brand_name.upper(),
-            generic_name=generic_name,
-            indications=indications,
-            biomarker_context=biomarker_context,
-            biomarker_approved=biomarker_approved,
-            biomarker_excluded=biomarker_excluded,
-            tumor_types=tumor_types,
-            full_label=label,
-        )
+                    # Get generic name from openfda
+                    openfda = label.get("openfda", {})
+                    generic_names = openfda.get("generic_name", [])
+                    found_generic = generic_names[0] if generic_names else None
 
-    async def check_variant_approval(
-        self,
-        gene: str,
-        variant: str,
-        tumor_type: str,
-    ) -> dict[str, Any]:
-        """Check if a variant is approved for a tumor type across known drugs.
+                    # Get brand name from openfda
+                    brand_names = openfda.get("brand_name", [])
+                    found_brand = brand_names[0] if brand_names else (brand_name or "Unknown")
 
-        This uses the curated ONCOLOGY_DRUG_BIOMARKERS lookup plus live API queries.
+                    return DrugLabelResult(
+                        brand_name=found_brand,
+                        generic_name=found_generic,
+                        indications=indications_text,
+                        biomarker_context=biomarker_context,
+                        effective_date=label.get('effective_time', 'Unknown'),
+                        full_label=label,
+                    )
 
-        Args:
-            gene: Gene symbol (e.g., "KIT")
-            variant: Variant notation (e.g., "D816V")
-            tumor_type: Tumor type (e.g., "Systemic Mastocytosis")
+                except Exception:
+                    if attempt < self.retries - 1:
+                        await asyncio.sleep(self.backoff * (2 ** attempt))
 
-        Returns:
-            Dict with 'approved_drugs', 'excluded_drugs', and 'details'
-        """
-        gene_upper = gene.upper()
-        variant_upper = variant.upper()
-        tumor_lower = tumor_type.lower()
-
-        approved_drugs: list[str] = []
-        excluded_drugs: list[str] = []
-        details: list[dict] = []
-
-        # Check curated lookup first
-        for drug_name, info in self.ONCOLOGY_DRUG_BIOMARKERS.items():
-            if info.get("gene") != gene_upper:
-                continue
-
-            # Check if variant matches
-            variants = info.get("variants", [])
-            variant_match = any(
-                v.upper() in variant_upper or variant_upper in v.upper()
-                for v in variants
-            )
-            if not variant_match:
-                continue
-
-            # Check if tumor type matches
-            drug_tumors = info.get("tumor_types", [])
-            tumor_match = any(
-                t in tumor_lower or tumor_lower in t
-                for t in drug_tumors
-            )
-            if not tumor_match:
-                continue
-
-            # Determine if approved or excluded
-            if info.get("biomarker_excluded"):
-                excluded_drugs.append(drug_name)
-                details.append({
-                    "drug": drug_name,
-                    "status": "excluded",
-                    "note": info.get("note", "Biomarker explicitly excluded"),
-                })
-            elif info.get("biomarker_approved"):
-                approved_drugs.append(drug_name)
-                details.append({
-                    "drug": drug_name,
-                    "status": "approved",
-                    "note": f"FDA-approved for {variant} in {tumor_type}",
-                })
-
-        # Query live API for drugs in approved/excluded lists
-        for drug_name in approved_drugs + excluded_drugs:
-            try:
-                result = await self.query_drug_label(drug_name, biomarker=variant)
-                if result:
-                    # Update details with live context
-                    for detail in details:
-                        if detail["drug"] == drug_name:
-                            detail["context"] = result.biomarker_context
-                            detail["tumor_types"] = result.tumor_types
-            except Exception:
-                pass  # Continue even if live query fails
-
-        return {
-            "gene": gene,
-            "variant": variant,
-            "tumor_type": tumor_type,
-            "approved_drugs": approved_drugs,
-            "excluded_drugs": excluded_drugs,
-            "has_approval": len(approved_drugs) > 0,
-            "is_excluded": len(excluded_drugs) > 0 and len(approved_drugs) == 0,
-            "details": details,
-        }
+        return None
 
     async def close(self) -> None:
         """Close the HTTP client."""
@@ -431,36 +221,19 @@ class FDALabelClient:
 
 # Convenience function for one-off queries
 async def query_drug_label(
-    brand_name: str,
+    brand_name: str | None = None,
+    generic_name: str | None = None,
     biomarker: str | None = None,
 ) -> DrugLabelResult | None:
-    """Query FDA label for a drug by brand name.
+    """Query FDA label for a drug by brand name or generic name.
 
     Args:
-        brand_name: Drug brand name (e.g., "AYVAKIT")
-        biomarker: Optional biomarker to check (e.g., "D816V")
+        brand_name: Drug brand name (e.g., "Tibsovo")
+        generic_name: Drug generic name (e.g., "ivosidenib")
+        biomarker: Optional biomarker to check (e.g., "IDH1", "R132C")
 
     Returns:
         DrugLabelResult or None
     """
     async with FDALabelClient() as client:
-        return await client.query_drug_label(brand_name, biomarker)
-
-
-async def check_variant_approval(
-    gene: str,
-    variant: str,
-    tumor_type: str,
-) -> dict[str, Any]:
-    """Check if a variant is approved for a tumor type.
-
-    Args:
-        gene: Gene symbol
-        variant: Variant notation
-        tumor_type: Tumor type
-
-    Returns:
-        Dict with approval status and details
-    """
-    async with FDALabelClient() as client:
-        return await client.check_variant_approval(gene, variant, tumor_type)
+        return await client.query_drug_label(brand_name, generic_name, biomarker)
