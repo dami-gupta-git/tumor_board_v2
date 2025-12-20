@@ -178,35 +178,86 @@ class AssessmentEngine:
             return []
 
         async def fetch_literature():
-            """Fetch literature from Semantic Scholar, falling back to PubMed on rate limit."""
+            """Fetch literature from Semantic Scholar, falling back to PubMed on rate limit.
+
+            Searches both resistance literature AND general variant literature to capture:
+            - Resistance papers (e.g., EGFR C797S osimertinib resistance)
+            - Mechanistic papers (e.g., TP53 R175H promoting proliferation)
+            - Therapeutic studies not framed as "resistance"
+            """
             if self.semantic_scholar_client:
                 try:
-                    # Try Semantic Scholar first (has TLDR, citations)
-                    papers = await self.semantic_scholar_client.search_resistance_literature(
-                        gene=variant_input.gene,
-                        variant=normalized_variant,
-                        max_results=5,
-                    )
-                    # Return tuple: (papers, source)
-                    return (papers, "semantic_scholar")
-                except SemanticScholarRateLimitError:
-                    print("  Semantic Scholar rate limit hit, falling back to PubMed...")
-                    # Fall back to PubMed
-                    if self.pubmed_client:
-                        articles = await self.pubmed_client.search_resistance_literature(
+                    # Search both resistance AND general variant literature
+                    resistance_papers, variant_papers = await asyncio.gather(
+                        self.semantic_scholar_client.search_resistance_literature(
                             gene=variant_input.gene,
                             variant=normalized_variant,
-                            max_results=5,
+                            max_results=3,
+                        ),
+                        self.semantic_scholar_client.search_variant_literature(
+                            gene=variant_input.gene,
+                            variant=normalized_variant,
+                            tumor_type=resolved_tumor_type,
+                            max_results=3,
+                        ),
+                    )
+                    # Merge and deduplicate by paper_id
+                    seen_ids = set()
+                    merged_papers = []
+                    for paper in resistance_papers + variant_papers:
+                        if paper.paper_id not in seen_ids:
+                            seen_ids.add(paper.paper_id)
+                            merged_papers.append(paper)
+                    # Return tuple: (papers, source)
+                    return (merged_papers[:6], "semantic_scholar")
+                except SemanticScholarRateLimitError:
+                    print("  Semantic Scholar rate limit hit, falling back to PubMed...")
+                    # Fall back to PubMed with both search types
+                    if self.pubmed_client:
+                        resistance_articles, variant_articles = await asyncio.gather(
+                            self.pubmed_client.search_resistance_literature(
+                                gene=variant_input.gene,
+                                variant=normalized_variant,
+                                max_results=3,
+                            ),
+                            self.pubmed_client.search_variant_literature(
+                                gene=variant_input.gene,
+                                variant=normalized_variant,
+                                tumor_type=resolved_tumor_type,
+                                max_results=3,
+                            ),
                         )
-                        return (articles, "pubmed")
+                        # Merge and deduplicate by pmid
+                        seen_pmids = set()
+                        merged_articles = []
+                        for article in resistance_articles + variant_articles:
+                            if article.pmid not in seen_pmids:
+                                seen_pmids.add(article.pmid)
+                                merged_articles.append(article)
+                        return (merged_articles[:6], "pubmed")
             elif self.pubmed_client:
-                # Only PubMed available
-                articles = await self.pubmed_client.search_resistance_literature(
-                    gene=variant_input.gene,
-                    variant=normalized_variant,
-                    max_results=5,
+                # Only PubMed available - search both types
+                resistance_articles, variant_articles = await asyncio.gather(
+                    self.pubmed_client.search_resistance_literature(
+                        gene=variant_input.gene,
+                        variant=normalized_variant,
+                        max_results=3,
+                    ),
+                    self.pubmed_client.search_variant_literature(
+                        gene=variant_input.gene,
+                        variant=normalized_variant,
+                        tumor_type=resolved_tumor_type,
+                        max_results=3,
+                    ),
                 )
-                return (articles, "pubmed")
+                # Merge and deduplicate
+                seen_pmids = set()
+                merged_articles = []
+                for article in resistance_articles + variant_articles:
+                    if article.pmid not in seen_pmids:
+                        seen_pmids.add(article.pmid)
+                        merged_articles.append(article)
+                return (merged_articles[:6], "pubmed")
             return ([], None)
 
         evidence, fda_approvals_raw, cgi_biomarkers_raw, vicc_associations_raw, civic_assertions_raw, clinical_trials_raw, literature_raw = await asyncio.gather(
