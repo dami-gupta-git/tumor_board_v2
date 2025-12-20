@@ -281,15 +281,11 @@ class SemanticScholarClient:
 
             return self._parse_paper(data, pmid)
 
-        except httpx.HTTPStatusError as e:
-            if e.response.status_code == 429:
-                print(f"Semantic Scholar rate limit hit for PMID {pmid}")
+        except httpx.HTTPStatusError:
             return None
-        except httpx.HTTPError as e:
-            print(f"Semantic Scholar API error for PMID {pmid}: {e}")
+        except httpx.HTTPError:
             return None
-        except Exception as e:
-            print(f"Semantic Scholar parse error for PMID {pmid}: {e}")
+        except Exception:
             return None
 
     async def get_papers_by_pmids(self, pmids: list[str]) -> dict[str, SemanticPaperInfo]:
@@ -343,8 +339,7 @@ class SemanticScholarClient:
 
             return results
 
-        except httpx.HTTPError as e:
-            print(f"Semantic Scholar batch API error: {e}")
+        except httpx.HTTPError:
             # Fall back to individual requests
             return await self._get_papers_individually(pmids)
 
@@ -397,8 +392,7 @@ class SemanticScholarClient:
                 publication_types=data.get("publicationTypes", []) or [],
             )
 
-        except Exception as e:
-            print(f"Error parsing Semantic Scholar paper data: {e}")
+        except Exception:
             return None
 
     async def search_papers(
@@ -465,10 +459,8 @@ class SemanticScholarClient:
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 429:
                 raise SemanticScholarRateLimitError("Semantic Scholar rate limit exceeded")
-            print(f"Semantic Scholar search error: {e}")
             return []
-        except httpx.HTTPError as e:
-            print(f"Semantic Scholar search error: {e}")
+        except httpx.HTTPError:
             return []
 
     async def search_resistance_literature(

@@ -27,6 +27,11 @@ class PubMedError(Exception):
     pass
 
 
+class PubMedRateLimitError(PubMedError):
+    """Exception raised when PubMed rate limit (429) is hit."""
+    pass
+
+
 @dataclass
 class PubMedArticle:
     """A research article from PubMed."""
@@ -295,11 +300,13 @@ class PubMedClient:
             pmids = result.get('idlist', [])
             return pmids
 
-        except httpx.HTTPError as e:
-            print(f"PubMed search warning: {e}")
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 429:
+                raise PubMedRateLimitError("PubMed rate limit exceeded")
             return []
-        except Exception as e:
-            print(f"PubMed parse warning: {e}")
+        except httpx.HTTPError:
+            return []
+        except Exception:
             return []
 
     async def _fetch_articles(self, pmids: list[str]) -> list[PubMedArticle]:
@@ -342,14 +349,15 @@ class PubMedClient:
 
             return articles
 
-        except httpx.HTTPError as e:
-            print(f"PubMed fetch warning: {e}")
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 429:
+                raise PubMedRateLimitError("PubMed rate limit exceeded")
             return []
-        except ET.ParseError as e:
-            print(f"PubMed XML parse warning: {e}")
+        except httpx.HTTPError:
             return []
-        except Exception as e:
-            print(f"PubMed parse warning: {e}")
+        except ET.ParseError:
+            return []
+        except Exception:
             return []
 
     def _parse_article(self, article_elem: ET.Element) -> PubMedArticle | None:

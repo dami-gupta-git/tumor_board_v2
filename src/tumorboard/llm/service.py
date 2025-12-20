@@ -210,13 +210,17 @@ class LLMService:
 
         tumor_context = tumor_type or "cancer (unspecified)"
 
-        system_prompt = """You are an expert oncology literature analyst. Your task is to evaluate whether a scientific paper is relevant to a specific gene variant in a specific tumor type.
+        system_prompt = """You are an expert oncology literature analyst. Your task is to evaluate whether a scientific paper is relevant to understanding a specific gene variant in a specific tumor type.
 
-Be STRICT about relevance:
-- The paper must specifically discuss the queried variant (not just the gene)
-- The paper must be relevant to the queried tumor type (not a different cancer)
+Be INCLUSIVE for clinically relevant papers:
+- Papers about the SAME EXON or SAME CODON are highly relevant (e.g., exon 17 papers for D816V)
+- Papers about drugs targeting this mutation class are relevant (e.g., avapritinib for KIT mutations in GIST)
+- Papers about resistance mechanisms in this tumor type are relevant
+- Papers about related variants in the SAME gene and SAME tumor are relevant
+
+Be STRICT only about tumor type:
 - A paper about KIT D816V in mastocytosis is NOT relevant if we're asking about GIST
-- A paper about KIT exon 11 mutations is NOT relevant if we're asking about D816V
+- A paper about a completely different gene is NOT relevant
 
 Return valid JSON only, no markdown."""
 
@@ -228,19 +232,22 @@ CONTENT: {text_content[:1500]}
 
 Return JSON with these exact fields:
 {{
-    "relevance_score": <float 0-1, where 1 = directly discusses {variant} in {tumor_context}>,
+    "relevance_score": <float 0-1, see scoring guide below>,
     "signal_type": "<'resistance' if variant causes drug resistance, 'sensitivity' if variant predicts response, 'mixed' if both, 'prognostic' if about outcomes not treatment, 'unclear' if not determinable>",
-    "drugs_mentioned": [<list of specific drug names mentioned in relation to this variant>],
-    "key_finding": "<one sentence: what does this paper say about {gene} {variant} in {tumor_context}? If not relevant, explain why>",
+    "drugs_mentioned": [<list of specific drug names mentioned in relation to this gene/variant>],
+    "key_finding": "<one sentence: what does this paper say that's relevant to {gene} {variant} in {tumor_context}?>",
     "confidence": <float 0-1 for how confident you are in this assessment>
 }}
 
 Scoring guide:
 - 1.0: Directly studies {gene} {variant} in {tumor_context}
-- 0.8: Studies {gene} {variant} in closely related context
-- 0.5: Mentions {gene} {variant} but different tumor type
-- 0.3: Studies {gene} but different variant
-- 0.0: Not relevant to this query"""
+- 0.9: Studies drugs targeting {gene} mutations (including {variant}) in {tumor_context}
+- 0.8: Studies {gene} exon/codon mutations in {tumor_context} that include {variant}'s class
+- 0.7: Studies {gene} resistance mechanisms in {tumor_context}
+- 0.6: Studies {gene} {variant} in a related tumor context
+- 0.4: Mentions {gene} mutations but different tumor type entirely
+- 0.2: Studies {gene} but completely different mutation class
+- 0.0: Not relevant to {gene} or {tumor_context}"""
 
         messages = [
             {"role": "system", "content": system_prompt},

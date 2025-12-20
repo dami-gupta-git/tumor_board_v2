@@ -19,6 +19,7 @@ Key Design:
 """
 
 import asyncio
+import os
 from tumorboard.api.myvariant import MyVariantClient
 from tumorboard.api.fda import FDAClient
 from tumorboard.api.cgi import CGIClient
@@ -26,7 +27,7 @@ from tumorboard.api.oncotree import OncoTreeClient
 from tumorboard.api.vicc import VICCClient
 from tumorboard.api.civic import CIViCClient
 from tumorboard.api.clinicaltrials import ClinicalTrialsClient
-from tumorboard.api.pubmed import PubMedClient, PubMedArticle
+from tumorboard.api.pubmed import PubMedClient, PubMedArticle, PubMedRateLimitError
 from tumorboard.api.semantic_scholar import SemanticScholarClient, SemanticScholarRateLimitError
 from tumorboard.llm.service import LLMService
 from tumorboard.models.assessment import ActionabilityAssessment
@@ -56,7 +57,9 @@ class AssessmentEngine:
         self.vicc_client = VICCClient() if enable_vicc else None
         self.civic_client = CIViCClient() if enable_civic_assertions else None
         self.clinical_trials_client = ClinicalTrialsClient() if enable_clinical_trials else None
-        self.semantic_scholar_client = SemanticScholarClient() if enable_semantic_scholar else None
+        # Initialize Semantic Scholar with API key from environment if available
+        s2_api_key = os.environ.get("SEMANTIC_SCHOLAR_API_KEY")
+        self.semantic_scholar_client = SemanticScholarClient(api_key=s2_api_key) if enable_semantic_scholar else None
         self.pubmed_client = PubMedClient() if enable_semantic_scholar else None  # Fallback for rate limits
         self.enable_vicc = enable_vicc
         self.enable_civic_assertions = enable_civic_assertions
@@ -212,14 +215,47 @@ class AssessmentEngine:
                     # Return tuple: (papers, source)
                     return (merged_papers[:6], "semantic_scholar")
                 except SemanticScholarRateLimitError:
-                    print("  Semantic Scholar rate limit hit, falling back to PubMed...")
-                    # Fall back to PubMed with both search types
+                    # Fall back to PubMed with retry on rate limit
                     if self.pubmed_client:
+                        for attempt in range(3):  # Max 3 retries
+                            try:
+                                resistance_articles, variant_articles = await asyncio.gather(
+                                    self.pubmed_client.search_resistance_literature(
+                                        gene=variant_input.gene,
+                                        variant=normalized_variant,
+                                        tumor_type=resolved_tumor_type,
+                                        max_results=3,
+                                    ),
+                                    self.pubmed_client.search_variant_literature(
+                                        gene=variant_input.gene,
+                                        variant=normalized_variant,
+                                        tumor_type=resolved_tumor_type,
+                                        max_results=3,
+                                    ),
+                                )
+                                # Merge and deduplicate by pmid
+                                seen_pmids = set()
+                                merged_articles = []
+                                for article in resistance_articles + variant_articles:
+                                    if article.pmid not in seen_pmids:
+                                        seen_pmids.add(article.pmid)
+                                        merged_articles.append(article)
+                                return (merged_articles[:6], "pubmed")
+                            except PubMedRateLimitError:
+                                wait_time = 2 ** attempt  # Exponential backoff: 1s, 2s, 4s
+                                print(f"  Rate limit hit on both APIs, waiting {wait_time}s...")
+                                await asyncio.sleep(wait_time)
+                        # All retries exhausted
+                        print("  Warning: Literature search unavailable (rate limits)")
+                        return ([], None)
+            elif self.pubmed_client:
+                # Only PubMed available - search both types with retry
+                for attempt in range(3):
+                    try:
                         resistance_articles, variant_articles = await asyncio.gather(
                             self.pubmed_client.search_resistance_literature(
                                 gene=variant_input.gene,
                                 variant=normalized_variant,
-                                tumor_type=resolved_tumor_type,
                                 max_results=3,
                             ),
                             self.pubmed_client.search_variant_literature(
@@ -229,7 +265,7 @@ class AssessmentEngine:
                                 max_results=3,
                             ),
                         )
-                        # Merge and deduplicate by pmid
+                        # Merge and deduplicate
                         seen_pmids = set()
                         merged_articles = []
                         for article in resistance_articles + variant_articles:
@@ -237,29 +273,12 @@ class AssessmentEngine:
                                 seen_pmids.add(article.pmid)
                                 merged_articles.append(article)
                         return (merged_articles[:6], "pubmed")
-            elif self.pubmed_client:
-                # Only PubMed available - search both types
-                resistance_articles, variant_articles = await asyncio.gather(
-                    self.pubmed_client.search_resistance_literature(
-                        gene=variant_input.gene,
-                        variant=normalized_variant,
-                        max_results=3,
-                    ),
-                    self.pubmed_client.search_variant_literature(
-                        gene=variant_input.gene,
-                        variant=normalized_variant,
-                        tumor_type=resolved_tumor_type,
-                        max_results=3,
-                    ),
-                )
-                # Merge and deduplicate
-                seen_pmids = set()
-                merged_articles = []
-                for article in resistance_articles + variant_articles:
-                    if article.pmid not in seen_pmids:
-                        seen_pmids.add(article.pmid)
-                        merged_articles.append(article)
-                return (merged_articles[:6], "pubmed")
+                    except PubMedRateLimitError:
+                        wait_time = 2 ** attempt
+                        print(f"  PubMed rate limit hit, waiting {wait_time}s...")
+                        await asyncio.sleep(wait_time)
+                print("  Warning: Literature search unavailable (rate limits)")
+                return ([], None)
             return ([], None)
 
         evidence, fda_approvals_raw, cgi_biomarkers_raw, vicc_associations_raw, civic_assertions_raw, clinical_trials_raw, literature_raw = await asyncio.gather(
@@ -447,10 +466,7 @@ class AssessmentEngine:
 
                 # Skip papers that aren't relevant to this specific context
                 if not relevance["is_relevant"]:
-                    print(f"    Filtered out: {title[:60]}... (score: {relevance['relevance_score']:.2f}, reason: {relevance['key_finding'][:80]})")
                     return None
-
-                print(f"    Relevant: {title[:60]}... (score: {relevance['relevance_score']:.2f}, signal: {relevance['signal_type']})")
 
                 # Use LLM-extracted signal type and drugs instead of keyword matching
                 signal_type = relevance["signal_type"]
@@ -509,7 +525,6 @@ class AssessmentEngine:
 
             # Extract structured knowledge from relevant papers
             if pubmed_evidence:
-                print(f"  Extracting structured knowledge from {len(pubmed_evidence)} relevant papers...")
                 paper_contents = [
                     {
                         "title": p.title,
@@ -553,16 +568,6 @@ class AssessmentEngine:
                     confidence=knowledge_data.get("confidence", 0.0),
                 )
 
-                # Log extracted knowledge
-                if evidence.literature_knowledge.confidence > 0.5:
-                    print(f"    Literature Knowledge (confidence: {evidence.literature_knowledge.confidence:.2f}):")
-                    if evidence.literature_knowledge.resistant_to:
-                        drugs = ", ".join(evidence.literature_knowledge.get_resistance_drugs())
-                        print(f"      Resistant to: {drugs}")
-                    if evidence.literature_knowledge.sensitive_to:
-                        drugs = ", ".join(evidence.literature_knowledge.get_sensitivity_drugs())
-                        print(f"      Sensitive to: {drugs}")
-                    print(f"      Tier recommendation: {evidence.literature_knowledge.tier_recommendation.tier}")
 
         # Step 4: Assess with LLM (must run sequentially since it depends on evidence)
         # Use original variant notation for display/reporting
