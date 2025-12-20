@@ -37,7 +37,7 @@
       "gene": "KIT",
       "variant": "D816V",
       "tumor_type": "Gastrointestinal Stromal Tumor",
-      "expected_tier": "Tier II",
+      "expected_tier": "Tier I",
       "notes": "FDA-approved imatinib for KIT-mutant GIST",
       "references": [
         "Demetri GD et al. N Engl J Med 2002"

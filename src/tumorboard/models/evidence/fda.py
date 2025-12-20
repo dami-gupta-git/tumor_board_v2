@@ -33,6 +33,8 @@ class FDAApproval(BaseModel):
             'lung': ['lung', 'nsclc', 'non-small cell'],
             'breast': ['breast'],
             'thyroid': ['thyroid', 'atc', 'anaplastic thyroid'],
+            'gist': ['gist', 'gastrointestinal stromal tumor', 'gastrointestinal stromal'],
+            'gastrointestinal stromal tumor': ['gist', 'gastrointestinal stromal tumor', 'gastrointestinal stromal'],
         }
 
         tumor_match = False

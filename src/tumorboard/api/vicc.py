@@ -146,6 +146,36 @@ class VICCClient:
             self._client = httpx.AsyncClient(timeout=self.timeout)
         return self._client
 
+    def _get_kit_exon(self, variant: str) -> int | None:
+        """Get the KIT exon number from a variant string.
+
+        KIT exon boundaries (codon ranges):
+        - Exon 9: codons 503-510 (extracellular domain)
+        - Exon 11: codons 550-591 (juxtamembrane domain) - most common in GIST
+        - Exon 13: codons 627-664 (ATP binding)
+        - Exon 17: codons 788-828 (activation loop)
+
+        Args:
+            variant: Variant string (e.g., "W557_K558del", "V560D")
+
+        Returns:
+            Exon number or None if not determinable
+        """
+        import re
+        # Extract first position from variant (e.g., W557_K558del → 557, V560D → 560)
+        pos_match = re.search(r'[A-Z](\d+)', variant.upper())
+        if pos_match:
+            position = int(pos_match.group(1))
+            if 503 <= position <= 510:
+                return 9
+            elif 550 <= position <= 591:
+                return 11
+            elif 627 <= position <= 664:
+                return 13
+            elif 788 <= position <= 828:
+                return 17
+        return None
+
     def _build_query(self, gene: str, variant: str | None = None) -> str:
         """Build a Lucene query string for the VICC API.
 
@@ -165,6 +195,18 @@ class VICCClient:
             query_parts.append(clean_variant)
 
         return " AND ".join(query_parts)
+
+    def _build_exon_query(self, gene: str, exon: int) -> str:
+        """Build a Lucene query for exon-level search.
+
+        Args:
+            gene: Gene symbol (e.g., "KIT")
+            exon: Exon number (e.g., 11)
+
+        Returns:
+            Lucene query string for exon-level search
+        """
+        return f'{gene.upper()} AND "exon {exon}"'
 
     def _tumor_matches(self, vicc_disease: str, tumor_type: str | None) -> bool:
         """Check if VICC disease matches user tumor type.
@@ -306,6 +348,55 @@ class VICCClient:
 
         return False
 
+    async def _fetch_with_query(
+        self,
+        query: str,
+        variant: str | None,
+        tumor_type: str | None,
+        max_results: int,
+    ) -> list[VICCAssociation]:
+        """Internal method to fetch associations with a specific query.
+
+        Args:
+            query: Lucene query string
+            variant: Optional variant for filtering compound mutations
+            tumor_type: Optional tumor type filter
+            max_results: Maximum results
+
+        Returns:
+            List of VICCAssociation objects
+        """
+        client = self._get_client()
+        url = f"{self.BASE_URL}/associations"
+        params = {"q": query, "size": max_results}
+
+        try:
+            response = await client.get(url, params=params)
+            response.raise_for_status()
+            data = response.json()
+        except httpx.HTTPError as e:
+            raise VICCError(f"VICC API request failed: {e}")
+        except Exception as e:
+            raise VICCError(f"Failed to parse VICC response: {e}")
+
+        associations = []
+        hits = data.get("hits", {}).get("hits", [])
+
+        for hit in hits:
+            assoc = self._parse_association(hit)
+            if assoc is None:
+                continue
+
+            if tumor_type and not self._tumor_matches(assoc.disease, tumor_type):
+                continue
+
+            if self._is_compound_mutation_resistance(assoc, variant):
+                continue
+
+            associations.append(assoc)
+
+        return associations
+
     async def fetch_associations(
         self,
         gene: str,
@@ -324,47 +415,26 @@ class VICCClient:
         Returns:
             List of VICCAssociation objects
         """
-        client = self._get_client()
-
-        # Build query
+        # Build primary query with exact variant
         query = self._build_query(gene, variant)
+        associations = await self._fetch_with_query(query, variant, tumor_type, max_results)
 
-        # Make request
-        url = f"{self.BASE_URL}/associations"
-        params = {
-            "q": query,
-            "size": max_results,
-        }
-
-        try:
-            response = await client.get(url, params=params)
-            response.raise_for_status()
-            data = response.json()
-            hits=data["hits"]
-
-        except httpx.HTTPError as e:
-            raise VICCError(f"VICC API request failed: {e}")
-        except Exception as e:
-            raise VICCError(f"Failed to parse VICC response: {e}")
-
-        # Parse hits
-        associations = []
-        hits = data.get("hits", {}).get("hits", [])
-
-        for hit in hits:
-            assoc = self._parse_association(hit)
-            if assoc is None:
-                continue
-
-            # Filter by tumor type if specified
-            if tumor_type and not self._tumor_matches(assoc.disease, tumor_type):
-                continue
-
-            # Filter out resistance entries that are about secondary/compound mutations
-            if self._is_compound_mutation_resistance(assoc, variant):
-                continue
-
-            associations.append(assoc)
+        # For KIT variants, also try exon-level search if we didn't find much
+        # This helps find evidence for deletions like W557_K558del which may be
+        # catalogued as "KIT exon 11 deletion" in databases
+        if gene.upper() == "KIT" and variant and len(associations) < 5:
+            exon = self._get_kit_exon(variant)
+            if exon:
+                exon_query = self._build_exon_query(gene, exon)
+                exon_associations = await self._fetch_with_query(
+                    exon_query, variant, tumor_type, max_results
+                )
+                # Add unique exon-level associations
+                seen_descriptions = {a.description for a in associations}
+                for assoc in exon_associations:
+                    if assoc.description not in seen_descriptions:
+                        associations.append(assoc)
+                        seen_descriptions.add(assoc.description)
 
         return associations
 

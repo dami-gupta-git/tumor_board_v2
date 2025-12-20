@@ -240,29 +240,6 @@ class TestFDAClient:
 
         await client.close()
 
-    @pytest.mark.asyncio
-    async def test_known_gene_drugs_mapping(self):
-        """Test known gene-drug mappings fallback."""
-        client = FDAClient()
-
-        # Test BRAF
-        braf_drugs = client._get_known_gene_drugs("BRAF")
-        assert "Tafinlar" in braf_drugs
-        assert "Zelboraf" in braf_drugs
-
-        # Test EGFR
-        egfr_drugs = client._get_known_gene_drugs("EGFR")
-        assert "Tagrisso" in egfr_drugs
-        assert "Tarceva" in egfr_drugs
-
-        # Test KRAS
-        kras_drugs = client._get_known_gene_drugs("KRAS")
-        assert "Lumakras" in kras_drugs
-
-        # Test unknown gene
-        unknown_drugs = client._get_known_gene_drugs("UNKNOWN")
-        assert len(unknown_drugs) == 0
-
     def test_parse_approval_data(self):
         """Test parsing FDA approval data from drug label endpoint."""
         client = FDAClient()

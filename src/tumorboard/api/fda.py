@@ -11,7 +11,7 @@ Key Design:
 - Structured parsing to typed FDAEvidence models
 - Context manager for session cleanup
 """
-
+import json
 from typing import Any
 
 import httpx
@@ -111,6 +111,7 @@ class FDAClient:
             response.raise_for_status()
             data = response.json()
 
+
             if "error" in data:
                 raise FDAAPIError(f"API error: {data['error']}")
 
@@ -188,6 +189,22 @@ class FDAClient:
                 for search_gene in genes_to_search:
                     gene_search = f'indications_and_usage:{search_gene}'
                     result = await self._query_drugsfda(gene_search, limit=15)
+                    for r in result.get("results", []):
+                        drug_id = r.get("openfda", {}).get("brand_name", [""])[0]
+                        if drug_id and drug_id not in seen_drugs:
+                            seen_drugs.add(drug_id)
+                            approvals.append(r)
+
+            # Strategy 3: For KIT variants, also search for GIST-specific approvals
+            # FDA labels for GIST often don't explicitly mention KIT but imply it
+            # since ~85% of GISTs have KIT mutations
+            if gene_upper == "KIT":
+                gist_searches = [
+                    'indications_and_usage:GIST',
+                    'indications_and_usage:"gastrointestinal stromal"',
+                ]
+                for gist_query in gist_searches:
+                    result = await self._query_drugsfda(gist_query, limit=10)
                     for r in result.get("results", []):
                         drug_id = r.get("openfda", {}).get("brand_name", [""])[0]
                         if drug_id and drug_id not in seen_drugs:
@@ -327,8 +344,8 @@ class FDAClient:
                 if indication_variant_note:
                     full_indication = indication_variant_note + "\n\n"
 
-                # Add truncated full indication
-                full_indication += indication_text[:1500] if indication_text else ""
+                # Add truncated full indication (2000 chars to capture multi-indication drugs)
+                full_indication += indication_text[:2000] if indication_text else ""
 
                 # Add clinical studies note if variant was found there (but not in indications)
                 if clinical_studies_note and not variant_in_indications:

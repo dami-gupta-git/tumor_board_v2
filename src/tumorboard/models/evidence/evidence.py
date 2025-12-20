@@ -109,13 +109,45 @@ class Evidence(VariantAnnotations):
             return False
 
         elif gene_lower == 'kit':
-            # Map variants to exons
+            # KIT exon boundaries (codon ranges)
+            # Exon 9: codons 503-510 (extracellular domain)
+            # Exon 11: codons 550-591 (juxtamembrane domain) - most common in GIST
+            # Exon 13: codons 627-664 (ATP binding)
+            # Exon 17: codons 788-828 (activation loop)
+
+            # Map specific variants to exons
             exon_map = {
-                'V560D': 9, 'V559D': 9,
-                'D816V': 17, 'D816H': 17, 'D816Y': 17,
+                # Exon 9
+                'A502_Y503DUP': 9, 'Y503_F504INSAY': 9,
+                # Exon 11 (most common GIST mutations)
+                'W557R': 11, 'W557G': 11, 'W557_K558DEL': 11,
+                'K558N': 11, 'K558E': 11, 'V559D': 11, 'V559A': 11, 'V559G': 11,
+                'V560D': 11, 'V560G': 11, 'V560E': 11,
+                'L576P': 11, 'P585P': 11,
+                # Exon 13
+                'K642E': 13,
+                # Exon 17
+                'D816V': 17, 'D816H': 17, 'D816Y': 17, 'D820Y': 17, 'N822K': 17,
             }
 
             variant_exon = exon_map.get(variant_upper)
+
+            # If not in map, try to extract exon from codon position for deletions/insertions
+            if not variant_exon:
+                import re
+                # Match patterns like W557_K558del, L576_P585del, V560del
+                pos_match = re.search(r'[A-Z](\d+)', variant_upper)
+                if pos_match:
+                    position = int(pos_match.group(1))
+                    # Determine exon from codon position
+                    if 503 <= position <= 510:
+                        variant_exon = 9
+                    elif 550 <= position <= 591:
+                        variant_exon = 11
+                    elif 627 <= position <= 664:
+                        variant_exon = 13
+                    elif 788 <= position <= 828:
+                        variant_exon = 17
 
             if variant.lower() in indication_text:
                 return True
@@ -123,11 +155,21 @@ class Evidence(VariantAnnotations):
             if variant_exon and f'exon {variant_exon}' in indication_text:
                 return True
 
-            # Broad "KIT-mutated" or "KIT-positive"
+            # Broad "KIT-mutated" or "KIT-positive" - common in GIST approvals
             if any(phrase in indication_text for phrase in [
                 'kit-positive', 'kit-mutated', 'kit mutation', 'kit (cd117)',
+                'kit-expressing', 'cd117-positive', 'cd117 positive',
             ]):
                 return True
+
+            # GIST-specific approvals: FDA labels for GIST often don't explicitly mention KIT
+            # but ~85% of GISTs have KIT mutations, and imatinib/sunitinib target KIT
+            # Exon 11 and 9 mutations are the primary sensitivity markers
+            if variant_exon in [9, 11, 13]:  # Sensitive exons
+                if any(phrase in indication_text for phrase in [
+                    'gist', 'gastrointestinal stromal tumor', 'gastrointestinal stromal tumour',
+                ]):
+                    return True
 
             return False
 
@@ -735,8 +777,10 @@ class Evidence(VariantAnnotations):
                         indication = (approval.indication or "")[:300]
                         lines.append(f"  • {drug} [OTHER INDICATIONS]: {indication}...")
                 else:
-                    indication = (approval.indication or "")[:800]
-                    lines.append(f"  • {drug}: {indication}...")
+                    indication = (approval.indication or "")[:300]
+                    date_str = f" (Approved: {approval.approval_date})" if approval.approval_date else ""
+                    status_str = f" [{approval.marketing_status}]" if approval.marketing_status else ""
+                    lines.append(f"  • {drug}{date_str}{status_str}: {indication}...")
             lines.append("")
 
         if self.cgi_biomarkers:
