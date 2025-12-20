@@ -1,7 +1,7 @@
 """Core assessment engine combining API and LLM services.
 
 ARCHITECTURE:
-    VariantInput → Normalize → MyVariantClient + FDAClient + CGIClient + CIViCClient + SemanticScholar → Evidence → LLMService → Assessment
+    VariantInput → Normalize → MyVariantClient + FDAClient + CGIClient + CIViCClient + SemanticScholar/PubMed → Evidence → LLMService → Assessment
 
 Orchestrates the pipeline with async concurrency for single and batch processing.
 
@@ -15,6 +15,7 @@ Key Design:
 - CGI biomarkers provide explicit FDA/NCCN approval status
 - CIViC Assertions provide curated AMP/ASCO/CAP tier classifications with NCCN guidelines
 - Semantic Scholar literature search with citation metrics and AI summaries (TLDR)
+- PubMed fallback when Semantic Scholar rate limit (429) is hit
 """
 
 import asyncio
@@ -25,7 +26,8 @@ from tumorboard.api.oncotree import OncoTreeClient
 from tumorboard.api.vicc import VICCClient
 from tumorboard.api.civic import CIViCClient
 from tumorboard.api.clinicaltrials import ClinicalTrialsClient
-from tumorboard.api.semantic_scholar import SemanticScholarClient
+from tumorboard.api.pubmed import PubMedClient, PubMedArticle
+from tumorboard.api.semantic_scholar import SemanticScholarClient, SemanticScholarRateLimitError
 from tumorboard.llm.service import LLMService
 from tumorboard.models.assessment import ActionabilityAssessment
 from tumorboard.models.evidence.cgi import CGIBiomarkerEvidence
@@ -55,6 +57,7 @@ class AssessmentEngine:
         self.civic_client = CIViCClient() if enable_civic_assertions else None
         self.clinical_trials_client = ClinicalTrialsClient() if enable_clinical_trials else None
         self.semantic_scholar_client = SemanticScholarClient() if enable_semantic_scholar else None
+        self.pubmed_client = PubMedClient() if enable_semantic_scholar else None  # Fallback for rate limits
         self.enable_vicc = enable_vicc
         self.enable_civic_assertions = enable_civic_assertions
         self.enable_clinical_trials = enable_clinical_trials
@@ -78,6 +81,8 @@ class AssessmentEngine:
             await self.clinical_trials_client.__aenter__()
         if self.semantic_scholar_client:
             await self.semantic_scholar_client.__aenter__()
+        if self.pubmed_client:
+            await self.pubmed_client.__aenter__()
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
@@ -93,6 +98,8 @@ class AssessmentEngine:
             await self.clinical_trials_client.__aexit__(exc_type, exc_val, exc_tb)
         if self.semantic_scholar_client:
             await self.semantic_scholar_client.__aexit__(exc_type, exc_val, exc_tb)
+        if self.pubmed_client:
+            await self.pubmed_client.__aexit__(exc_type, exc_val, exc_tb)
 
     async def assess_variant(self, variant_input: VariantInput) -> ActionabilityAssessment:
         """Assess a single variant.
@@ -170,15 +177,37 @@ class AssessmentEngine:
                 )
             return []
 
-        async def fetch_semantic_scholar_literature():
+        async def fetch_literature():
+            """Fetch literature from Semantic Scholar, falling back to PubMed on rate limit."""
             if self.semantic_scholar_client:
-                # Search for resistance-related literature for this variant
-                return await self.semantic_scholar_client.search_resistance_literature(
+                try:
+                    # Try Semantic Scholar first (has TLDR, citations)
+                    papers = await self.semantic_scholar_client.search_resistance_literature(
+                        gene=variant_input.gene,
+                        variant=normalized_variant,
+                        max_results=5,
+                    )
+                    # Return tuple: (papers, source)
+                    return (papers, "semantic_scholar")
+                except SemanticScholarRateLimitError:
+                    print("  Semantic Scholar rate limit hit, falling back to PubMed...")
+                    # Fall back to PubMed
+                    if self.pubmed_client:
+                        articles = await self.pubmed_client.search_resistance_literature(
+                            gene=variant_input.gene,
+                            variant=normalized_variant,
+                            max_results=5,
+                        )
+                        return (articles, "pubmed")
+            elif self.pubmed_client:
+                # Only PubMed available
+                articles = await self.pubmed_client.search_resistance_literature(
                     gene=variant_input.gene,
                     variant=normalized_variant,
                     max_results=5,
                 )
-            return []
+                return (articles, "pubmed")
+            return ([], None)
 
         evidence, fda_approvals_raw, cgi_biomarkers_raw, vicc_associations_raw, civic_assertions_raw, clinical_trials_raw, literature_raw = await asyncio.gather(
             self.myvariant_client.fetch_evidence(
@@ -198,7 +227,7 @@ class AssessmentEngine:
             fetch_vicc(),
             fetch_civic_assertions(),
             fetch_clinical_trials(),
-            fetch_semantic_scholar_literature(),
+            fetch_literature(),
             return_exceptions=True
         )
 
@@ -234,8 +263,11 @@ class AssessmentEngine:
             clinical_trials_raw = []
 
         if isinstance(literature_raw, Exception):
-            print(f"  Warning: Semantic Scholar API failed: {str(literature_raw)}")
-            literature_raw = []
+            print(f"  Warning: Literature search failed: {str(literature_raw)}")
+            literature_raw = ([], None)
+
+        # Unpack literature result (papers/articles, source)
+        literature_items, literature_source = literature_raw if isinstance(literature_raw, tuple) else ([], None)
 
         # Parse FDA approval data and add to evidence
         if fda_approvals_raw:
@@ -331,32 +363,55 @@ class AssessmentEngine:
                 ))
             evidence.clinical_trials = clinical_trials_evidence
 
-        # Add Semantic Scholar literature to evidence
-        if literature_raw:
+        # Add literature to evidence (from Semantic Scholar or PubMed fallback)
+        if literature_items:
             pubmed_evidence = []
-            for paper in literature_raw:
-                # Build PubMed URL if PMID is available
-                url = f"https://pubmed.ncbi.nlm.nih.gov/{paper.pmid}/" if paper.pmid else f"https://www.semanticscholar.org/paper/{paper.paper_id}"
 
-                pubmed_evidence.append(PubMedEvidence(
-                    pmid=paper.pmid or paper.paper_id,  # Use paper_id as fallback
-                    title=paper.title,
-                    abstract=paper.abstract or "",
-                    authors=[],  # Semantic Scholar search doesn't return authors by default
-                    journal=paper.venue or "",
-                    year=str(paper.year) if paper.year else None,
-                    doi=None,  # Not in default fields
-                    url=url,
-                    signal_type=paper.get_signal_type(),
-                    drugs_mentioned=paper.extract_drug_mentions(),
-                    # Semantic Scholar data is now primary
-                    citation_count=paper.citation_count,
-                    influential_citation_count=paper.influential_citation_count,
-                    tldr=paper.tldr,
-                    is_open_access=paper.is_open_access,
-                    open_access_pdf_url=paper.open_access_pdf_url,
-                    semantic_scholar_id=paper.paper_id,
-                ))
+            if literature_source == "semantic_scholar":
+                # Process Semantic Scholar papers
+                for paper in literature_items:
+                    url = f"https://pubmed.ncbi.nlm.nih.gov/{paper.pmid}/" if paper.pmid else f"https://www.semanticscholar.org/paper/{paper.paper_id}"
+                    pubmed_evidence.append(PubMedEvidence(
+                        pmid=paper.pmid or paper.paper_id,
+                        title=paper.title,
+                        abstract=paper.abstract or "",
+                        authors=[],
+                        journal=paper.venue or "",
+                        year=str(paper.year) if paper.year else None,
+                        doi=None,
+                        url=url,
+                        signal_type=paper.get_signal_type(),
+                        drugs_mentioned=paper.extract_drug_mentions(),
+                        citation_count=paper.citation_count,
+                        influential_citation_count=paper.influential_citation_count,
+                        tldr=paper.tldr,
+                        is_open_access=paper.is_open_access,
+                        open_access_pdf_url=paper.open_access_pdf_url,
+                        semantic_scholar_id=paper.paper_id,
+                    ))
+            else:
+                # Process PubMed articles (fallback)
+                for article in literature_items:
+                    pubmed_evidence.append(PubMedEvidence(
+                        pmid=article.pmid,
+                        title=article.title,
+                        abstract=article.abstract,
+                        authors=article.authors,
+                        journal=article.journal,
+                        year=article.year,
+                        doi=article.doi,
+                        url=article.url,
+                        signal_type=article.get_signal_type(),
+                        drugs_mentioned=article.extract_drug_mentions(),
+                        # No Semantic Scholar data when using PubMed fallback
+                        citation_count=None,
+                        influential_citation_count=None,
+                        tldr=None,
+                        is_open_access=None,
+                        open_access_pdf_url=None,
+                        semantic_scholar_id=None,
+                    ))
+
             evidence.pubmed_articles = pubmed_evidence
 
         # Step 4: Assess with LLM (must run sequentially since it depends on evidence)

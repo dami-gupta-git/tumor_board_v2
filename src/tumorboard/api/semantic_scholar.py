@@ -30,6 +30,11 @@ class SemanticScholarError(Exception):
     pass
 
 
+class SemanticScholarRateLimitError(SemanticScholarError):
+    """Exception raised when Semantic Scholar rate limit (429) is hit."""
+    pass
+
+
 @dataclass
 class SemanticPaperInfo:
     """Semantic Scholar paper information."""
@@ -432,6 +437,11 @@ class SemanticScholarClient:
         try:
             await self._rate_limit()
             response = await client.get(url, params=params)
+
+            # Check for rate limit before raising for other errors
+            if response.status_code == 429:
+                raise SemanticScholarRateLimitError("Semantic Scholar rate limit exceeded")
+
             response.raise_for_status()
             data = response.json()
 
@@ -449,6 +459,14 @@ class SemanticScholarClient:
 
             return papers
 
+        except SemanticScholarRateLimitError:
+            # Re-raise rate limit errors for caller to handle
+            raise
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 429:
+                raise SemanticScholarRateLimitError("Semantic Scholar rate limit exceeded")
+            print(f"Semantic Scholar search error: {e}")
+            return []
         except httpx.HTTPError as e:
             print(f"Semantic Scholar search error: {e}")
             return []
