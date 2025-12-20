@@ -5,6 +5,7 @@ import logging
 
 from pydantic import BaseModel, Field
 
+from tumorboard.config.variant_classes import load_variant_classes
 from tumorboard.constants import TUMOR_TYPE_MAPPINGS
 from tumorboard.models.annotations import VariantAnnotations
 from tumorboard.models.evidence.cgi import CGIBiomarkerEvidence
@@ -17,6 +18,9 @@ from tumorboard.models.evidence.pubmed import PubMedEvidence
 from tumorboard.models.evidence.vicc import VICCEvidence
 
 logger = logging.getLogger(__name__)
+
+# Load variant class configuration
+_variant_config = load_variant_classes()
 
 
 
@@ -70,265 +74,35 @@ class Evidence(VariantAnnotations):
                                        tumor_type: str | None = None) -> bool:
         """Determine if this specific variant falls under the approval.
 
+        Uses configuration from variant_classes.yaml to determine which variants
+        qualify for FDA approvals based on indication text patterns.
+
         This prevents:
         - BRAF G469A claiming BRAF V600E approvals
         - KRAS G12D claiming broad "KRAS" mentions
         - Non-specific matches
         - KIT D816V matching generic GIST approvals (D816V causes imatinib resistance in GIST)
         """
-        gene_lower = gene.lower()
-        variant_upper = variant.upper()
-        tumor_lower = (tumor_type or '').lower()
+        # Check special rules first (e.g., KIT D816V in GIST)
+        special_result = _variant_config.check_special_rules(
+            gene, variant, indication_text, tumor_type
+        )
+        if special_result is not None:
+            if not special_result:
+                logger.debug(f"{gene} {variant}: excluded by special rule for tumor {tumor_type}")
+            return special_result
 
-        # Check for exclusion patterns
-        # Note: Be careful with "wild type" - it may appear in clinical studies patient tables
-        # (e.g., "wild type 1 (1) 0" showing 1 patient was wild type) which is NOT an exclusion.
-        # Only treat as exclusion if it's a specific indication context like "wild-type EGFR"
-        exclusion_patterns = [
-            f'{gene_lower} wild-type', f'{gene_lower} wild type', f'{gene_lower} wildtype',
-            f'wild-type {gene_lower}', f'wild type {gene_lower}', f'wildtype {gene_lower}',
-            f'{gene_lower}-negative',
-            'without mutations',
-        ]
+        # Use config-based matching
+        matches, class_name = _variant_config.get_variant_class(
+            gene, variant, indication_text
+        )
 
-        for pattern in exclusion_patterns:
-            if pattern in indication_text:
-                return False
+        if matches:
+            logger.debug(f"{gene} {variant}: matched class '{class_name}'")
+        else:
+            logger.debug(f"{gene} {variant}: no matching class found")
 
-        # Gene-specific validation rules
-        if gene_lower == 'braf':
-            # BRAF inhibitors are V600-specific
-            if 'v600' in indication_text:
-                return variant_upper in ['V600E', 'V600K', 'V600D', 'V600R']
-            else:
-                # Generic "BRAF-mutated" is rare and suspicious
-                return False
-
-        elif gene_lower in ['kras', 'nras']:
-            # Check for specific variant mentions
-            if 'g12c' in indication_text:
-                return variant_upper == 'G12C'
-
-            # Generic "KRAS-mutated" without specifics
-            if any(phrase in indication_text for phrase in [
-                f'{gene_lower} mutation',
-                f'{gene_lower}-mutated',
-                f'{gene_lower}-positive',
-            ]):
-                # Verify not an exclusion
-                return 'wild-type' not in indication_text
-
-            return False
-
-        elif gene_lower == 'kit':
-            # KIT exon boundaries (codon ranges)
-            # Exon 9: codons 503-510 (extracellular domain)
-            # Exon 11: codons 550-591 (juxtamembrane domain) - most common in GIST
-            # Exon 13: codons 627-664 (ATP binding)
-            # Exon 17: codons 788-828 (activation loop) - D816 mutations cause imatinib resistance
-
-            # Map specific variants to exons
-            exon_map = {
-                # Exon 9
-                'A502_Y503DUP': 9, 'Y503_F504INSAY': 9,
-                # Exon 11 (most common GIST mutations)
-                'W557R': 11, 'W557G': 11, 'W557_K558DEL': 11,
-                'K558N': 11, 'K558E': 11, 'V559D': 11, 'V559A': 11, 'V559G': 11,
-                'V560D': 11, 'V560G': 11, 'V560E': 11,
-                'L576P': 11, 'P585P': 11,
-                # Exon 13
-                'K642E': 13,
-                # Exon 17 (activation loop - causes imatinib resistance)
-                'D816V': 17, 'D816H': 17, 'D816Y': 17, 'D820Y': 17, 'N822K': 17,
-            }
-
-            variant_exon = exon_map.get(variant_upper)
-
-            # If not in map, try to extract exon from codon position for deletions/insertions
-            if not variant_exon:
-                import re
-                # Match patterns like W557_K558del, L576_P585del, V560del
-                pos_match = re.search(r'[A-Z](\d+)', variant_upper)
-                if pos_match:
-                    position = int(pos_match.group(1))
-                    # Determine exon from codon position
-                    if 503 <= position <= 510:
-                        variant_exon = 9
-                    elif 550 <= position <= 591:
-                        variant_exon = 11
-                    elif 627 <= position <= 664:
-                        variant_exon = 13
-                    elif 788 <= position <= 828:
-                        variant_exon = 17
-
-            # CRITICAL: D816 mutations (exon 17) cause imatinib resistance in GIST
-            # These should NOT match on generic "Kit-positive GIST" approvals
-            # However, in Systemic Mastocytosis, avapritinib/midostaurin ARE approved for D816V
-            is_d816_mutation = variant_upper.startswith('D816') or variant_exon == 17
-            is_gist = any(term in tumor_lower for term in ['gist', 'gastrointestinal stromal'])
-
-            if is_d816_mutation and is_gist:
-                # D816 mutations in GIST: only match if the variant is EXPLICITLY mentioned
-                # in the indication IN A POSITIVE context (not generic Kit-positive/GIST approvals)
-                # because D816 causes resistance to imatinib/sunitinib (standard GIST therapies)
-
-                variant_lower = variant.lower()
-
-                # Check if variant is explicitly mentioned - but ALSO check for exclusion context
-                if variant_lower in indication_text:
-                    # Check if it's in an exclusion context (e.g., "without the D816V mutation")
-                    exclusion_patterns = [
-                        f'without the {variant_lower}',
-                        f'without {variant_lower}',
-                        f'no {variant_lower}',
-                        f'not {variant_lower}',
-                        f'excluding {variant_lower}',
-                        f'absence of {variant_lower}',
-                    ]
-                    is_exclusion = any(pattern in indication_text for pattern in exclusion_patterns)
-                    if not is_exclusion:
-                        return True
-                    # If it's an exclusion, fall through to return False
-
-                # Check for explicit exon 17 mention (only if it's a positive mention)
-                if 'exon 17' in indication_text:
-                    # Check that exon 17 is not mentioned in an exclusion context
-                    if 'without exon 17' not in indication_text and 'excluding exon 17' not in indication_text:
-                        return True
-
-                # Do NOT match on generic Kit-positive or GIST phrases for D816 in GIST
-                logger.debug(f"KIT {variant} in GIST: NOT matching generic Kit-positive/GIST approval (D816 causes imatinib resistance)")
-                return False
-
-            if variant.lower() in indication_text:
-                return True
-
-            if variant_exon and f'exon {variant_exon}' in indication_text:
-                return True
-
-            # Broad "KIT-mutated" or "KIT-positive" - common in GIST approvals
-            # Note: D816 mutations in GIST are excluded above (they cause imatinib resistance)
-            if any(phrase in indication_text for phrase in [
-                'kit-positive', 'kit-mutated', 'kit mutation', 'kit (cd117)',
-                'kit-expressing', 'cd117-positive', 'cd117 positive',
-            ]):
-                return True
-
-            # GIST-specific approvals: FDA labels for GIST often don't explicitly mention KIT
-            # but ~85% of GISTs have KIT mutations, and imatinib/sunitinib target KIT
-            # Exon 11 and 9 mutations are the primary sensitivity markers
-            if variant_exon in [9, 11, 13]:  # Sensitive exons
-                if any(phrase in indication_text for phrase in [
-                    'gist', 'gastrointestinal stromal tumor', 'gastrointestinal stromal tumour',
-                ]):
-                    return True
-
-            return False
-
-        elif gene_lower == 'egfr':
-            common_mutations = ['L858R', 'EXON19DEL']
-            uncommon_mutations = ['G719A', 'G719C', 'G719S', 'L861Q', 'S768I']
-            resistance_mutations = ['T790M', 'C797S']
-
-            # Check for explicit variant mention in positive context
-            variant_lower = variant.lower()
-            if variant_lower in indication_text:
-                # Check if it's an exclusion context ("no T790M", "without T790M", etc.)
-                exclusion_patterns = [
-                    f'no {variant_lower}',
-                    f'without {variant_lower}',
-                    f'not {variant_lower}',
-                    f'excluding {variant_lower}',
-                    f'absence of {variant_lower}',
-                    f'no known {variant_lower}',
-                    f'no known egfr {variant_lower}',
-                ]
-                is_exclusion = any(p in indication_text for p in exclusion_patterns)
-
-                # For T790M specifically, require explicit positive indication
-                # Don't match just because T790M is mentioned (e.g., in clinical studies population)
-                if variant_upper == 'T790M':
-                    positive_patterns = [
-                        't790m mutation-positive',
-                        't790m-positive',
-                        'approved for t790m',
-                        'egfr t790m mutation-positive',
-                        'metastatic egfr t790m mutation-positive',
-                    ]
-                    is_positive = any(p in indication_text for p in positive_patterns)
-                    # For T790M, only return True if explicitly positive (not just absence of exclusion)
-                    # This prevents matching on drugs where T790M is just mentioned in study population
-                    if is_positive and not is_exclusion:
-                        return True
-                    # If T790M is just mentioned in clinical studies but not as an indication, don't match
-                    return False
-
-                if not is_exclusion:
-                    return True
-
-            if variant_upper in common_mutations or any(v in variant_upper for v in ['DEL19', 'E746']):
-                if 'common' in indication_text or 'exon 19' in indication_text or 'l858r' in indication_text:
-                    return True
-
-            if variant_upper in uncommon_mutations:
-                if 'uncommon' in indication_text or 'g719' in indication_text:
-                    return True
-
-            # For T790M/C797S resistance mutations - only match if explicitly indicated FOR the variant
-            # Don't match on generic "resistance" mentions as those typically mean resistance TO a drug
-            if variant_upper in resistance_mutations:
-                # Only return True if we already matched above on positive patterns
-                # Don't match on generic patterns here
-                pass
-
-            if 'egfr mutation' in indication_text or 'egfr-mutated' in indication_text:
-                # Generic EGFR mutation approval - but NOT for resistance mutations
-                # T790M/C797S require specific approval, not generic EGFR mutation approval
-                if variant_upper not in resistance_mutations:
-                    if 'specific' not in indication_text and 'particular' not in indication_text:
-                        return True
-
-            return False
-
-        elif gene_lower in ['fgfr2', 'fgfr3']:
-            # FGFR inhibitors like erdafitinib (BALVERSA) and pemigatinib (Pemazyre) are approved for
-            # "susceptible FGFR genetic alterations" which includes multiple variants
-            # Known susceptible FGFR3 mutations include: S249C, R248C, G370C, Y373C, etc.
-            susceptible_fgfr3_mutations = [
-                'S249C', 'R248C', 'G370C', 'Y373C', 'G380R', 'K650E', 'K650M', 'K650N', 'K650Q', 'K650T',
-                # Fusions are handled separately, but these are common point mutations
-            ]
-            # Known susceptible FGFR2 mutations (pemigatinib/futibatinib in cholangiocarcinoma)
-            susceptible_fgfr2_mutations = [
-                'N549H', 'N549K', 'N549S', 'E565A', 'K659E', 'K659M', 'K659N',
-                'V564F', 'V564I', 'V564L', 'L617V', 'L617M',
-                # These are kinase domain mutations known to respond to FGFR inhibitors
-            ]
-
-            # Check for explicit variant mention
-            if variant.lower() in indication_text:
-                return True
-
-            # Check for "susceptible FGFR" or "FGFR genetic alterations" language
-            if any(phrase in indication_text for phrase in [
-                'susceptible fgfr3', 'fgfr3 genetic alteration', 'fgfr3 alteration',
-                'susceptible fgfr2', 'fgfr2 genetic alteration', 'fgfr2 alteration',
-                f'{gene_lower} mutation', f'{gene_lower}-mutated', f'{gene_lower}-positive',
-                'fgfr2 fusion', 'fgfr2 rearrangement',  # Fusions also qualify
-            ]):
-                # If the variant is a known susceptible mutation, approve it
-                if gene_lower == 'fgfr3' and variant_upper in susceptible_fgfr3_mutations:
-                    return True
-                if gene_lower == 'fgfr2' and variant_upper in susceptible_fgfr2_mutations:
-                    return True
-                # For other variants, still approve under broad "genetic alterations" language
-                # unless it's a known resistance mutation
-                return True
-
-            return False
-
-        # Default for other genes - tentatively approve if mentioned without exclusions
-        return True
+        return matches
 
     def _check_fda_requires_wildtype(self, tumor_type: str) -> tuple[bool, list[str]]:
         """Check if any FDA drugs in this tumor REQUIRE wild-type (exclude mutants).

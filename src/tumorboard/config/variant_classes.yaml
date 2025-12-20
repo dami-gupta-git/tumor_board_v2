@@ -1,0 +1,265 @@
+# Variant Class Configuration for FDA Approval Matching
+#
+# This file defines which variants qualify for FDA approvals based on
+# the language in FDA drug labels. FDA approvals are often variant-class-specific
+# (e.g., "BRAF V600" not "any BRAF mutation").
+#
+# Structure:
+#   GENE:
+#     classes:
+#       class_name:
+#         pattern: "text to match in FDA indication"
+#         variants: [list of variants that qualify]
+#         require_explicit: true/false (if true, only match if pattern found)
+#     special_rules:
+#       - description of any special handling needed
+
+BRAF:
+  description: "BRAF inhibitors are V600-specific. Non-V600 mutations (G469A, K601E) do not respond."
+  require_explicit: true  # Must find V600 pattern to match
+  classes:
+    V600:
+      patterns:
+        - "v600"
+        - "v600e"
+        - "v600k"
+      variants:
+        - V600E
+        - V600K
+        - V600D
+        - V600R
+
+KRAS:
+  description: "KRAS G12C has specific inhibitors. Other KRAS mutations may exclude anti-EGFR therapy."
+  require_explicit: true  # Must match a class pattern, no default approval
+  classes:
+    G12C:
+      patterns:
+        - "g12c"
+        - "kras g12c"
+      variants:
+        - G12C
+    # Generic KRAS-mutated (for anti-EGFR exclusion)
+    any_mutation:
+      patterns:
+        - "kras mutation"
+        - "kras-mutated"
+        - "kras-positive"
+      variants: ["*"]  # Any KRAS mutation qualifies
+      exclude_patterns:
+        - "wild-type"
+        - "wildtype"
+
+NRAS:
+  description: "NRAS mutations exclude anti-EGFR therapy in colorectal cancer."
+  require_explicit: true
+  classes:
+    any_mutation:
+      patterns:
+        - "nras mutation"
+        - "nras-mutated"
+        - "nras-positive"
+        - "ras mutation"
+        - "ras-mutated"
+      variants: ["*"]
+      exclude_patterns:
+        - "wild-type"
+        - "wildtype"
+
+EGFR:
+  description: "EGFR TKIs have different approvals for common, uncommon, and resistance mutations."
+  require_explicit: true  # Resistance mutations like T790M need explicit matching
+  classes:
+    common:
+      patterns:
+        - "common"
+        - "exon 19"
+        - "l858r"
+      variants:
+        - L858R
+        - EXON19DEL
+        - E746_A750DEL
+        - E746_T751DEL
+        - L747_P753DEL
+    uncommon:
+      patterns:
+        - "uncommon"
+        - "g719"
+        - "l861q"
+        - "s768i"
+      variants:
+        - G719A
+        - G719C
+        - G719S
+        - G719X
+        - L861Q
+        - S768I
+    T790M:
+      patterns:
+        - "t790m mutation-positive"
+        - "t790m-positive"
+        - "egfr t790m"
+      variants:
+        - T790M
+      require_positive_context: true  # Must be in approval context, not exclusion
+    # Generic EGFR-mutated (covers most mutations except resistance)
+    any_mutation:
+      patterns:
+        - "egfr mutation"
+        - "egfr-mutated"
+        - "egfr-positive"
+      variants: ["*"]
+      exclude_variants:
+        - T790M  # Resistance mutations need explicit approval
+        - C797S
+
+KIT:
+  description: "KIT mutations in GIST have exon-specific responses. D816 causes imatinib resistance."
+  require_explicit: true  # D816 mutations need special handling for GIST vs mastocytosis
+  classes:
+    exon_9:
+      patterns:
+        - "exon 9"
+      variants:
+        - A502_Y503DUP
+        - Y503_F504INSAY
+      codon_range: [503, 510]
+    exon_11:
+      patterns:
+        - "exon 11"
+        - "kit-positive"
+        - "kit-mutated"
+        - "gist"
+      variants:
+        - W557R
+        - W557G
+        - W557_K558DEL
+        - K558N
+        - K558E
+        - V559D
+        - V559A
+        - V559G
+        - V560D
+        - V560G
+        - V560E
+        - L576P
+      codon_range: [550, 591]
+    exon_13:
+      patterns:
+        - "exon 13"
+      variants:
+        - K642E
+      codon_range: [627, 664]
+    exon_17_resistance:
+      patterns:
+        - "d816v"
+        - "exon 17"
+      variants:
+        - D816V
+        - D816H
+        - D816Y
+        - D820Y
+        - N822K
+      codon_range: [788, 828]
+      special_rules:
+        # D816 in GIST = imatinib resistance, but approved in mastocytosis
+        - tumor_exclusion: ["gist", "gastrointestinal stromal"]
+          unless_explicit: true  # Only match GIST if D816V explicitly in label
+
+FGFR2:
+  description: "FGFR2 fusions and mutations in cholangiocarcinoma."
+  classes:
+    susceptible:
+      patterns:
+        - "susceptible fgfr2"
+        - "fgfr2 genetic alteration"
+        - "fgfr2 alteration"
+        - "fgfr2 mutation"
+        - "fgfr2-mutated"
+        - "fgfr2 fusion"
+        - "fgfr2 rearrangement"
+      variants:
+        - N549H
+        - N549K
+        - N549S
+        - E565A
+        - K659E
+        - K659M
+        - K659N
+        - V564F
+        - V564I
+        - V564L
+        - L617V
+        - L617M
+
+FGFR3:
+  description: "FGFR3 mutations in bladder cancer."
+  classes:
+    susceptible:
+      patterns:
+        - "susceptible fgfr3"
+        - "fgfr3 genetic alteration"
+        - "fgfr3 alteration"
+        - "fgfr3 mutation"
+        - "fgfr3-mutated"
+        - "fgfr3-positive"
+      variants:
+        - S249C
+        - R248C
+        - G370C
+        - Y373C
+        - G380R
+        - K650E
+        - K650M
+        - K650N
+        - K650Q
+        - K650T
+
+# Genes with broad "any mutation" approvals (no class-specific validation needed)
+# These use the default behavior: return True if gene mentioned without exclusions
+
+PIK3CA:
+  description: "PIK3CA inhibitors (alpelisib) approved for any PIK3CA mutation in breast cancer."
+  default_approve: true  # Any mutation qualifies if gene mentioned
+
+ALK:
+  description: "ALK inhibitors approved for ALK rearrangements/fusions."
+  default_approve: true
+
+ROS1:
+  description: "ROS1 inhibitors approved for ROS1 rearrangements/fusions."
+  default_approve: true
+
+RET:
+  description: "RET inhibitors approved for RET fusions and mutations."
+  default_approve: true
+
+MET:
+  description: "MET inhibitors approved for MET exon 14 skipping and amplification."
+  classes:
+    exon14:
+      patterns:
+        - "exon 14"
+        - "exon14"
+        - "met exon 14 skipping"
+      variants: ["*"]  # Any exon 14 mutation
+
+NTRK:
+  description: "TRK inhibitors approved for any NTRK fusion."
+  default_approve: true
+
+HER2:
+  description: "HER2/ERBB2 targeted therapies."
+  default_approve: true
+
+# Global exclusion patterns (apply to all genes)
+global_exclusions:
+  - "{gene} wild-type"
+  - "{gene} wild type"
+  - "{gene} wildtype"
+  - "wild-type {gene}"
+  - "wild type {gene}"
+  - "wildtype {gene}"
+  - "{gene}-negative"
+  - "without {gene} mutation"
+  - "without mutations"
