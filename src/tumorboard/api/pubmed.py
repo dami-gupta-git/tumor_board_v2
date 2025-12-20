@@ -195,6 +195,7 @@ class PubMedClient:
         gene: str,
         variant: str,
         drug: str | None = None,
+        tumor_type: str | None = None,
     ) -> str:
         """Build a PubMed search query for resistance information.
 
@@ -202,6 +203,7 @@ class PubMedClient:
             gene: Gene symbol (e.g., "EGFR")
             variant: Variant notation (e.g., "C797S")
             drug: Optional specific drug to search for
+            tumor_type: Optional tumor type for more specific search (e.g., "GIST")
 
         Returns:
             PubMed search query string
@@ -216,8 +218,19 @@ class PubMedClient:
         if drug:
             query_parts.append(f'"{drug}"[Title/Abstract]')
 
-        # Add cancer/oncology filter
-        query_parts.append('(cancer[Title/Abstract] OR tumor[Title/Abstract] OR neoplasm[Title/Abstract] OR oncology[Title/Abstract])')
+        # Add tumor type filter if provided, otherwise use generic cancer filter
+        if tumor_type:
+            tumor_lower = tumor_type.lower()
+            if "gastrointestinal stromal" in tumor_lower or tumor_lower == "gist":
+                query_parts.append('(GIST[Title/Abstract] OR "gastrointestinal stromal"[Title/Abstract])')
+            else:
+                tumor_simple = tumor_lower.replace('adenocarcinoma', '').replace('carcinoma', '').strip()
+                if tumor_simple:
+                    query_parts.append(f'"{tumor_simple}"[Title/Abstract]')
+                else:
+                    query_parts.append('(cancer[Title/Abstract] OR tumor[Title/Abstract] OR neoplasm[Title/Abstract] OR oncology[Title/Abstract])')
+        else:
+            query_parts.append('(cancer[Title/Abstract] OR tumor[Title/Abstract] OR neoplasm[Title/Abstract] OR oncology[Title/Abstract])')
 
         return ' AND '.join(query_parts)
 
@@ -451,6 +464,7 @@ class PubMedClient:
         gene: str,
         variant: str,
         drug: str | None = None,
+        tumor_type: str | None = None,
         max_results: int = DEFAULT_MAX_RESULTS,
     ) -> list[PubMedArticle]:
         """Search for resistance-related literature for a variant.
@@ -462,12 +476,13 @@ class PubMedClient:
             gene: Gene symbol (e.g., "EGFR")
             variant: Variant notation (e.g., "C797S")
             drug: Optional specific drug to search for
+            tumor_type: Optional tumor type for more specific search (e.g., "GIST")
             max_results: Maximum number of articles to return
 
         Returns:
             List of PubMedArticle objects discussing resistance
         """
-        query = self._build_resistance_query(gene, variant, drug)
+        query = self._build_resistance_query(gene, variant, drug, tumor_type)
         pmids = await self._search_pmids(query, max_results * 2)  # Fetch extra for filtering
 
         if not pmids:

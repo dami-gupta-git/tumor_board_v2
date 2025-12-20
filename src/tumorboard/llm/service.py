@@ -164,3 +164,292 @@ class LLMService:
                 )
             # Re-raise the exception
             raise
+
+    async def score_paper_relevance(
+        self,
+        title: str,
+        abstract: str | None,
+        tldr: str | None,
+        gene: str,
+        variant: str,
+        tumor_type: str | None,
+    ) -> dict:
+        """Score a paper's relevance to a specific gene/variant/tumor context.
+
+        Uses LLM to determine if a paper is actually relevant to the specific
+        clinical context, extracting key findings about resistance/sensitivity.
+
+        Args:
+            title: Paper title
+            abstract: Paper abstract (may be None)
+            tldr: AI-generated summary from Semantic Scholar (may be None)
+            gene: Gene symbol (e.g., "KIT")
+            variant: Variant notation (e.g., "D816V")
+            tumor_type: Tumor type (e.g., "GIST", "Gastrointestinal Stromal Tumor")
+
+        Returns:
+            dict with keys:
+                - relevance_score: float 0-1 (1 = directly about this variant in this tumor)
+                - is_relevant: bool (True if score >= 0.6)
+                - signal_type: "resistance", "sensitivity", "mixed", "prognostic", or "unclear"
+                - drugs_mentioned: list of drug names affected by this variant
+                - key_finding: one sentence summary of the paper's relevance
+                - confidence: float 0-1 for the extraction confidence
+        """
+        # Use the best available text
+        text_content = tldr or abstract or ""
+        if not text_content:
+            return {
+                "relevance_score": 0.0,
+                "is_relevant": False,
+                "signal_type": "unclear",
+                "drugs_mentioned": [],
+                "key_finding": "No abstract or summary available",
+                "confidence": 0.0,
+            }
+
+        tumor_context = tumor_type or "cancer (unspecified)"
+
+        system_prompt = """You are an expert oncology literature analyst. Your task is to evaluate whether a scientific paper is relevant to a specific gene variant in a specific tumor type.
+
+Be STRICT about relevance:
+- The paper must specifically discuss the queried variant (not just the gene)
+- The paper must be relevant to the queried tumor type (not a different cancer)
+- A paper about KIT D816V in mastocytosis is NOT relevant if we're asking about GIST
+- A paper about KIT exon 11 mutations is NOT relevant if we're asking about D816V
+
+Return valid JSON only, no markdown."""
+
+        user_prompt = f"""Evaluate this paper's relevance to {gene} {variant} in {tumor_context}:
+
+TITLE: {title}
+
+CONTENT: {text_content[:1500]}
+
+Return JSON with these exact fields:
+{{
+    "relevance_score": <float 0-1, where 1 = directly discusses {variant} in {tumor_context}>,
+    "signal_type": "<'resistance' if variant causes drug resistance, 'sensitivity' if variant predicts response, 'mixed' if both, 'prognostic' if about outcomes not treatment, 'unclear' if not determinable>",
+    "drugs_mentioned": [<list of specific drug names mentioned in relation to this variant>],
+    "key_finding": "<one sentence: what does this paper say about {gene} {variant} in {tumor_context}? If not relevant, explain why>",
+    "confidence": <float 0-1 for how confident you are in this assessment>
+}}
+
+Scoring guide:
+- 1.0: Directly studies {gene} {variant} in {tumor_context}
+- 0.8: Studies {gene} {variant} in closely related context
+- 0.5: Mentions {gene} {variant} but different tumor type
+- 0.3: Studies {gene} but different variant
+- 0.0: Not relevant to this query"""
+
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ]
+
+        # Use a fast, cheap model for this screening task
+        screening_model = "gpt-4o-mini"
+
+        try:
+            response = await acompletion(
+                model=screening_model,
+                messages=messages,
+                temperature=0.0,
+                max_tokens=500,
+                response_format={"type": "json_object"},
+            )
+
+            content = response.choices[0].message.content.strip()
+
+            # Handle markdown code blocks if present
+            if content.startswith("```"):
+                parts = content.split("```")
+                content = parts[1] if len(parts) > 1 else parts[0]
+                if content.lower().startswith("json"):
+                    content = content[4:].lstrip()
+
+            data = json.loads(content)
+
+            # Normalize and validate response
+            relevance_score = float(data.get("relevance_score", 0.0))
+            relevance_score = max(0.0, min(1.0, relevance_score))
+
+            return {
+                "relevance_score": relevance_score,
+                "is_relevant": relevance_score >= 0.6,
+                "signal_type": data.get("signal_type", "unclear"),
+                "drugs_mentioned": data.get("drugs_mentioned", []),
+                "key_finding": data.get("key_finding", ""),
+                "confidence": float(data.get("confidence", 0.5)),
+            }
+
+        except Exception as e:
+            # On error, return low confidence result
+            print(f"Paper relevance scoring error: {e}")
+            return {
+                "relevance_score": 0.5,  # Uncertain
+                "is_relevant": False,
+                "signal_type": "unclear",
+                "drugs_mentioned": [],
+                "key_finding": f"Error during analysis: {str(e)[:100]}",
+                "confidence": 0.0,
+            }
+
+    async def extract_variant_knowledge(
+        self,
+        gene: str,
+        variant: str,
+        tumor_type: str,
+        paper_contents: list[dict],
+    ) -> dict:
+        """Extract structured knowledge about a variant from multiple papers.
+
+        Uses LLM to synthesize information from paper abstracts/TLDRs into
+        structured knowledge about the variant's clinical significance.
+
+        Args:
+            gene: Gene symbol (e.g., "KIT")
+            variant: Variant notation (e.g., "D816V")
+            tumor_type: Tumor type (e.g., "GIST", "Gastrointestinal Stromal Tumor")
+            paper_contents: List of dicts with keys: title, abstract, tldr, pmid, url
+
+        Returns:
+            dict with structured knowledge:
+                - mutation_type: "primary" (driver) or "secondary" (resistance/acquired)
+                - resistant_to: list of drugs this variant causes resistance to
+                - sensitive_to: list of drugs this variant may respond to
+                - clinical_significance: summary of clinical implications
+                - evidence_level: "FDA-approved", "Phase 3", "Phase 2", "Preclinical", "Case reports"
+                - tier_recommendation: "I", "II", "III", or "IV" with rationale
+                - references: list of PMIDs supporting the findings
+                - confidence: 0-1 score for extraction confidence
+        """
+        if not paper_contents:
+            return {
+                "mutation_type": "unknown",
+                "resistant_to": [],
+                "sensitive_to": [],
+                "clinical_significance": "No literature available for analysis",
+                "evidence_level": "None",
+                "tier_recommendation": {"tier": "III", "rationale": "Insufficient evidence"},
+                "references": [],
+                "confidence": 0.0,
+            }
+
+        # Format paper contents for the prompt
+        papers_text = []
+        for i, paper in enumerate(paper_contents[:5], 1):  # Limit to 5 papers
+            content = paper.get("tldr") or paper.get("abstract") or ""
+            pmid = paper.get("pmid", "Unknown")
+            title = paper.get("title", "Untitled")
+            papers_text.append(f"""
+Paper {i} (PMID: {pmid}):
+Title: {title}
+Content: {content[:1000]}
+""")
+
+        papers_combined = "\n".join(papers_text)
+
+        system_prompt = """You are an expert oncology researcher synthesizing knowledge from scientific literature.
+
+Your task is to extract structured, clinically actionable information about a specific gene variant from research papers.
+
+Be PRECISE and EVIDENCE-BASED:
+- Only report findings that are directly supported by the papers provided
+- Distinguish between in vitro/preclinical and clinical evidence
+- Note the strength of evidence (case reports vs. clinical trials)
+- If papers disagree, note the conflict
+
+Return valid JSON only, no markdown."""
+
+        user_prompt = f"""Extract structured knowledge about {gene} {variant} in {tumor_type} from these papers:
+
+{papers_combined}
+
+Return JSON with these exact fields:
+{{
+    "mutation_type": "<'primary' if this is a driver mutation, 'secondary' if it's an acquired resistance mutation, 'both' if it can be either, 'unknown' if unclear>",
+
+    "resistant_to": [
+        {{"drug": "<drug name>", "evidence": "<in vitro|preclinical|clinical|FDA-labeled>", "mechanism": "<brief mechanism if known>"}}
+    ],
+
+    "sensitive_to": [
+        {{"drug": "<drug name>", "evidence": "<in vitro|preclinical|clinical|FDA-labeled>", "ic50_nM": "<IC50 if reported, else null>"}}
+    ],
+
+    "clinical_significance": "<2-3 sentence summary of what this variant means clinically for {tumor_type} patients>",
+
+    "evidence_level": "<'FDA-approved' if there's FDA approval for this variant in this tumor, 'Phase 3' if phase 3 trial data, 'Phase 2', 'Preclinical', 'Case reports', or 'None'>",
+
+    "tier_recommendation": {{
+        "tier": "<'I' if FDA-approved therapy exists FOR this variant in this tumor, 'II' if resistance marker or off-label evidence, 'III' if unknown significance, 'IV' if benign>",
+        "rationale": "<one sentence explaining the tier recommendation based on AMP/ASCO/CAP guidelines>"
+    }},
+
+    "references": ["<PMID1>", "<PMID2>"],
+
+    "key_findings": [
+        "<Most important finding 1>",
+        "<Most important finding 2>"
+    ],
+
+    "confidence": <0.0-1.0 based on how confident you are in these extractions>
+}}
+
+CRITICAL for {gene} {variant} in {tumor_type}:
+- Focus ONLY on evidence relevant to {tumor_type}, not other cancer types
+- If this variant is known to cause resistance to standard therapies, that's clinically significant (Tier II)
+- If there's no FDA-approved therapy FOR this specific variant in this tumor, it cannot be Tier I"""
+
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ]
+
+        try:
+            response = await acompletion(
+                model="gpt-4o-mini",
+                messages=messages,
+                temperature=0.0,
+                max_tokens=1500,
+                response_format={"type": "json_object"},
+            )
+
+            content = response.choices[0].message.content.strip()
+
+            # Handle markdown code blocks if present
+            if content.startswith("```"):
+                parts = content.split("```")
+                content = parts[1] if len(parts) > 1 else parts[0]
+                if content.lower().startswith("json"):
+                    content = content[4:].lstrip()
+
+            data = json.loads(content)
+
+            # Normalize and validate response
+            return {
+                "mutation_type": data.get("mutation_type", "unknown"),
+                "resistant_to": data.get("resistant_to", []),
+                "sensitive_to": data.get("sensitive_to", []),
+                "clinical_significance": data.get("clinical_significance", ""),
+                "evidence_level": data.get("evidence_level", "None"),
+                "tier_recommendation": data.get("tier_recommendation", {"tier": "III", "rationale": "Unknown"}),
+                "references": data.get("references", []),
+                "key_findings": data.get("key_findings", []),
+                "confidence": float(data.get("confidence", 0.5)),
+            }
+
+        except Exception as e:
+            print(f"Variant knowledge extraction error: {e}")
+            return {
+                "mutation_type": "unknown",
+                "resistant_to": [],
+                "sensitive_to": [],
+                "clinical_significance": f"Error during extraction: {str(e)[:100]}",
+                "evidence_level": "None",
+                "tier_recommendation": {"tier": "III", "rationale": "Extraction failed"},
+                "references": [],
+                "key_findings": [],
+                "confidence": 0.0,
+            }

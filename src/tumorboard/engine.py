@@ -192,6 +192,7 @@ class AssessmentEngine:
                         self.semantic_scholar_client.search_resistance_literature(
                             gene=variant_input.gene,
                             variant=normalized_variant,
+                            tumor_type=resolved_tumor_type,
                             max_results=3,
                         ),
                         self.semantic_scholar_client.search_variant_literature(
@@ -218,6 +219,7 @@ class AssessmentEngine:
                             self.pubmed_client.search_resistance_literature(
                                 gene=variant_input.gene,
                                 variant=normalized_variant,
+                                tumor_type=resolved_tumor_type,
                                 max_results=3,
                             ),
                             self.pubmed_client.search_variant_literature(
@@ -415,14 +417,48 @@ class AssessmentEngine:
             evidence.clinical_trials = clinical_trials_evidence
 
         # Add literature to evidence (from Semantic Scholar or PubMed fallback)
+        # Use LLM-based relevance scoring to filter and enrich papers
         if literature_items:
             pubmed_evidence = []
 
-            if literature_source == "semantic_scholar":
-                # Process Semantic Scholar papers
-                for paper in literature_items:
+            # Score all papers in parallel for efficiency
+            async def score_and_convert_paper(paper_or_article, source: str):
+                """Score paper relevance and convert to PubMedEvidence."""
+                if source == "semantic_scholar":
+                    paper = paper_or_article
+                    title = paper.title
+                    abstract = paper.abstract
+                    tldr = paper.tldr
+                else:
+                    article = paper_or_article
+                    title = article.title
+                    abstract = article.abstract
+                    tldr = None
+
+                # Use LLM to score relevance
+                relevance = await self.llm_service.score_paper_relevance(
+                    title=title,
+                    abstract=abstract,
+                    tldr=tldr,
+                    gene=variant_input.gene,
+                    variant=normalized_variant,
+                    tumor_type=resolved_tumor_type,
+                )
+
+                # Skip papers that aren't relevant to this specific context
+                if not relevance["is_relevant"]:
+                    print(f"    Filtered out: {title[:60]}... (score: {relevance['relevance_score']:.2f}, reason: {relevance['key_finding'][:80]})")
+                    return None
+
+                print(f"    Relevant: {title[:60]}... (score: {relevance['relevance_score']:.2f}, signal: {relevance['signal_type']})")
+
+                # Use LLM-extracted signal type and drugs instead of keyword matching
+                signal_type = relevance["signal_type"]
+                drugs_mentioned = relevance["drugs_mentioned"]
+
+                if source == "semantic_scholar":
                     url = f"https://pubmed.ncbi.nlm.nih.gov/{paper.pmid}/" if paper.pmid else f"https://www.semanticscholar.org/paper/{paper.paper_id}"
-                    pubmed_evidence.append(PubMedEvidence(
+                    return PubMedEvidence(
                         pmid=paper.pmid or paper.paper_id,
                         title=paper.title,
                         abstract=paper.abstract or "",
@@ -431,19 +467,17 @@ class AssessmentEngine:
                         year=str(paper.year) if paper.year else None,
                         doi=None,
                         url=url,
-                        signal_type=paper.get_signal_type(),
-                        drugs_mentioned=paper.extract_drug_mentions(),
+                        signal_type=signal_type,
+                        drugs_mentioned=drugs_mentioned,
                         citation_count=paper.citation_count,
                         influential_citation_count=paper.influential_citation_count,
-                        tldr=paper.tldr,
+                        tldr=relevance["key_finding"] or paper.tldr,  # Use LLM-extracted finding if available
                         is_open_access=paper.is_open_access,
                         open_access_pdf_url=paper.open_access_pdf_url,
                         semantic_scholar_id=paper.paper_id,
-                    ))
-            else:
-                # Process PubMed articles (fallback)
-                for article in literature_items:
-                    pubmed_evidence.append(PubMedEvidence(
+                    )
+                else:
+                    return PubMedEvidence(
                         pmid=article.pmid,
                         title=article.title,
                         abstract=article.abstract,
@@ -452,18 +486,83 @@ class AssessmentEngine:
                         year=article.year,
                         doi=article.doi,
                         url=article.url,
-                        signal_type=article.get_signal_type(),
-                        drugs_mentioned=article.extract_drug_mentions(),
-                        # No Semantic Scholar data when using PubMed fallback
+                        signal_type=signal_type,
+                        drugs_mentioned=drugs_mentioned,
                         citation_count=None,
                         influential_citation_count=None,
-                        tldr=None,
+                        tldr=relevance["key_finding"],  # Use LLM-extracted finding
                         is_open_access=None,
                         open_access_pdf_url=None,
                         semantic_scholar_id=None,
-                    ))
+                    )
+
+            # Process all papers in parallel
+            scored_papers = await asyncio.gather(*[
+                score_and_convert_paper(item, literature_source)
+                for item in literature_items
+            ])
+
+            # Filter out None results (non-relevant papers)
+            pubmed_evidence = [p for p in scored_papers if p is not None]
 
             evidence.pubmed_articles = pubmed_evidence
+
+            # Extract structured knowledge from relevant papers
+            if pubmed_evidence:
+                print(f"  Extracting structured knowledge from {len(pubmed_evidence)} relevant papers...")
+                paper_contents = [
+                    {
+                        "title": p.title,
+                        "abstract": p.abstract,
+                        "tldr": p.tldr,
+                        "pmid": p.pmid,
+                        "url": p.url,
+                    }
+                    for p in pubmed_evidence
+                ]
+
+                knowledge_data = await self.llm_service.extract_variant_knowledge(
+                    gene=variant_input.gene,
+                    variant=normalized_variant,
+                    tumor_type=resolved_tumor_type,
+                    paper_contents=paper_contents,
+                )
+
+                # Convert to LiteratureKnowledge model
+                from tumorboard.models.evidence.literature_knowledge import (
+                    LiteratureKnowledge, DrugResistance, DrugSensitivity, TierRecommendation
+                )
+
+                evidence.literature_knowledge = LiteratureKnowledge(
+                    mutation_type=knowledge_data.get("mutation_type", "unknown"),
+                    resistant_to=[
+                        DrugResistance(**r) if isinstance(r, dict) else DrugResistance(drug=str(r))
+                        for r in knowledge_data.get("resistant_to", [])
+                    ],
+                    sensitive_to=[
+                        DrugSensitivity(**s) if isinstance(s, dict) else DrugSensitivity(drug=str(s))
+                        for s in knowledge_data.get("sensitive_to", [])
+                    ],
+                    clinical_significance=knowledge_data.get("clinical_significance", ""),
+                    evidence_level=knowledge_data.get("evidence_level", "None"),
+                    tier_recommendation=TierRecommendation(
+                        **knowledge_data.get("tier_recommendation", {"tier": "III", "rationale": ""})
+                    ),
+                    references=knowledge_data.get("references", []),
+                    key_findings=knowledge_data.get("key_findings", []),
+                    confidence=knowledge_data.get("confidence", 0.0),
+                )
+
+                # Log extracted knowledge
+                if evidence.literature_knowledge.confidence > 0.5:
+                    print(f"    Literature Knowledge (confidence: {evidence.literature_knowledge.confidence:.2f}):")
+                    if evidence.literature_knowledge.resistant_to:
+                        drugs = ", ".join(evidence.literature_knowledge.get_resistance_drugs())
+                        print(f"      Resistant to: {drugs}")
+                    if evidence.literature_knowledge.sensitive_to:
+                        drugs = ", ".join(evidence.literature_knowledge.get_sensitivity_drugs())
+                        print(f"      Sensitive to: {drugs}")
+                    print(f"      Tier recommendation: {evidence.literature_knowledge.tier_recommendation.tier}")
 
         # Step 4: Assess with LLM (must run sequentially since it depends on evidence)
         # Use original variant notation for display/reporting

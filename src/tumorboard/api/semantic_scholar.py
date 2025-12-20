@@ -476,6 +476,7 @@ class SemanticScholarClient:
         gene: str,
         variant: str,
         drug: str | None = None,
+        tumor_type: str | None = None,
         max_results: int = 5,
     ) -> list[SemanticPaperInfo]:
         """Search for resistance-related literature for a variant.
@@ -487,13 +488,30 @@ class SemanticScholarClient:
             gene: Gene symbol (e.g., "EGFR")
             variant: Variant notation (e.g., "C797S")
             drug: Optional specific drug to search for
+            tumor_type: Optional tumor type for more specific search (e.g., "GIST")
             max_results: Maximum number of articles to return
 
         Returns:
             List of SemanticPaperInfo objects discussing resistance
         """
         # Build query for resistance literature
-        query_parts = [gene, variant, "resistance", "cancer"]
+        query_parts = [gene, variant, "resistance"]
+
+        # Use tumor type if provided, otherwise fall back to generic "cancer"
+        if tumor_type:
+            # Simplify tumor type for search (e.g., "Gastrointestinal Stromal Tumor" -> "GIST" or "gastrointestinal stromal")
+            tumor_lower = tumor_type.lower()
+            if "gastrointestinal stromal" in tumor_lower or tumor_lower == "gist":
+                query_parts.append("GIST")
+            else:
+                tumor_simple = tumor_lower.replace('adenocarcinoma', '').replace('carcinoma', '').strip()
+                if tumor_simple:
+                    query_parts.append(tumor_simple)
+                else:
+                    query_parts.append("cancer")
+        else:
+            query_parts.append("cancer")
+
         if drug:
             query_parts.append(drug)
 

@@ -114,7 +114,7 @@ EGFR:
         - C797S
 
 KIT:
-  description: "KIT mutations in GIST have exon-specific responses. D816 causes imatinib resistance."
+  description: "KIT mutations in GIST have exon-specific responses. Exon 17 mutations (D816V, Y823D) cause imatinib resistance."
   require_explicit: true  # D816 mutations need special handling for GIST vs mastocytosis
   classes:
     exon_9:
@@ -151,8 +151,15 @@ KIT:
         - K642E
       codon_range: [627, 664]
     exon_17_resistance:
+      # Exon 17 activation loop mutations cause primary/secondary imatinib resistance
+      # References:
+      #   - PMID 21475850: Secondary resistance via exon 17 mutations (Y823D) in GIST
+      #   - PMID 19164557 (PNAS): KIT kinase mutants show unique resistance mechanisms
+      #   - PMID 16849480 (Blood): Dasatinib inhibits D816V with IC50 ~37-79 nM
       patterns:
         - "d816v"
+        - "d816h"
+        - "y823d"
         - "exon 17"
       variants:
         - D816V
@@ -160,7 +167,43 @@ KIT:
         - D816Y
         - D820Y
         - N822K
+        - Y823D  # Secondary resistance mutation (PMID 21475850)
       codon_range: [788, 828]
+      resistance_profile:
+        # IC50 values from in vitro studies
+        imatinib:
+          ic50_nM: ">10000"
+          status: "resistant"
+          reference: "PMID 19164557"
+        sunitinib:
+          ic50_nM: ">1000"
+          status: "resistant"
+          note: "536-fold faster autoactivation than WT KIT"
+          reference: "PMID 19164557"
+        sorafenib:
+          ic50_nM: ">5000"
+          status: "resistant"
+          reference: "PMC3992122"
+        regorafenib:
+          status: "resistant"
+          reference: "PMC4688306"
+        dasatinib:
+          ic50_nM: "37-79"
+          status: "sensitive"
+          note: "Comparable to wild-type KIT inhibition"
+          reference: "PMID 16849480"
+      clinical_guidance:
+        tier: "II"
+        rationale: "Resistance marker excluding standard GIST therapies; dasatinib may be effective"
+        excludes_drugs:
+          - imatinib
+          - sunitinib
+          - sorafenib
+          - regorafenib
+        potential_therapies:
+          - drug: dasatinib
+            evidence_level: "preclinical/case reports"
+            note: "IC50 37-79 nM, comparable to WT KIT"
       special_rules:
         # D816 in GIST = imatinib resistance, but approved in mastocytosis
         - tumor_exclusion: ["gist", "gastrointestinal stromal"]

@@ -16,6 +16,7 @@ from tumorboard.models.evidence.cosmic import COSMICEvidence
 from tumorboard.models.evidence.fda import FDAApproval
 from tumorboard.models.evidence.pubmed import PubMedEvidence
 from tumorboard.models.evidence.vicc import VICCEvidence
+from tumorboard.models.evidence.literature_knowledge import LiteratureKnowledge
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +43,9 @@ class Evidence(VariantAnnotations):
     civic_assertions: list[CIViCAssertionEvidence] = Field(default_factory=list)
     clinical_trials: list[ClinicalTrialEvidence] = Field(default_factory=list)
     pubmed_articles: list[PubMedEvidence] = Field(default_factory=list)
+    literature_knowledge: LiteratureKnowledge | None = Field(
+        None, description="Structured knowledge extracted from literature via LLM"
+    )
     raw_data: dict[str, Any] = Field(default_factory=dict)
 
     def has_evidence(self) -> bool:
@@ -300,7 +304,7 @@ class Evidence(VariantAnnotations):
             indication_lower = (approval.indication or '').lower()
             variant_lower = self.variant.lower()
 
-            # Strategy 1: Explicit variant mention (but check for exclusion context)
+            # Strategy 1: Explicit variant mention (but check for exclusion context AND special rules)
             if variant_lower in indication_lower:
                 # Check for exclusion patterns around the variant mention
                 # e.g., "without the D816V mutation" means NOT approved for D816V
@@ -314,12 +318,23 @@ class Evidence(VariantAnnotations):
                 ]
                 is_exclusion = any(pattern in indication_lower for pattern in exclusion_patterns)
 
-                if not is_exclusion:
-                    variant_is_approved = True
-                    logger.debug(f"FDA approval found via explicit variant mention: {approval.drug_name}")
-                    break
-                else:
+                if is_exclusion:
                     logger.debug(f"Variant {self.variant} found in exclusion context for {approval.drug_name}")
+                    continue
+
+                # CRITICAL: Check special rules even for explicit variant mentions
+                # This handles cases like KIT D816V which is approved for mastocytosis
+                # but causes resistance in GIST - the label mentions D816V but for a different tumor
+                special_result = _variant_config.check_special_rules(
+                    self.gene, self.variant, indication_lower, tumor_type
+                )
+                if special_result is False:
+                    logger.debug(f"Variant {self.variant} excluded by special rule for {tumor_type} (drug: {approval.drug_name})")
+                    continue
+
+                variant_is_approved = True
+                logger.debug(f"FDA approval found via explicit variant mention: {approval.drug_name}")
+                break
 
             # Strategy 2: Gene mention with variant class validation
             if self.gene.lower() in indication_lower:
@@ -476,7 +491,33 @@ class Evidence(VariantAnnotations):
     def get_tier_hint(self, tumor_type: str | None = None) -> str:
         """Generate explicit tier guidance based on evidence structure."""
 
-        # Check for FDA approval FOR variant in tumor FIRST (highest priority = Tier I)
+        # Check LLM-extracted literature knowledge FIRST (highest confidence source)
+        # This uses structured extraction from papers to determine tier
+        if self.literature_knowledge and self.literature_knowledge.confidence >= 0.7:
+            lit = self.literature_knowledge
+            tier_rec = lit.tier_recommendation
+
+            # If literature strongly indicates resistance, that takes precedence
+            if lit.is_resistance_marker() and tier_rec.tier == "II":
+                resistant_drugs = ", ".join(lit.get_resistance_drugs()[:3])
+                sensitive_drugs = lit.get_sensitivity_drugs()
+                refs = ", ".join(lit.references[:3]) if lit.references else "literature"
+
+                if sensitive_drugs:
+                    alt_drugs = ", ".join(sensitive_drugs[:2])
+                    logger.info(f"Tier II (literature): {self.gene} {self.variant} resistant to {resistant_drugs}, may respond to {alt_drugs}")
+                    return f"TIER II INDICATOR (LITERATURE): Resistant to {resistant_drugs}. Potential alternatives: {alt_drugs}. Evidence: {refs}"
+                else:
+                    logger.info(f"Tier II (literature): {self.gene} {self.variant} resistant to {resistant_drugs}")
+                    return f"TIER II INDICATOR (LITERATURE): Resistant to {resistant_drugs} - no FDA-approved alternative. Evidence: {refs}"
+
+            # If literature says Tier I and has sensitivity evidence with high confidence
+            if tier_rec.tier == "I" and lit.has_therapeutic_options():
+                sensitive_drugs = ", ".join(lit.get_sensitivity_drugs()[:2])
+                logger.info(f"Tier I (literature): {self.gene} {self.variant} has therapeutic options: {sensitive_drugs}")
+                return f"TIER I INDICATOR (LITERATURE): Therapeutic options: {sensitive_drugs}. {tier_rec.rationale}"
+
+        # Check for FDA approval FOR variant in tumor (highest priority from structured data)
         if self.has_fda_for_variant_in_tumor(tumor_type):
             logger.info(f"Tier I: {self.gene} {self.variant} in {tumor_type} has FDA approval")
             return "TIER I INDICATOR: FDA-approved therapy FOR this variant in this tumor type"
@@ -712,6 +753,37 @@ class Evidence(VariantAnnotations):
         if pubmed_summary:
             lines.append("")
             lines.append(pubmed_summary)
+
+        # Add LLM-extracted literature knowledge
+        if self.literature_knowledge and self.literature_knowledge.confidence >= 0.5:
+            lit = self.literature_knowledge
+            lines.append("")
+            lines.append("*** LITERATURE-EXTRACTED KNOWLEDGE ***")
+            lines.append(f"Confidence: {lit.confidence:.0%}")
+            lines.append(f"Mutation Type: {lit.mutation_type}")
+
+            if lit.resistant_to:
+                drugs_info = [f"{r.drug} ({r.evidence})" for r in lit.resistant_to[:3]]
+                lines.append(f"RESISTANT TO: {', '.join(drugs_info)}")
+
+            if lit.sensitive_to:
+                drugs_info = [f"{s.drug} ({s.evidence})" for s in lit.sensitive_to[:3]]
+                lines.append(f"POTENTIALLY SENSITIVE TO: {', '.join(drugs_info)}")
+
+            if lit.clinical_significance:
+                lines.append(f"Clinical Significance: {lit.clinical_significance}")
+
+            if lit.key_findings:
+                lines.append("Key Findings:")
+                for finding in lit.key_findings[:3]:
+                    lines.append(f"  • {finding}")
+
+            lines.append(f"Literature Tier Recommendation: {lit.tier_recommendation.tier}")
+            if lit.tier_recommendation.rationale:
+                lines.append(f"  Rationale: {lit.tier_recommendation.rationale}")
+
+            if lit.references:
+                lines.append(f"References: {', '.join(lit.references[:5])}")
 
         lines.append("=" * 60)
         lines.append("")

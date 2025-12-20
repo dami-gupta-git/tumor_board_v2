@@ -68,6 +68,7 @@ Available in two interfaces:
 - **Evidence Aggregation**: Fetches from CIViC, ClinVar, COSMIC, FDA drug approvals, CGI Biomarkers, VICC MetaKB, Semantic Scholar, ClinicalTrials.gov, and AlphaMissense
 - **VICC MetaKB Integration**: Harmonized evidence from 6 major cancer variant knowledgebases (CIViC, CGI, JAX-CKB, OncoKB, PMKB, MolecularMatch)
 - **Semantic Scholar Literature Search**: Research literature with citation metrics, influential citations, and AI-generated paper summaries (TLDR) for resistance mutations and emerging evidence
+- **LLM-Based Literature Knowledge Extraction**: Structured extraction of resistance/sensitivity profiles from papers with tier recommendations
 - **Clinical Trials Matching**: Active trial search from ClinicalTrials.gov with variant-specific enrollment detection
 - **LLM Tiering**: Assigns AMP/ASCO/CAP tiers with confidence scores and rationale
 - **Smart Evidence Prioritization**: Surfaces tumor-specific sensitivity evidence first; correctly interprets resistance markers
@@ -218,6 +219,42 @@ See **[Full CLI Documentation](CLI.md)** for all options, output formats, and al
   - Known benign polymorphisms
   - No oncogenic evidence
 
+
+## Literature Knowledge Extraction
+
+TumorBoard uses a multi-stage LLM pipeline to extract structured clinical knowledge from research literature:
+
+### How It Works
+
+1. **Tumor-Specific Literature Search**: Searches Semantic Scholar/PubMed with tumor-type-aware queries (e.g., "KIT D816V resistance GIST" instead of generic "cancer")
+
+2. **Relevance Filtering**: LLM scores each paper's relevance (0-1) to the specific gene/variant/tumor context, filtering out papers about different tumor types or variants
+
+3. **Structured Knowledge Extraction**: LLM analyzes relevant papers to extract:
+   - **Mutation type**: Primary (driver) vs. secondary (resistance/acquired)
+   - **Resistance profile**: Drugs the variant causes resistance to, with evidence level
+   - **Sensitivity profile**: Drugs the variant may respond to, including IC50 values
+   - **Tier recommendation**: Literature-based AMP/ASCO/CAP tier with rationale
+
+### Example: KIT D816V in GIST
+
+```
+Literature Knowledge (confidence: 90%):
+  Mutation Type: secondary (resistance)
+  Resistant to: imatinib (clinical), sorafenib (preclinical)
+  Sensitive to: PLX9486 (preclinical), dasatinib (in vitro, IC50: 37-79 nM)
+  Tier recommendation: II
+  Rationale: Resistance marker excluding standard GIST therapies
+```
+
+This enables correct classification of complex cases where structured databases may have incomplete or conflicting information.
+
+### Configuration
+
+The variant-specific configuration in `src/tumorboard/config/variant_classes.yaml` includes:
+- IC50 resistance/sensitivity profiles for known mutations
+- Special rules for tumor-type-specific handling (e.g., D816V behaves differently in GIST vs. mastocytosis)
+- Literature references (PMIDs) supporting the classification
 
 ## Variant Normalization
 
