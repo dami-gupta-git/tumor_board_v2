@@ -125,6 +125,15 @@ For phenotype-causing approvals, the variant IS the approval even if not literal
 - "MPL W515L in MPN" + myelofibrosis approval = Tier I (MPL mutation defines the disease)
 
 DO NOT say "the drug isn't specifically approved for this variant" when the tier guidance already accounts for biomarker-phenotype cascades. The structured preprocessing has validated these relationships. Trust the tier guidance.
+
+ACQUIRED RESISTANCE MUTATIONS (NEVER TIER I):
+These mutations cause RESISTANCE to FDA-approved therapies and should NEVER be Tier I:
+- **EGFR C797S**: Causes resistance to osimertinib AND first-gen TKIs (gefitinib, erlotinib). NO FDA-approved therapy exists. This is Tier II (resistance marker).
+- **EGFR T790M**: Resistance to first-gen TKIs, BUT osimertinib IS FDA-approved for T790M → Tier I
+- **KIT D816V in GIST**: Causes imatinib resistance (but approved in mastocytosis) → Tier II in GIST
+
+If the tier guidance says "TIER II INDICATOR: Resistance marker" or "FDA-approved in different tumor", do NOT upgrade to Tier I.
+The presence of FDA-approved drugs for the GENE (like gefitinib for EGFR) does NOT mean approval for the specific VARIANT (C797S).
 """
 
 ACTIONABILITY_USER_PROMPT = """Assess the following somatic variant:

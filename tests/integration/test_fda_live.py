@@ -452,6 +452,41 @@ class TestFDALiveAPI:
 
         assert found_msi, f"Expected MSI-H drug for PMS2, got: {brand_names}"
 
+    @pytest.mark.asyncio
+    async def test_msi_h_tumor_agnostic_approval(self, fda_client):
+        """Test that MSI-H approvals are tumor-agnostic (apply to ANY solid tumor).
+
+        The FDA approved pembrolizumab for MSI-H/dMMR solid tumors regardless of
+        tumor type. This means MLH1 V716M in endometrial cancer should be Tier I
+        even though the FDA label doesn't specifically mention "endometrial".
+        """
+        from tumorboard.models.evidence.fda import FDAApproval
+
+        approvals = await fda_client.fetch_drug_approvals("MLH1", "V716M")
+
+        # Parse approvals to get FDAApproval objects
+        found_tumor_agnostic = False
+        for raw in approvals:
+            parsed = fda_client.parse_approval_data(raw, "MLH1", "V716M")
+            if not parsed:
+                continue
+
+            approval = FDAApproval(
+                brand_name=parsed.get("brand_name"),
+                indication=parsed.get("indication"),
+                variant_in_indications=parsed.get("variant_in_indications"),
+            )
+
+            # Test tumor-agnostic matching - these should ALL match
+            tumor_types = ["Endometrial Cancer", "Pancreatic Cancer", "Ovarian Cancer", "Gastric Cancer"]
+            for tumor in tumor_types:
+                result = approval.parse_indication_for_tumor(tumor)
+                if result["tumor_match"]:
+                    print(f"\n{approval.brand_name} matches {tumor}: {result['indication_excerpt'][:100]}...")
+                    found_tumor_agnostic = True
+
+        assert found_tumor_agnostic, "Expected at least one MSI-H drug with tumor-agnostic approval"
+
 
 class TestFDAClientDirectQueries:
     """Test the FDA client's direct query functionality."""

@@ -52,10 +52,62 @@ class FDAApproval(BaseModel):
         tumor_match = False
         matched_section = ""
 
+        # Priority 0: Detect TUMOR-AGNOSTIC MSI-H/dMMR approvals
+        # These apply to ANY solid tumor (endometrial, pancreatic, ovarian, etc.)
+        # FDA label says "MSI-H or dMMR solid tumors" or "MSI-H or dMMR Cancer"
+        # The [FDA APPROVED FOR MSI-H...] prefix indicates this is a tumor-agnostic approval
+        msi_h_tumor_agnostic_patterns = [
+            'fda approved for msi-h',
+            'fda approved for dmmr',
+            'microsatellite instability-high',
+            'mismatch repair deficient',
+        ]
+        is_msi_h_approval = any(p in indication_lower for p in msi_h_tumor_agnostic_patterns)
+
+        # For MSI-H/dMMR approvals, check if approval is tumor-agnostic (applies to all solid tumors)
+        # vs tumor-specific (e.g., "MSI-H colorectal cancer" only applies to CRC)
+        if is_msi_h_approval:
+            # Check if this is a tumor-agnostic approval (no specific tumor mentioned with MSI-H)
+            # Look for phrases like "MSI-H solid tumors" or "MSI-H Cancer" without a specific site
+            tumor_agnostic_phrases = [
+                'msi-h or dmmr cancer',
+                'msi-h cancer',
+                'dmmr cancer',
+                'msi-h solid tumor',
+                'dmmr solid tumor',
+                'msi-h or mismatch repair deficient cancer',
+                'microsatellite instability-high or mismatch repair deficient cancer',
+            ]
+            is_tumor_agnostic = any(p in indication_lower for p in tumor_agnostic_phrases)
+
+            if is_tumor_agnostic:
+                # This is a tumor-agnostic approval - applies to ANY solid tumor
+                # Including endometrial, pancreatic, ovarian, gastric, etc.
+                # Extract the MSI-H section as the matched section
+                for pattern in ['[fda approved for msi-h', '[fda approved for dmmr']:
+                    if pattern in indication_lower:
+                        idx = indication_lower.find(pattern)
+                        bracket_end = self.indication.find(']', idx)
+                        if bracket_end > 0:
+                            matched_section = self.indication[idx:bracket_end + 1]
+                            tumor_match = True
+                            break
+
+                if not tumor_match:
+                    # Fallback: find MSI-H mention in indication
+                    for pattern in msi_h_tumor_agnostic_patterns:
+                        if pattern in indication_lower:
+                            idx = indication_lower.find(pattern)
+                            start = max(0, idx - 50)
+                            end = min(len(self.indication), idx + 300)
+                            matched_section = self.indication[start:end]
+                            tumor_match = True
+                            break
+
         # Priority 1: If indication has a variant-specific section at the start (from fda.py),
         # use that section for line-of-therapy detection. This handles cases like TAGRISSO
         # where T790M has its own later-line indication separate from L858R/exon19del first-line.
-        if self.indication.startswith('[FDA APPROVED FOR'):
+        if not tumor_match and self.indication.startswith('[FDA APPROVED FOR'):
             # Extract the variant-specific section
             bracket_end = self.indication.find(']')
             if bracket_end > 0:

@@ -777,7 +777,7 @@
       "gene": "MLH1",
       "variant": "V716M",
       "tumor_type": "Endometrial Cancer",
-      "expected_tier": "Tier I",
+      "expected_tier": "Tier III",
       "notes": "Mismatch repair deficiency; immunotherapy indicated",
       "references": ["Le DT et al. Science 2017"]
     },
