@@ -39,6 +39,14 @@ class FDAApproval(BaseModel):
             'bladder cancer': ['bladder', 'urothelial', 'transitional cell', 'urothelial carcinoma'],
             'urothelial': ['urothelial', 'bladder', 'transitional cell'],
             'cholangiocarcinoma': ['cholangiocarcinoma', 'bile duct', 'biliary'],
+            # Myeloproliferative neoplasms - these are DEFINED by MPL/JAK2/CALR mutations
+            # The FDA labels say "myelofibrosis" or "polycythemia vera" but patients present
+            # with a diagnosis of "myeloproliferative neoplasm" containing these mutations
+            'myeloproliferative neoplasm': ['myelofibrosis', 'polycythemia vera', 'myeloproliferative', 'mpn'],
+            'myeloproliferative': ['myelofibrosis', 'polycythemia vera', 'myeloproliferative', 'mpn'],
+            'mpn': ['myelofibrosis', 'polycythemia vera', 'myeloproliferative', 'mpn'],
+            'myelofibrosis': ['myelofibrosis', 'myeloproliferative'],
+            'polycythemia vera': ['polycythemia vera', 'myeloproliferative'],
         }
 
         tumor_match = False

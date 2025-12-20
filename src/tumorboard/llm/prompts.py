@@ -111,6 +111,20 @@ CRITICAL REMINDERS:
 - Never cite FDA approvals not explicitly shown in the evidence
 - Focus on synthesizing the evidence into clear clinical recommendations
 - IMPORTANT: If the tier guidance says "TIER I INDICATOR: FDA-approved therapy FOR this variant", assign Tier I. The presence of resistance to OTHER drugs does NOT negate FDA-approved targeted therapy.
+
+BIOMARKER-PHENOTYPE APPROVALS (DO NOT OVERRIDE):
+When the tier guidance says "TIER I INDICATOR", the preprocessing has ALREADY validated one of these:
+1. **Direct variant approval**: FDA label explicitly mentions this variant (e.g., BRAF V600E)
+2. **Gene-class approval**: FDA approved for any deleterious mutation in this gene (e.g., BRCA-mutated)
+3. **Phenotype-causing approval**: The variant CAUSES a phenotype that has FDA approval:
+   - MMR gene mutations (MLH1, MSH2, MSH6, PMS2) → cause dMMR → result in MSI-H → KEYTRUDA approved for MSI-H
+   - MPN driver mutations (MPL, JAK2, CALR) → ARE the diagnostic criteria for myelofibrosis → JAKAFI approved for myelofibrosis
+
+For phenotype-causing approvals, the variant IS the approval even if not literally named:
+- "PMS2 R20* in CRC" + MSI-H approval = Tier I (PMS2 mutation causes the MSI-H phenotype)
+- "MPL W515L in MPN" + myelofibrosis approval = Tier I (MPL mutation defines the disease)
+
+DO NOT say "the drug isn't specifically approved for this variant" when the tier guidance already accounts for biomarker-phenotype cascades. The structured preprocessing has validated these relationships. Trust the tier guidance.
 """
 
 ACTIONABILITY_USER_PROMPT = """Assess the following somatic variant:

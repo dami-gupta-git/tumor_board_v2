@@ -211,6 +211,44 @@ class FDAClient:
                             seen_drugs.add(drug_id)
                             approvals.append(r)
 
+            # Strategy 4: For myeloproliferative neoplasm driver genes (MPL, JAK2, CALR)
+            # These are diagnostic mutations - having them MEANS you have the disease
+            # Jakafi (ruxolitinib) is FDA-approved for myelofibrosis/PV, which are defined
+            # by these mutations. The FDA label says "myelofibrosis" not "MPL-mutated".
+            if gene_upper in ["MPL", "JAK2", "CALR"]:
+                mpn_searches = [
+                    'indications_and_usage:myelofibrosis',
+                    'indications_and_usage:"polycythemia vera"',
+                    'indications_and_usage:myeloproliferative',
+                ]
+                for mpn_query in mpn_searches:
+                    result = await self._query_drugsfda(mpn_query, limit=10)
+                    for r in result.get("results", []):
+                        drug_id = r.get("openfda", {}).get("brand_name", [""])[0]
+                        if drug_id and drug_id not in seen_drugs:
+                            seen_drugs.add(drug_id)
+                            approvals.append(r)
+
+            # Strategy 5: For mismatch repair (MMR) genes (MLH1, MSH2, MSH6, PMS2)
+            # Deleterious mutations in these genes cause mismatch repair deficiency (dMMR)
+            # which results in microsatellite instability-high (MSI-H).
+            # Pembrolizumab (KEYTRUDA) is FDA-approved tumor-agnostic for MSI-H/dMMR tumors.
+            # The FDA label says "MSI-H" or "dMMR" - not the specific gene names.
+            if gene_upper in ["MLH1", "MSH2", "MSH6", "PMS2"]:
+                msi_searches = [
+                    'indications_and_usage:"microsatellite instability"',
+                    'indications_and_usage:MSI-H',
+                    'indications_and_usage:"mismatch repair deficient"',
+                    'indications_and_usage:dMMR',
+                ]
+                for msi_query in msi_searches:
+                    result = await self._query_drugsfda(msi_query, limit=10)
+                    for r in result.get("results", []):
+                        drug_id = r.get("openfda", {}).get("brand_name", [""])[0]
+                        if drug_id and drug_id not in seen_drugs:
+                            seen_drugs.add(drug_id)
+                            approvals.append(r)
+
             return approvals[:10]  # Return top 10 most relevant
 
         except Exception as e:
@@ -356,6 +394,74 @@ class FDAClient:
                         variant_in_indications = True
                         indication_variant_note = f"[FDA APPROVED FOR {gene_upper}-mutated cancers: {context_snippet}]"
                         break
+
+            # Check for DISEASE-BASED approvals for myeloproliferative neoplasm genes (MPL, JAK2, CALR)
+            # These mutations are DIAGNOSTIC markers - having them DEFINES the disease.
+            # Jakafi (ruxolitinib) is approved for myelofibrosis/PV, which ARE the diseases these mutations cause.
+            # The FDA label says "myelofibrosis" not "MPL-mutated" because the mutation IS the disease.
+            if gene_upper in ['MPL', 'JAK2', 'CALR'] and not variant_in_indications:
+                mpn_disease_patterns = [
+                    ('myelofibrosis', 'myelofibrosis'),
+                    ('polycythemia vera', 'polycythemia vera'),
+                    ('myeloproliferative neoplasm', 'myeloproliferative neoplasms'),
+                    ('primary myelofibrosis', 'primary myelofibrosis'),
+                    ('post-polycythemia vera', 'post-polycythemia vera myelofibrosis'),
+                    ('post-essential thrombocythemia', 'post-essential thrombocythemia myelofibrosis'),
+                ]
+                for search_pattern, display_name in mpn_disease_patterns:
+                    if search_pattern in indication_lower:
+                        # Find context for this disease-based approval
+                        idx = indication_lower.find(search_pattern)
+                        start = indication_text.rfind("•", 0, idx)
+                        if start == -1:
+                            start = max(0, idx - 50)
+                        end = indication_text.find("•", idx + len(search_pattern))
+                        if end == -1:
+                            end = min(len(indication_text), idx + 200)
+                        context_snippet = indication_text[start:end].strip()
+
+                        # Check it's not an exclusion
+                        exclusion_terms = ['no data', 'not studied', 'not recommended', 'not indicated']
+                        is_excluded = any(ex in context_snippet.lower() for ex in exclusion_terms)
+
+                        if not is_excluded:
+                            variant_in_indications = True
+                            indication_variant_note = f"[FDA APPROVED FOR {display_name} ({gene_upper} mutations are diagnostic): {context_snippet}]"
+                            break
+
+            # Check for MSI-H/dMMR approvals for mismatch repair genes (MLH1, MSH2, MSH6, PMS2)
+            # Deleterious mutations in these genes cause mismatch repair deficiency (dMMR),
+            # which results in microsatellite instability-high (MSI-H).
+            # Pembrolizumab (KEYTRUDA) is FDA-approved tumor-agnostic for MSI-H/dMMR solid tumors.
+            # The FDA label says "MSI-H" or "dMMR" - not the specific gene names.
+            if gene_upper in ['MLH1', 'MSH2', 'MSH6', 'PMS2'] and not variant_in_indications:
+                msi_biomarker_patterns = [
+                    ('microsatellite instability-high', 'MSI-H (microsatellite instability-high)'),
+                    ('microsatellite instability high', 'MSI-H (microsatellite instability-high)'),
+                    ('msi-h', 'MSI-H (microsatellite instability-high)'),
+                    ('mismatch repair deficient', 'dMMR (mismatch repair deficient)'),
+                    ('dmmr', 'dMMR (mismatch repair deficient)'),
+                ]
+                for search_pattern, display_name in msi_biomarker_patterns:
+                    if search_pattern in indication_lower:
+                        # Find context for this biomarker-based approval
+                        idx = indication_lower.find(search_pattern)
+                        start = indication_text.rfind("•", 0, idx)
+                        if start == -1:
+                            start = max(0, idx - 50)
+                        end = indication_text.find("•", idx + len(search_pattern))
+                        if end == -1:
+                            end = min(len(indication_text), idx + 200)
+                        context_snippet = indication_text[start:end].strip()
+
+                        # Check it's not an exclusion
+                        exclusion_terms = ['no data', 'not studied', 'not recommended', 'not indicated']
+                        is_excluded = any(ex in context_snippet.lower() for ex in exclusion_terms)
+
+                        if not is_excluded:
+                            variant_in_indications = True
+                            indication_variant_note = f"[FDA APPROVED FOR {display_name} tumors ({gene_upper} mutations cause dMMR/MSI-H): {context_snippet}]"
+                            break
 
             # Check clinical_studies for variant-specific approval info
             # This is important for variants like G719X, S768I, L861Q that are mentioned

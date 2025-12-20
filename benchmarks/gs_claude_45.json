@@ -502,7 +502,7 @@
       "gene": "ARID1A",
       "variant": "Q1334*",
       "tumor_type": "Ovarian Cancer",
-      "expected_tier": "Tier III",
+      "expected_tier": "Tier II",
       "notes": "Potential synthetic lethality with ATR/PARP inhibitors. Phase 2 data only, not FDA-approved.",
       "references": [
         "Bitler BG et al. Nat Med 2015",
