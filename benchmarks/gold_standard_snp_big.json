@@ -41,7 +41,7 @@
       "gene": "BRAF",
       "variant": "V600E",
       "tumor_type": "Colorectal Cancer",
-      "expected_tier": "Tier II",
+      "expected_tier": "Tier I",
       "notes": "BRAF inhibitors + anti-EGFR therapy shows activity; not first-line",
       "references": ["Kopetz S et al. N Engl J Med 2019"]
     },
@@ -129,7 +129,7 @@
       "gene": "KRAS",
       "variant": "G12V",
       "tumor_type": "Colorectal Cancer",
-      "expected_tier": "Tier I",
+      "expected_tier": "Tier II",
       "notes": "Resistance to anti-EGFR therapy (cetuximab, panitumumab)",
       "references": ["Karapetis CS et al. N Engl J Med 2008"]
     },

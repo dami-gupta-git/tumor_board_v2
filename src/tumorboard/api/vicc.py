@@ -18,7 +18,7 @@ Key Design:
 - Response types: Responsive/Sensitivity, Resistant, 1A/1B/2A/2B/etc (OncoKB-style)
 - Sources attributed to original KB for provenance tracking
 """
-
+import json
 from typing import Any
 
 import httpx
@@ -340,6 +340,8 @@ class VICCClient:
             response = await client.get(url, params=params)
             response.raise_for_status()
             data = response.json()
+            hits=data["hits"]
+
         except httpx.HTTPError as e:
             raise VICCError(f"VICC API request failed: {e}")
         except Exception as e:

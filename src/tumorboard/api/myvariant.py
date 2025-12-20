@@ -11,7 +11,7 @@ Key Design:
 - Structured parsing to typed Evidence models
 - Context manager for session cleanup
 """
-
+import json
 import re
 from typing import Any
 
@@ -806,6 +806,8 @@ class MyVariantClient:
             protein_notation = f"p.{variant}" if not variant.startswith("p.") else variant
             query = f"{gene} {protein_notation}"
             result = await self._query(query, fields=fields)
+            with open("myvar.json", "w") as f:
+                json.dump(result, f, indent=4)
 
             # Strategy 2: If no hits, try simple gene:variant (e.g., "BRAF:V600E")
             if result.get("total", 0) == 0:
