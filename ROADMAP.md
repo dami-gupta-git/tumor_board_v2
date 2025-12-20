@@ -28,6 +28,14 @@ Research literature search with built-in citation metrics and AI summaries (repl
 - Impact score calculation for evidence prioritization
 - Example: EGFR C797S correctly classified as Tier II resistance marker via Semantic Scholar evidence
 
+### Exon-Level Literature Search
+Enhance literature search to find papers about mutation classes, not just specific variants:
+- When searching for V560D, also search for "KIT exon 11" papers
+- Map variants to their exon/domain using variant_classes.yaml configuration
+- Find foundational papers like Heinrich 2003 (PMID 14645423) that establish exon-class response patterns
+- Currently missed: Papers discussing "exon 11 mutations" won't be found when searching for "V560D"
+- Note: Semantic Scholar may not index older foundational papers (e.g., PMID 14645423 not found)
+
 ### LLM-Powered Literature Synthesis (Future)
 Enhanced literature analysis with LLM-based evidence synthesis:
 - Relevance ranking of retrieved abstracts

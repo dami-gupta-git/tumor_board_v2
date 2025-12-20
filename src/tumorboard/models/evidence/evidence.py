@@ -491,8 +491,17 @@ class Evidence(VariantAnnotations):
     def get_tier_hint(self, tumor_type: str | None = None) -> str:
         """Generate explicit tier guidance based on evidence structure."""
 
-        # Check LLM-extracted literature knowledge FIRST (highest confidence source)
-        # This uses structured extraction from papers to determine tier
+        # PRIORITY 1: Check for FDA approval FOR variant in tumor (highest priority)
+        # Structured FDA data takes precedence over literature extraction because:
+        # - FDA approval is definitive evidence of clinical utility
+        # - Literature extraction may find resistance to OTHER drugs (e.g., sunitinib)
+        #   while FDA-approved therapy (e.g., imatinib) exists for the same variant
+        if self.has_fda_for_variant_in_tumor(tumor_type):
+            logger.info(f"Tier I: {self.gene} {self.variant} in {tumor_type} has FDA approval")
+            return "TIER I INDICATOR: FDA-approved therapy FOR this variant in this tumor type"
+
+        # PRIORITY 2: Check LLM-extracted literature knowledge
+        # Only use literature if no FDA approval exists for this variant in tumor
         if self.literature_knowledge and self.literature_knowledge.confidence >= 0.7:
             lit = self.literature_knowledge
             tier_rec = lit.tier_recommendation
@@ -516,11 +525,6 @@ class Evidence(VariantAnnotations):
                 sensitive_drugs = ", ".join(lit.get_sensitivity_drugs()[:2])
                 logger.info(f"Tier I (literature): {self.gene} {self.variant} has therapeutic options: {sensitive_drugs}")
                 return f"TIER I INDICATOR (LITERATURE): Therapeutic options: {sensitive_drugs}. {tier_rec.rationale}"
-
-        # Check for FDA approval FOR variant in tumor (highest priority from structured data)
-        if self.has_fda_for_variant_in_tumor(tumor_type):
-            logger.info(f"Tier I: {self.gene} {self.variant} in {tumor_type} has FDA approval")
-            return "TIER I INDICATOR: FDA-approved therapy FOR this variant in this tumor type"
 
         # Check for active clinical trials - overrides investigational-only (Tier II)
         has_trials, trial_drugs = self.has_active_clinical_trials(variant_specific_only=True)
@@ -755,6 +759,10 @@ class Evidence(VariantAnnotations):
             lines.append(pubmed_summary)
 
         # Add LLM-extracted literature knowledge
+        # But suppress the tier recommendation when FDA approval already exists
+        # (literature extraction doesn't know about FDA approvals and may contradict)
+        has_fda_approval = self.has_fda_for_variant_in_tumor(tumor_type)
+
         if self.literature_knowledge and self.literature_knowledge.confidence >= 0.5:
             lit = self.literature_knowledge
             lines.append("")
@@ -778,9 +786,14 @@ class Evidence(VariantAnnotations):
                 for finding in lit.key_findings[:3]:
                     lines.append(f"  • {finding}")
 
-            lines.append(f"Literature Tier Recommendation: {lit.tier_recommendation.tier}")
-            if lit.tier_recommendation.rationale:
-                lines.append(f"  Rationale: {lit.tier_recommendation.rationale}")
+            # Only include literature tier recommendation if no FDA approval exists
+            # This prevents the LLM from being confused by conflicting tier signals
+            if not has_fda_approval:
+                lines.append(f"Literature Tier Recommendation: {lit.tier_recommendation.tier}")
+                if lit.tier_recommendation.rationale:
+                    lines.append(f"  Rationale: {lit.tier_recommendation.rationale}")
+            else:
+                lines.append("(Literature tier recommendation suppressed - FDA approval takes precedence)")
 
             if lit.references:
                 lines.append(f"References: {', '.join(lit.references[:5])}")

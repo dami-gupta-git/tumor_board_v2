@@ -210,7 +210,9 @@ class ValidationMetrics(BaseModel):
             # Add to failure analysis for later review
             self.failure_analysis.append(
                 {
-                    "variant": f"{result.gene} {result.variant}",
+                    "gene": result.gene,
+                    "variant": result.variant,
+                    "variant_display": f"{result.gene} {result.variant}",
                     "tumor_type": result.tumor_type,
                     "expected": result.expected_tier.value,
                     "predicted": result.predicted_tier.value,
@@ -294,8 +296,8 @@ class ValidationMetrics(BaseModel):
             lines.append(f"\n{'-' * 80}")
             lines.append(f"FAILURE ANALYSIS ({len(self.failure_analysis)} errors)")
             lines.append(f"{'-' * 80}")
-            for idx, failure in enumerate(self.failure_analysis[:10], 1):  # Show top 10
-                lines.append(f"\n{idx}. {failure['variant']} in {failure['tumor_type']}")
+            for idx, failure in enumerate(self.failure_analysis, 1):  # Show all errors
+                lines.append(f"\n{idx}. {failure['variant_display']} in {failure['tumor_type']}")
                 lines.append(
                     f"   Expected: {failure['expected']} | "
                     f"Predicted: {failure['predicted']} | "
@@ -303,9 +305,8 @@ class ValidationMetrics(BaseModel):
                 )
                 lines.append(f"   Confidence: {failure['confidence']}")
                 lines.append(f"   Summary: {failure['summary']}")
-
-            if len(self.failure_analysis) > 10:
-                lines.append(f"\n... and {len(self.failure_analysis) - 10} more errors")
+                # Add test command for easy reproduction
+                lines.append(f"   Test: tumorboard assess {failure['gene']} {failure['variant']} -t \"{failure['tumor_type']}\"")
 
         lines.append(f"\n{'=' * 80}")
         return "\n".join(lines)

@@ -121,7 +121,7 @@
       "gene": "KRAS",
       "variant": "G12D",
       "tumor_type": "Pancreatic Cancer",
-      "expected_tier": "Tier III",
+      "expected_tier": "Tier II",
       "notes": "KRAS G12D inhibitors in clinical trials; no FDA approval yet",
       "references": ["Waters AM et al. Cold Spring Harb Perspect Med 2018"]
     },
@@ -385,7 +385,7 @@
       "gene": "TP53",
       "variant": "Y220C",
       "tumor_type": "Ovarian Cancer",
-      "expected_tier": "Tier III",
+      "expected_tier": "Tier II",
       "notes": "Small molecule stabilizers in early trials",
       "references": ["Boeckler FM et al. Proc Natl Acad Sci 2008"]
     },
