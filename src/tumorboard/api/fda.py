@@ -306,6 +306,57 @@ class FDAClient:
                         indication_variant_note = f"[FDA APPROVED FOR {variant_upper}: {indication_text[start:end].strip()}]"
                     # If it's an exclusion, don't set variant_in_indications or add the prefix
 
+            # Check for GENE-CLASS approvals (e.g., "BRCA-mutated", "gBRCAm")
+            # These are approvals for ANY deleterious mutation in the gene, not specific variants
+            # Common for DNA repair genes like BRCA1/BRCA2 where PARP inhibitors work for any pathogenic mutation
+            gene_upper = gene.upper()
+            gene_class_approval_patterns = [
+                # BRCA patterns used in FDA labels
+                f'{gene_upper}-mutated',  # "BRCA1-mutated"
+                f'{gene_upper}m',  # "BRCA1m" (FDA abbreviation)
+                f'g{gene_upper}m',  # "gBRCA1m" (germline BRCA1 mutation)
+                f'{gene_upper} mutation',  # "BRCA1 mutation"
+                f'{gene_upper} mutations',  # "BRCA1 mutations"
+                f'deleterious {gene_upper}',  # "deleterious BRCA1"
+                f'pathogenic {gene_upper}',  # "pathogenic BRCA1"
+            ]
+            # Also check for generic BRCA patterns if gene is BRCA1 or BRCA2
+            if gene_upper in ['BRCA1', 'BRCA2']:
+                gene_class_approval_patterns.extend([
+                    'brca-mutated',
+                    'brca -mutated',  # FDA sometimes puts space before hyphen
+                    'brcam',
+                    'gbrcam',
+                    'gbrca m',  # "g BRCA m" (FDA uses spaces)
+                    'g brca m',  # More spacing variants
+                    'brca mutation',
+                    'brca mutations',
+                    'deleterious brca',
+                    'pathogenic brca',
+                ])
+
+            indication_lower = indication_text.lower()
+            for pattern in gene_class_approval_patterns:
+                if pattern in indication_lower:
+                    # Find context for this gene-class approval
+                    idx = indication_lower.find(pattern)
+                    start = indication_text.rfind("•", 0, idx)
+                    if start == -1:
+                        start = max(0, idx - 50)
+                    end = indication_text.find("•", idx + len(pattern))
+                    if end == -1:
+                        end = min(len(indication_text), idx + 200)
+                    context_snippet = indication_text[start:end].strip()
+
+                    # Check it's not an exclusion
+                    exclusion_terms = ['no data', 'not studied', 'not recommended', 'not indicated']
+                    is_excluded = any(ex in context_snippet.lower() for ex in exclusion_terms)
+
+                    if not is_excluded:
+                        variant_in_indications = True
+                        indication_variant_note = f"[FDA APPROVED FOR {gene_upper}-mutated cancers: {context_snippet}]"
+                        break
+
             # Check clinical_studies for variant-specific approval info
             # This is important for variants like G719X, S768I, L861Q that are mentioned
             # in clinical studies but not in the generic indications text

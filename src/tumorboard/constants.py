@@ -25,6 +25,11 @@ GENE_ALIASES: dict[str, list[str]] = {
     "KIT": ["CD117", "C-KIT"],
     "PDGFRA": ["CD140A"],
     "PDGFRB": ["CD140B"],
+    # BRCA1/BRCA2: FDA labels often use generic "BRCA" or "gBRCA" (germline BRCA)
+    # without specifying BRCA1 vs BRCA2. PARP inhibitors like Olaparib (Lynparza)
+    # are approved for "BRCA-mutated" cancers.
+    "BRCA1": ["BRCA", "gBRCA"],
+    "BRCA2": ["BRCA", "gBRCA"],
 }
 
 
