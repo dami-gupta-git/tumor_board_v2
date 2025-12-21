@@ -1,6 +1,7 @@
 """Logging configuration for TumorBoard LLM decisions.
 
 Provides structured logging for LLM interactions, decision tracking, and debugging.
+By default, LLM logging is disabled. Enable it explicitly when needed for debugging.
 """
 
 import json
@@ -13,28 +14,36 @@ from typing import Any
 class LLMDecisionLogger:
     """Logger for LLM decisions with structured output."""
 
-    def __init__(self, log_dir: Path | None = None, enable_file_logging: bool = True):
+    def __init__(
+        self,
+        log_dir: Path | None = None,
+        enable_file_logging: bool = False,
+        enable_console_logging: bool = False,
+    ):
         """Initialize the LLM decision logger.
 
         Args:
             log_dir: Directory for log files. Defaults to ./logs
-            enable_file_logging: Whether to write logs to files
+            enable_file_logging: Whether to write logs to files (default: False)
+            enable_console_logging: Whether to print logs to console (default: False)
         """
         self.logger = logging.getLogger("tumorboard.llm")
         self.logger.setLevel(logging.INFO)
+        self.enable_console_logging = enable_console_logging
 
         # Remove existing handlers to avoid duplicates
         self.logger.handlers.clear()
 
-        # Console handler for structured output
-        console_handler = logging.StreamHandler()
-        console_handler.setLevel(logging.INFO)
-        console_formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-            datefmt='%Y-%m-%d %H:%M:%S'
-        )
-        console_handler.setFormatter(console_formatter)
-        self.logger.addHandler(console_handler)
+        # Console handler for structured output (only if enabled)
+        if enable_console_logging:
+            console_handler = logging.StreamHandler()
+            console_handler.setLevel(logging.INFO)
+            console_formatter = logging.Formatter(
+                '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                datefmt='%Y-%m-%d %H:%M:%S'
+            )
+            console_handler.setFormatter(console_formatter)
+            self.logger.addHandler(console_handler)
 
         # File handler for detailed JSON logs
         self.file_handler = None
@@ -55,7 +64,8 @@ class LLMDecisionLogger:
             self.logger.addHandler(self.file_handler)
 
             self.log_file = log_file
-            self.logger.info(f"LLM decision logging enabled: {log_file}")
+            if enable_console_logging:
+                self.logger.info(f"LLM decision logging enabled: {log_file}")
         else:
             self.log_file = None
 
@@ -89,7 +99,8 @@ class LLMDecisionLogger:
             }
         }
 
-        self.logger.info(f"LLM Request: {gene} {variant} (tumor: {tumor_type or 'unspecified'}) using {model}")
+        if self.enable_console_logging:
+            self.logger.info(f"LLM Request: {gene} {variant} (tumor: {tumor_type or 'unspecified'}) using {model}")
 
         # Write JSON to file handler only
         if self.file_handler:
@@ -136,10 +147,11 @@ class LLMDecisionLogger:
         if raw_response:
             log_entry["raw_response"] = raw_response
 
-        self.logger.info(
-            f"LLM Decision: {gene} {variant} → {tier} "
-            f"(confidence: {confidence_score:.1%}, therapies: {len(recommended_therapies)})"
-        )
+        if self.enable_console_logging:
+            self.logger.info(
+                f"LLM Decision: {gene} {variant} → {tier} "
+                f"(confidence: {confidence_score:.1%}, therapies: {len(recommended_therapies)})"
+            )
 
         # Write JSON to file handler only
         if self.file_handler:
@@ -169,6 +181,7 @@ class LLMDecisionLogger:
             }
         }
 
+        # Always log errors to console (even if console logging is disabled)
         self.logger.error(f"LLM Error: {gene} {variant} - {error}")
 
         # Write JSON to file handler only
@@ -187,6 +200,8 @@ class LLMDecisionLogger:
         decision_rationale: str,
     ) -> None:
         """Log a high-level decision summary for easy review."""
+        if not self.enable_console_logging:
+            return
 
         summary = (
             f"\n{'='*80}\n"
@@ -218,12 +233,29 @@ class LLMDecisionLogger:
 _global_logger: LLMDecisionLogger | None = None
 
 
-def get_logger(log_dir: Path | None = None, enable_file_logging: bool = True) -> LLMDecisionLogger:
-    """Get or create the global LLM decision logger."""
+def get_logger(
+    log_dir: Path | None = None,
+    enable_file_logging: bool = False,
+    enable_console_logging: bool = False,
+) -> LLMDecisionLogger:
+    """Get or create the global LLM decision logger.
+
+    Args:
+        log_dir: Directory for log files. Defaults to ./logs
+        enable_file_logging: Whether to write logs to files (default: False)
+        enable_console_logging: Whether to print logs to console (default: False)
+
+    Returns:
+        The global LLMDecisionLogger instance
+    """
     global _global_logger
 
     if _global_logger is None:
-        _global_logger = LLMDecisionLogger(log_dir=log_dir, enable_file_logging=enable_file_logging)
+        _global_logger = LLMDecisionLogger(
+            log_dir=log_dir,
+            enable_file_logging=enable_file_logging,
+            enable_console_logging=enable_console_logging,
+        )
 
     return _global_logger
 

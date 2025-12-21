@@ -1,5 +1,6 @@
-# TumorBoard v2
-An AI-powered tool for assessing cancer variant actionability with integrated validation.
+# TumorBoardLite
+An tool for assessing cancer variant actionability with integrated validation. Performs evidence‑driven 
+AMP/ASCO/CAP tiering. Includes with a validation framework to benchmark against gold standard datasets.
 
 **Current Validation Performance: 91% accuracy | 94% Tier I F1 score**
 
@@ -9,13 +10,14 @@ tumors are clinically 'actionable'—that is, whether they have associated FDA-a
 guidelines. This is a complex, manual process involving synthesis of evidence from multiple databases.
 
 TumorBoard v2 automates and mimics this expert workflow by aggregating evidence from key genomic and drug-labeling 
-databases (CIViC, ClinVar, COSMIC, FDA) and uses large language models (LLMs) to assign standardized 
-AMP/ASCO/CAP tiers indicating clinical actionability levels. All AI decision rationale and evidence sources are 
-fully logged for transparency and auditability. A built-in validation framework benchmarks AI predictions against 
-expert-labeled “gold-standard” variant classifications.
+databases (e.g. CIViC, ClinVar, COSMIC, FDA). It applies an explicit AMP/ASCO/CAP decision tree (including Tier II 
+scenarios and Tier III sub‑levels), and produces standardized tier assignments with confidence scores and 
+human‑readable rationales. There is an LLM wrapper that explains decision making and provides detailed evidence. 
+
+A built-in validation framework benchmarks predictions against expert-labeled “gold-standard” variant classifications.
 
 Note: Currently, this tool supports only single nucleotide polymorphisms (SNPs) and small insertions/deletions (indels).  
-It is a research prototype exploring AI-assisted decision-making and is not intended for clinical use.  
+It is a research prototype and is not intended for clinical use.  
 
 **Coming Soon TL;DR – The Real AI Tumor Board**
 - Full RAG stack (NCCN/ESMO guidelines, semantic search over literature)
