@@ -1,0 +1,7 @@
+gene,variant,tumor_type
+BRAF,V600E,Melanoma
+EGFR,L858R,NSCLC
+KRAS,G12C,Lung Adenocarcinoma
+EGFR,T790M,NSCLC
+PIK3CA,H1047R,Breast Cancer
+TP53,R248W,Breast Cancer

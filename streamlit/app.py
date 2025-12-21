@@ -3,8 +3,7 @@ import streamlit as st
 import pandas as pd
 import asyncio
 import json
-from streamlit_searchbox import st_searchbox
-from backend import assess_variant, batch_assess_variants, validate_gold_standard, fetch_tumor_type_suggestions
+from backend import assess_variant, batch_assess_variants, validate_gold_standard
 
 st.set_page_config(page_title="TumorBoard", page_icon="🧬", layout="wide")
 st.title("🧬 TumorBoard: Variant Actionability Assessment")
@@ -25,79 +24,14 @@ with tab1:
     with col1:
         st.subheader("Input")
 
-        # Initialize session state for form fields if not exists
-        if 'input_gene' not in st.session_state:
-            st.session_state['input_gene'] = "BRAF"
-        if 'input_variant' not in st.session_state:
-            st.session_state['input_variant'] = "V600E"
-        if 'input_tumor' not in st.session_state:
-            st.session_state['input_tumor'] = "Melanoma"
-
-        gene = st.text_input("Gene Symbol", value=st.session_state['input_gene'], help="e.g., BRAF, EGFR, TP53", key="gene_input")
-        variant = st.text_input("Variant", value=st.session_state['input_variant'], help="e.g., V600E, L858R", key="variant_input")
-
-        # Fetch tumor type suggestions when gene and variant are provided
-        tumor_suggestions = []
-        if gene and variant and (gene != st.session_state.get('last_gene') or variant != st.session_state.get('last_variant')):
-            with st.spinner("Fetching tumor types..."):
-                tumor_suggestions = asyncio.run(fetch_tumor_type_suggestions(gene, variant))
-                st.session_state['tumor_suggestions'] = tumor_suggestions
-                st.session_state['last_gene'] = gene
-                st.session_state['last_variant'] = variant
-        elif 'tumor_suggestions' in st.session_state:
-            tumor_suggestions = st.session_state['tumor_suggestions']
-
-        # Show tumor type input with typeahead search
-        if tumor_suggestions:
-            st.info(f"💡 Found {len(tumor_suggestions)} tumor types. Start typing to search.")
-
-            # Define search function that has access to tumor_suggestions
-            def search_tumor_types(searchterm: str):
-                """Search function for typeahead widget."""
-                if not searchterm:
-                    # Show top 20 suggestions when no query
-                    return tumor_suggestions[:20]
-
-                # Filter suggestions that match the search term (case-insensitive)
-                searchterm_upper = searchterm.upper()
-                matches = [
-                    item for item in tumor_suggestions
-                    if searchterm_upper in item.upper()
-                ]
-                return matches[:20]  # Limit to 20 results
-
-            tumor = st_searchbox(
-                search_tumor_types,
-                label="Tumor Type (optional)",
-                placeholder="Type to search (e.g., NSCLC, Melanoma)...",
-                key="tumor_searchbox",
-                clear_on_submit=False
-            )
-        else:
-            tumor = st.text_input("Tumor Type (optional)", value=st.session_state['input_tumor'], help="e.g., Melanoma, Lung Adenocarcinoma", key="tumor_input")
-            st.caption("⚠️ The tumor type should exactly match values from the OncoTree ontology or CIViC database")
+        gene = st.text_input("Gene Symbol", placeholder="e.g., BRAF, EGFR, TP53", key="gene_input")
+        variant = st.text_input("Variant", placeholder="e.g., V600E, L858R", key="variant_input")
+        tumor = st.text_input("Tumor Type (optional)", placeholder="e.g., Melanoma, NSCLC", key="tumor_input")
 
         model_name = st.selectbox("LLM Model", list(MODELS.keys()))
         temperature = st.slider("Temperature", 0.0, 1.0, 0.1, 0.05)
 
-        col_btn1, col_btn2 = st.columns(2)
-        with col_btn1:
-            assess_btn = st.button("🔍 Assess Variant", type="primary", use_container_width=True)
-        with col_btn2:
-            clear_btn = st.button("🔄 Clear/Reset", use_container_width=True)
-
-        if clear_btn:
-            # Reset all input fields to default values
-            st.session_state['input_gene'] = "BRAF"
-            st.session_state['input_variant'] = "V600E"
-            st.session_state['input_tumor'] = "Melanoma"
-
-            # Clear cache
-            for key in ['tumor_suggestions', 'last_gene', 'last_variant']:
-                if key in st.session_state:
-                    del st.session_state[key]
-
-            st.rerun()
+        assess_btn = st.button("🔍 Assess Variant", type="primary", use_container_width=True)
 
     with col2:
         if assess_btn:

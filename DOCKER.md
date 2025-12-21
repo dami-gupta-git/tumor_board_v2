@@ -9,6 +9,7 @@ Simple guide to running TumorBoard with Docker.
 echo "OPENAI_API_KEY=your-key-here" > .env
 
 # 2. Build and start
+cd streamlit
 docker compose up -d
 
 # 3. Open in browser

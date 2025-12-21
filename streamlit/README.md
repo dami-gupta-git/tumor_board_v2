@@ -6,13 +6,13 @@ Clean, single-container Streamlit implementation of TumorBoard variant actionabi
 
 1. **Set up environment variables:**
 ```bash
-cd streamlit
 cp .env.example .env
 # Edit .env with your API keys
 ```
 
 2. **Start the application:**
 ```bash
+cd streamlit
 docker compose up --build
 ```
 

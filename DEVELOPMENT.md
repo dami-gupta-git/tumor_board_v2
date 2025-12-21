@@ -7,7 +7,7 @@ This guide is for developers who want to contribute to TumorBoard or extend its 
 1. Clone the repository:
 ```bash
 git clone <repository-url>
-cd tumor_board
+cd tumor_board_v2
 ```
 
 2. Create a virtual environment:
@@ -33,36 +33,82 @@ export ANTHROPIC_API_KEY="your-key"  # Optional
 
 ```
 src/tumorboard/
-├── api/              # External API clients
-│   └── myvariant.py  # MyVariant.info client with retry logic
-├── llm/              # LLM integration
-│   ├── service.py    # LLM service using litellm
-│   └── prompts.py    # System and assessment prompts
-├── models/           # Pydantic data models
-│   ├── variant.py    # Variant input/output models
-│   ├── evidence.py   # Evidence from databases
-│   ├── assessment.py # Assessment and tier models
-│   └── validation.py # Validation metrics models
-├── validation/       # Validation framework
-│   └── validator.py  # Gold standard validation logic
-├── engine.py         # Core assessment engine
-└── cli.py            # CLI interface with Typer
+├── api/                    # External API clients
+│   ├── myvariant.py        # MyVariant.info client (CIViC, ClinVar, COSMIC)
+│   ├── myvariant_models.py # API response models
+│   ├── fda.py              # FDA openFDA API client
+│   ├── cgi.py              # Cancer Genome Interpreter biomarkers
+│   ├── vicc.py             # VICC MetaKB harmonized evidence
+│   ├── civic.py            # CIViC GraphQL client (fallback)
+│   ├── semantic_scholar.py # Literature search with TLDRs
+│   ├── pubmed.py           # PubMed fallback
+│   ├── clinicaltrials.py   # ClinicalTrials.gov client
+│   └── oncokb.py           # OncoKB cancer gene list
+├── llm/                    # LLM integration
+│   ├── service.py          # LLM service (narrative + literature analysis)
+│   └── prompts.py          # Narrative prompts (tier is deterministic)
+├── models/                 # Pydantic data models
+│   ├── variant.py          # Variant input/output models
+│   ├── evidence.py         # Evidence + get_tier_hint() for deterministic tier
+│   ├── assessment.py       # Assessment and tier models
+│   ├── validation.py       # Validation metrics models
+│   ├── annotations.py      # Shared annotation fields (HGVS, scores)
+│   └── gene_context.py     # Oncogene classes, pathway-actionable TSGs
+├── config/                 # Configuration files
+│   └── variant_classes.yaml # Variant-class matching rules
+├── validation/             # Validation framework
+│   └── validator.py        # Gold standard validation logic
+├── utils/                  # Utilities
+│   ├── variant_normalization.py  # Variant format standardization
+│   └── logging_config.py   # Logging setup
+├── engine.py               # Core assessment engine
+└── cli.py                  # CLI interface with Typer
 ```
 
 ### Data Flow
 
-1. **User Input** → `VariantInput` model
-2. **Evidence Gathering** → MyVariant API → `Evidence` model
-3. **LLM Assessment** → LiteLLM → `ActionabilityAssessment` model
-4. **Output** → JSON or formatted report
+The system uses **deterministic tier classification** with LLM for narrative generation only:
+
+```
+1. User Input → VariantInput model
+2. Evidence Gathering (parallel):
+   → MyVariant API (CIViC, ClinVar, COSMIC)
+   → FDA openFDA API
+   → CGI Biomarkers
+   → VICC MetaKB
+   → Semantic Scholar / PubMed
+   → ClinicalTrials.gov
+3. Evidence Aggregation → Evidence model
+4. Deterministic Tier → Evidence.get_tier_hint() (Python code, NOT LLM)
+5. LLM Narrative → LiteLLM (explains the pre-computed tier)
+6. Output → ActionabilityAssessment (tier + narrative)
+```
 
 ### Key Design Patterns
 
+- **Deterministic tiers**: `get_tier_hint()` computes tier in testable Python code
+- **LLM for narrative only**: LLM writes clinical explanations, doesn't decide tiers
 - **Async throughout**: All I/O operations are async for performance
 - **Retry logic**: API calls use tenacity for automatic retries
 - **Type safety**: Full type hints with Pydantic validation
-- **Error handling**: Custom exceptions with meaningful messages
-- **Separation of concerns**: Each module has a single responsibility
+- **Fallback chains**: CIViC GraphQL, ClinVar E-utilities when primary sources fail
+
+## Key Files to Understand
+
+### Tier Classification Logic
+
+- **`models/evidence.py`** - `get_tier_hint()` method contains all tier decision logic
+- **`models/gene_context.py`** - Oncogene mutation classes (BRAF I/II/III), pathway-actionable TSGs
+- **`config/variant_classes.yaml`** - Variant-class matching rules (BRAF V600 specificity, EGFR exclusions)
+- **`DECISIONS.md`** - Documents all tier classification decisions and rationale
+
+### LLM Integration
+
+- **`llm/service.py`** - Three main functions:
+  - `assess_variant()` - Generates narrative for pre-computed tier
+  - `score_paper_relevance()` - Scores papers for relevance (0-1)
+  - `extract_variant_knowledge()` - Extracts structured knowledge from papers
+- **`llm/prompts.py`** - Narrative-only prompts (LLM doesn't decide tier)
 
 ## Running Tests
 
@@ -79,17 +125,17 @@ open htmlcov/index.html
 
 ### Run specific test file
 ```bash
-pytest tests/test_models.py -v
+pytest tests/unit/test_evidence.py -v
 ```
 
 ### Run tests matching a pattern
 ```bash
-pytest -k "test_civic" -v
+pytest -k "test_tier" -v
 ```
 
-### Run async tests only
+### Run integration tests
 ```bash
-pytest tests/test_api.py tests/test_llm.py
+pytest tests/integration/ -v
 ```
 
 ## Code Quality
@@ -125,12 +171,33 @@ pytest
 
 ## Adding New Features
 
+### Adding a New Tier Rule
+
+1. Identify where in the priority order the rule belongs (see `DECISIONS.md`)
+2. Add the logic to `models/evidence.py` in `get_tier_hint()`
+3. Add tests in `tests/unit/test_evidence.py`
+4. Document the decision in `DECISIONS.md`
+5. Run validation: `tumorboard validate benchmarks/gold_standard_snp.json`
+
+Example:
+```python
+# In get_tier_hint()
+def get_tier_hint(self, tumor_type: str | None = None) -> str:
+    # ... existing checks ...
+
+    # NEW RULE: Check for my new condition
+    if self._check_my_new_condition(tumor_type):
+        return "TIER II-B INDICATOR: My new condition explanation"
+
+    # ... remaining checks ...
+```
+
 ### Adding a New Database Source
 
-1. Create a new parser in `src/tumorboard/api/`:
+1. Create a new client in `src/tumorboard/api/`:
 ```python
 class NewDatabaseClient:
-    async def fetch_data(self, gene: str, variant: str) -> dict:
+    async def fetch_data(self, gene: str, variant: str) -> list[NewEvidence]:
         # Implementation
         pass
 ```
@@ -149,16 +216,55 @@ class Evidence(BaseModel):
     new_database: list[NewDatabaseEvidence] = Field(default_factory=list)
 ```
 
-4. Update `engine.py` to fetch from new source
+4. Update `engine.py` to fetch from new source in parallel
+5. Update `get_tier_hint()` if the new source affects tier decisions
+6. Add tests in `tests/unit/test_api.py`
 
-5. Add tests in `tests/test_api.py`
+### Adding an Oncogene Mutation Class
+
+Edit `src/tumorboard/models/gene_context.py`:
+
+```python
+ONCOGENE_MUTATION_CLASSES: dict[str, dict] = {
+    # ... existing entries ...
+    "NEW_GENE": {
+        "class_i": {
+            "name": "Class I",
+            "variants": ["V600E", "V600K"],
+            "mechanism": "Description of mechanism",
+            "drugs": ["drug1", "drug2"],
+            "fda_tumors": ["tumor1", "tumor2"],
+            "note": "Clinical note for LLM",
+        },
+    },
+}
+```
+
+### Adding a Pathway-Actionable TSG
+
+Edit `src/tumorboard/models/gene_context.py`:
+
+```python
+PATHWAY_ACTIONABLE_TSGS: dict[str, dict] = {
+    # ... existing entries ...
+    "NEW_TSG": {
+        "pathway": "Pathway Name",
+        "mechanism": "LOF mechanism description",
+        "drugs": ["drug1", "drug2"],
+        "high_prevalence_tumors": ["tumor1", "tumor2"],
+        "fda_context": "FDA approval context",
+    },
+}
+```
 
 ### Modifying the LLM Prompt
 
+Since tier is deterministic, prompt changes only affect narrative quality:
+
 1. Edit `src/tumorboard/llm/prompts.py`
-2. Update `ACTIONABILITY_SYSTEM_PROMPT` or `ACTIONABILITY_ASSESSMENT_PROMPT`
+2. Update `NARRATIVE_SYSTEM_PROMPT` or `NARRATIVE_USER_PROMPT`
 3. Test with: `tumorboard assess BRAF V600E --tumor Melanoma`
-4. Run validation to measure impact: `tumorboard validate benchmarks/gold_standard.json`
+4. The tier won't change, but the narrative should improve
 
 ### Adding New CLI Commands
 
@@ -177,12 +283,13 @@ def my_command(
 ## Testing Strategy
 
 ### Unit Tests
-- Test individual models: `tests/test_models.py`
-- Test API parsing: `tests/test_api.py`
-- Test LLM service: `tests/test_llm.py`
+- Test tier logic: `tests/unit/test_evidence.py`
+- Test gene context: `tests/unit/test_gene_context.py`
+- Test API parsing: `tests/unit/test_api.py`
+- Test LLM service: `tests/unit/test_llm.py`
 
 ### Integration Tests
-- Test end-to-end flow: `tests/test_validation.py`
+- Test end-to-end flow: `tests/integration/`
 - Mock external APIs to avoid rate limits
 
 ### Fixtures
@@ -193,13 +300,15 @@ def my_command(
 
 ### Enable Verbose Logging
 ```bash
-tumorboard assess BRAF V600E --tumor Melanoma --verbose
+tumorboard assess BRAF V600E --tumor Melanoma --log
 ```
 
-### Use Python Debugger
+### Debug Tier Classification
+Add prints in `get_tier_hint()` or use debugger:
 ```python
-# Add breakpoint in code
-import pdb; pdb.set_trace()
+# In get_tier_hint()
+print(f"DEBUG: Checking FDA approval for {tumor_type}")
+print(f"DEBUG: CIViC evidence: {self.civic}")
 ```
 
 ### Test with Mock Data
@@ -211,32 +320,11 @@ with patch.object(client, "fetch_evidence", new_callable=AsyncMock) as mock:
     # Test code
 ```
 
-## Performance Optimization
-
-### Profiling
-```python
-import cProfile
-import pstats
-
-profiler = cProfile.Profile()
-profiler.enable()
-# Code to profile
-profiler.disable()
-stats = pstats.Stats(profiler)
-stats.sort_stats('cumulative')
-stats.print_stats(20)
-```
-
-### Concurrency Tuning
-- Adjust `max_concurrent` parameter in batch operations
-- Monitor API rate limits
-- Consider caching evidence data
-
 ## Adding to Gold Standard Dataset
 
-1. Research the variant to determine correct tier
+1. Research the variant to determine correct tier (use AMP/ASCO/CAP 2017)
 2. Find supporting references
-3. Add entry to `benchmarks/gold_standard.json`:
+3. Add entry to `benchmarks/gold_standard_snp.json`:
 ```json
 {
   "gene": "GENE_NAME",
@@ -247,88 +335,54 @@ stats.print_stats(20)
   "references": ["Reference 1", "Reference 2"]
 }
 ```
-4. Run validation: `tumorboard validate benchmarks/gold_standard.json`
+4. Run validation: `tumorboard validate benchmarks/gold_standard_snp.json`
+
+## Validation
+
+Run validation to measure tier classification accuracy:
+
+```bash
+# Run against gold standard
+tumorboard validate benchmarks/gold_standard_snp.json
+
+# With specific model
+tumorboard validate benchmarks/gold_standard_snp.json --model gpt-4o-mini
+```
+
+Current performance: **80%+ accuracy**, **~95% Tier I recall**
 
 ## Release Process
 
 1. Update version in `src/tumorboard/__init__.py`
 2. Update version in `pyproject.toml`
 3. Run full test suite: `pytest`
-4. Run validation: `tumorboard validate benchmarks/gold_standard.json`
+4. Run validation: `tumorboard validate benchmarks/gold_standard_snp.json`
 5. Update CHANGELOG.md
 6. Create git tag: `git tag v0.2.0`
 7. Push: `git push origin v0.2.0`
 
-## Common Development Tasks
-
-### Add a new test
-```python
-# In tests/test_*.py
-import pytest
-
-@pytest.mark.asyncio
-async def test_my_feature(sample_fixture):
-    """Test description."""
-    # Arrange
-    expected = "result"
-
-    # Act
-    result = await my_function()
-
-    # Assert
-    assert result == expected
-```
-
-### Update dependencies
-```bash
-# Edit pyproject.toml
-# Then reinstall
-pip install -e ".[dev]"
-```
-
-### Generate test coverage report
-```bash
-pytest --cov=tumorboard --cov-report=term-missing
-```
-
 ## Best Practices
 
-1. **Type everything**: Use type hints for all functions
-2. **Document thoroughly**: Add docstrings to all public functions
-3. **Test first**: Write tests before implementing features
-4. **Keep it simple**: Avoid unnecessary complexity
+1. **Deterministic first**: Put tier logic in `get_tier_hint()`, not LLM prompts
+2. **Document decisions**: Update `DECISIONS.md` when adding tier rules
+3. **Type everything**: Use type hints for all functions
+4. **Test first**: Write tests before implementing features
 5. **Async by default**: Use async/await for I/O operations
 6. **Fail fast**: Validate inputs early with Pydantic
-7. **Log appropriately**: Use logging for debugging, not print()
-8. **Handle errors**: Use custom exceptions with clear messages
-
-## Troubleshooting
-
-### Tests failing with API errors
-- Check API keys are set
-- Check internet connection
-- Consider mocking external APIs
-
-### MyPy type errors
-- Add type hints
-- Use `# type: ignore` sparingly
-- Check imports are correct
-
-### Import errors
-- Reinstall: `pip install -e .`
-- Check Python path: `echo $PYTHONPATH`
 
 ## Resources
 
+- [DECISIONS.md](DECISIONS.md) - Tier classification decisions and rationale
+- [architecture.md](architecture.md) - System architecture documentation
+- [FEATURES.md](FEATURES.md) - Feature documentation
+- [AMP/ASCO/CAP 2017 Guidelines](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5707196/)
 - [Pydantic Documentation](https://docs.pydantic.dev/)
-- [Typer Documentation](https://typer.tiangolo.com/)
 - [LiteLLM Documentation](https://docs.litellm.ai/)
 - [MyVariant.info API](https://docs.myvariant.info/)
-- [AMP/ASCO/CAP Guidelines](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5707196/)
 
 ## Getting Help
 
 - Check existing issues on GitHub
 - Read the test files for examples
-- Ask questions in GitHub Discussions
+- Review `DECISIONS.md` for tier logic rationale
 - Review the code comments
