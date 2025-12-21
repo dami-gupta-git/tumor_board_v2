@@ -7,6 +7,9 @@ from pydantic import Field
 
 from tumorboard.config.gene_classes import load_gene_classes
 from tumorboard.config.variant_classes import load_variant_classes
+from tumorboard.models.gene_context import (
+    get_gene_context, get_therapeutic_implication, get_lof_assessment, GeneRole
+)
 from tumorboard.constants import TUMOR_TYPE_MAPPINGS
 from tumorboard.models.annotations import VariantAnnotations
 from tumorboard.models.evidence.cgi import CGIBiomarkerEvidence
@@ -1284,7 +1287,73 @@ class Evidence(VariantAnnotations):
                     logger.info(f"Tier II-D: {self.gene} {self.variant} {gene_type} with Level {sens_level} sensitivity evidence")
                     return f"TIER II-D INDICATOR: {self.gene} is a {gene_type}. Preclinical/early evidence suggests sensitivity to {drugs_str} in other cancers ({disease_str}). Limited clinical validation."
 
-        # Use functional predictions to inform VUS classification
+        # =================================================================
+        # GENE-CENTRIC FALLBACK CHAIN
+        # =================================================================
+        # When variant-specific evidence is lacking, use gene context + functional predictions
+        # This provides therapeutic guidance based on gene role even without CIViC evidence
+
+        gene_context = get_gene_context(self.gene)
+
+        if gene_context.is_cancer_gene:
+            # Assess LOF status using variant notation and predictions
+            is_lof, lof_confidence, lof_rationale = get_lof_assessment(
+                self.variant,
+                snpeff_effect=self.snpeff_effect,
+                polyphen2_prediction=self.polyphen2_prediction,
+                cadd_score=self.cadd_score,
+                alphamissense_prediction=self.alphamissense_prediction,
+            )
+
+            # Get therapeutic implication based on gene role
+            therapeutic_note = get_therapeutic_implication(gene_context, is_lof)
+
+            # Handle DDR genes - special therapeutic implications
+            if gene_context.role == GeneRole.DDR:
+                if is_lof or not lof_rationale or lof_rationale == "no functional predictions available":
+                    # LOF confirmed or unknown (give benefit of doubt for DDR genes)
+                    logger.info(f"Tier II-D: {self.gene} {self.variant} DDR gene (LOF: {lof_confidence})")
+                    return (
+                        f"TIER II-D INDICATOR: {self.gene} is a DDR gene. "
+                        f"Variant {self.variant} ({lof_rationale}, confidence: {lof_confidence}). "
+                        f"{therapeutic_note or 'Consider platinum/PARP inhibitor sensitivity.'}"
+                    )
+                else:
+                    # DDR gene but variant is predicted tolerated
+                    logger.info(f"Tier III-B: {self.gene} {self.variant} DDR gene but predicted tolerated")
+                    return (
+                        f"TIER III-B INDICATOR: {self.gene} is a DDR gene, but {self.variant} is "
+                        f"predicted TOLERATED ({lof_rationale}). May not cause loss of function. "
+                        "Functional testing recommended if clinical suspicion is high."
+                    )
+
+            elif gene_context.role == GeneRole.ONCOGENE:
+                # For oncogenes, we need variant-specific evidence (hotspots matter)
+                # Gene-level reasoning doesn't apply the same way
+                logger.info(f"Tier III-B: {self.gene} {self.variant} oncogene without variant-specific evidence")
+                return (
+                    f"TIER III-B INDICATOR: {self.gene} is an oncogene. "
+                    f"Variant {self.variant} lacks specific evidence. "
+                    "Oncogene therapeutic implications depend on specific activating mutations - "
+                    "this variant's effect is unknown."
+                )
+
+            elif gene_context.role == GeneRole.TSG:
+                if is_lof:
+                    logger.info(f"Tier III-B: {self.gene} {self.variant} TSG with predicted LOF")
+                    return (
+                        f"TIER III-B INDICATOR: {self.gene} is a tumor suppressor. "
+                        f"Variant {self.variant} is predicted loss-of-function ({lof_rationale}). "
+                        f"{therapeutic_note or 'Generally not directly targetable but confirms pathogenic variant.'}"
+                    )
+                else:
+                    logger.info(f"Tier III-C: {self.gene} {self.variant} TSG without LOF prediction")
+                    return (
+                        f"TIER III-C INDICATOR: {self.gene} is a tumor suppressor, but {self.variant} "
+                        f"is not clearly loss-of-function ({lof_rationale}). Clinical significance uncertain."
+                    )
+
+        # Use functional predictions to inform VUS classification (for genes not in curated lists)
         # If we have PolyPhen-2, CADD, or AlphaMissense predictions, use them to refine the tier
         if self.polyphen2_prediction or self.cadd_score or self.alphamissense_prediction:
             is_predicted_damaging = (

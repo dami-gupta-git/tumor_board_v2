@@ -469,7 +469,7 @@
       "gene": "POLE",
       "variant": "P286R",
       "tumor_type": "Endometrial Cancer",
-      "expected_tier": "Tier II",
+      "expected_tier": "Tier I",
       "notes": "Ultramutated phenotype, favorable prognosis. May predict immunotherapy response. Not FDA-approved indication but clinical utility.",
       "references": [
         "Church DN et al. J Clin Oncol 2015",
