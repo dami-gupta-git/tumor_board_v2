@@ -47,12 +47,9 @@ class TestLLMService:
 
         # Mock the acompletion call
         with patch("tumorboard.llm.service.acompletion", new_callable=AsyncMock) as mock_call:
-            # Create mock response object - now LLM returns narrative, not tier
+            # Create mock response object - LLM returns single narrative field
             narrative_response = json.dumps({
-                "summary": "BRAF V600E is a well-characterized oncogenic mutation.",
-                "rationale": "FDA-approved targeted therapies exist for this variant.",
-                "therapeutic_note": "Consider vemurafenib or dabrafenib.",
-                "key_evidence": ["FDA approval", "NCCN guidelines"]
+                "narrative": "BRAF V600E is a well-characterized oncogenic mutation with FDA-approved targeted therapies including vemurafenib and dabrafenib."
             })
             mock_response = AsyncMock()
             mock_response.choices = [AsyncMock()]
@@ -78,10 +75,7 @@ class TestLLMService:
         service = LLMService()
 
         response_json = {
-            "summary": "Test summary",
-            "rationale": "Test rationale",
-            "therapeutic_note": None,
-            "key_evidence": []
+            "narrative": "Test narrative for the variant."
         }
 
         markdown_response = f"```json\n{json.dumps(response_json)}\n```"
@@ -101,7 +95,7 @@ class TestLLMService:
 
             # Tier determined by evidence, not LLM
             assert assessment.gene == "BRAF"
-            assert assessment.summary == "Test summary"
+            assert assessment.summary == "Test narrative for the variant."
 
     @pytest.mark.asyncio
     async def test_llm_service_with_custom_temperature(self, sample_evidence):
@@ -113,10 +107,7 @@ class TestLLMService:
         assert service.model == "gpt-4o-mini"
 
         response_json = {
-            "summary": "Test summary",
-            "rationale": "Test rationale",
-            "therapeutic_note": None,
-            "key_evidence": []
+            "narrative": "Test narrative for the variant."
         }
 
         with patch("tumorboard.llm.service.acompletion", new_callable=AsyncMock) as mock_call:

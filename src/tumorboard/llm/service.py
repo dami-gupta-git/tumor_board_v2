@@ -132,18 +132,19 @@ class LLMService:
             data = json.loads(content)
 
             # Build assessment with deterministic tier + LLM narrative
+            narrative = data.get("narrative", tier_hint)
             assessment = ActionabilityAssessment(
                 gene=gene,
                 variant=variant,
                 tumor_type=tumor_type,
                 tier=ActionabilityTier(tier),  # Use deterministic tier
                 confidence_score=self._tier_to_confidence(tier, sublevel),
-                summary=data.get("summary", tier_hint),
-                rationale=data.get("rationale", tier_hint),
+                summary=narrative,
+                rationale="",  # No longer separate - merged into summary
                 evidence_strength=self._tier_to_strength(tier),
                 clinical_trials_available=bool(evidence.clinical_trials),
                 recommended_therapies=[],  # Could be populated from evidence
-                references=data.get("key_evidence", []),
+                references=[],
                 **evidence.model_dump(include={
                     'cosmic_id', 'ncbi_gene_id', 'dbsnp_id', 'clinvar_id',
                     'clinvar_clinical_significance', 'clinvar_accession',

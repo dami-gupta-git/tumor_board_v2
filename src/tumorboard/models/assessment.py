@@ -118,19 +118,10 @@ class ActionabilityAssessment(VariantAnnotations):
         if annotations:
             content_lines.append(f"[dim]Scores:[/dim] {' | '.join(annotations)}")
 
-        # Summary section - soft-wrapped
+        # Clinical narrative - soft-wrapped
         content_lines.append("")
-        content_lines.append("[bold]Summary[/bold]")
-        # Wrap summary text to fit in box (accounting for panel borders)
         wrapped_summary = textwrap.fill(self.summary, width=74)
         content_lines.append(wrapped_summary)
-
-        # Rationale section - soft-wrapped
-        if self.rationale:
-            content_lines.append("")
-            content_lines.append("[bold]Rationale[/bold]")
-            wrapped_rationale = textwrap.fill(self.rationale, width=74)
-            content_lines.append(wrapped_rationale)
 
         # Therapies section
         if self.recommended_therapies:

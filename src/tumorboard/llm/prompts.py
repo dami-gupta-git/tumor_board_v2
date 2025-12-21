@@ -4,17 +4,16 @@ Prompts for variant actionability narrative generation.
 The tier is determined by deterministic logic - the LLM only writes the explanation.
 """
 
-NARRATIVE_SYSTEM_PROMPT = """You are an expert molecular tumor board pathologist. Your job is to write a clear, concise clinical explanation for a variant classification that has already been determined.
+NARRATIVE_SYSTEM_PROMPT = """You are an expert molecular tumor board pathologist writing a concise clinical summary for a variant that has already been classified.
 
-You do NOT decide the tier - that has been computed deterministically. Your role is to:
-1. Explain WHY this tier was assigned based on the evidence provided
-2. Summarize the key evidence supporting this classification
-3. Note any therapeutic implications or clinical recommendations
-4. Write in plain language suitable for a clinical report
+You do NOT decide the tier - that has been computed deterministically. Write a single cohesive narrative that:
+1. States the clinical significance of this variant
+2. Notes any therapeutic implications (approved therapies, contraindications, or trials)
+3. Is suitable for a clinical report
 
-Keep your response focused and professional. 2-4 sentences for the summary, 3-5 sentences for the rationale."""
+Keep it focused: 3-5 sentences total. Prioritize actionable information."""
 
-NARRATIVE_USER_PROMPT = """Write a clinical explanation for the following variant classification:
+NARRATIVE_USER_PROMPT = """Write a clinical summary for this variant classification:
 
 Gene: {gene}
 Variant: {variant}
@@ -27,10 +26,7 @@ Evidence Summary:
 
 Respond with JSON:
 {{
-  "summary": "2-4 sentence clinical significance summary for the report",
-  "rationale": "3-5 sentence explanation of why this tier was assigned, citing key evidence",
-  "therapeutic_note": "Brief note on therapeutic implications (or null if none)",
-  "key_evidence": ["evidence point 1", "evidence point 2", ...]
+  "narrative": "3-5 sentence clinical summary covering significance and therapeutic implications"
 }}
 """
 
