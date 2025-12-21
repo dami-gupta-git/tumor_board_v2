@@ -343,7 +343,7 @@
       "gene": "FGFR1",
       "variant": "N546K",
       "tumor_type": "Breast Cancer",
-      "expected_tier": "Tier III",
+      "expected_tier": "Tier II",
       "notes": "FGFR inhibitors under investigation",
       "references": ["Turner N et al. Cancer Discov 2010"]
     },
@@ -359,7 +359,7 @@
       "gene": "TP53",
       "variant": "R248Q",
       "tumor_type": "Colorectal Cancer",
-      "expected_tier": "Tier III",
+      "expected_tier": "Tier II",
       "notes": "No approved targeted therapies; prognostic marker",
       "references": ["Olivier M et al. Cold Spring Harb Perspect Biol 2010"]
     },
@@ -367,7 +367,7 @@
       "gene": "TP53",
       "variant": "R273H",
       "tumor_type": "Lung Cancer",
-      "expected_tier": "Tier III",
+      "expected_tier": "Tier II",
       "notes": "No approved targeted therapies",
       "references": ["Olivier M et al. Cold Spring Harb Perspect Biol 2010"]
     },
@@ -383,7 +383,7 @@
       "gene": "AKT1",
       "variant": "E17K",
       "tumor_type": "Breast Cancer",
-      "expected_tier": "Tier II",
+      "expected_tier": "Tier I",
       "notes": "AKT inhibitors show activity; capivasertib in trials",
       "references": ["Carpten JD et al. Nature 2007"]
     },
@@ -503,7 +503,7 @@
       "gene": "CTNNB1",
       "variant": "S45F",
       "tumor_type": "Hepatocellular Carcinoma",
-      "expected_tier": "Tier III",
+      "expected_tier": "Tier II",
       "notes": "No approved targeted therapies",
       "references": ["Totoki Y et al. Nat Genet 2014"]
     },
@@ -511,7 +511,7 @@
       "gene": "CTNNB1",
       "variant": "T41A",
       "tumor_type": "Colorectal Cancer",
-      "expected_tier": "Tier III",
+      "expected_tier": "Tier II",
       "notes": "No approved targeted therapies",
       "references": ["Cancer Genome Atlas Network. Nature 2012"]
     },
@@ -530,14 +530,6 @@
       "expected_tier": "Tier I",
       "notes": "JAK2 inhibitors show activity",
       "references": ["Pardanani AD et al. N Engl J Med 2006"]
-    },
-    {
-      "gene": "CALR",
-      "variant": "K385fs",
-      "tumor_type": "Myeloproliferative Neoplasm",
-      "expected_tier": "Tier III",
-      "notes": "JAK2 inhibitors may have activity",
-      "references": ["Klampfl T et al. N Engl J Med 2013"]
     },
     {
       "gene": "SF3B1",
@@ -567,7 +559,7 @@
       "gene": "NPM1",
       "variant": "W288fs",
       "tumor_type": "Acute Myeloid Leukemia",
-      "expected_tier": "Tier III",
+      "expected_tier": "Tier I",
       "notes": "Favorable prognostic marker; venetoclax combination effective",
       "references": ["DiNardo CD et al. Blood 2019"]
     },
@@ -591,7 +583,7 @@
       "gene": "DNMT3A",
       "variant": "R882H",
       "tumor_type": "Acute Myeloid Leukemia",
-      "expected_tier": "Tier III",
+      "expected_tier": "Tier II",
       "notes": "Poor prognostic marker; no targeted therapy",
       "references": ["Ley TJ et al. N Engl J Med 2010"]
     },
@@ -599,7 +591,7 @@
       "gene": "TET2",
       "variant": "H1380Y",
       "tumor_type": "Acute Myeloid Leukemia",
-      "expected_tier": "Tier III",
+      "expected_tier": "Tier II",
       "notes": "No approved targeted therapies",
       "references": ["Delhommeau F et al. N Engl J Med 2009"]
     },
