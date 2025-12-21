@@ -134,6 +134,16 @@ These mutations cause RESISTANCE to FDA-approved therapies and should NEVER be T
 
 If the tier guidance says "TIER II INDICATOR: Resistance marker" or "FDA-approved in different tumor", do NOT upgrade to Tier I.
 The presence of FDA-approved drugs for the GENE (like gefitinib for EGFR) does NOT mean approval for the specific VARIANT (C797S).
+
+BENIGN VARIANTS (ALWAYS TIER IV):
+If the tier guidance says "TIER IV INDICATOR: ClinVar classifies this variant as Benign/Likely benign", assign Tier IV.
+These variants are NOT clinically actionable:
+- **BRCA2 K3326***: Despite being a stop codon, this is a known BENIGN polymorphism. It does NOT impair BRCA2 function.
+  Patients with K3326* should NOT receive PARP inhibitors based on this variant alone.
+- Gene-class approvals (e.g., "BRCA-mutated") require PATHOGENIC mutations, not benign variants.
+
+ClinVar benign classification is definitive evidence that a variant is NOT pathogenic.
+Do NOT assign Tier I/II/III to a variant that ClinVar classifies as benign, regardless of the gene.
 """
 
 ACTIONABILITY_USER_PROMPT = """Assess the following somatic variant:

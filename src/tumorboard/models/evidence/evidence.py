@@ -511,8 +511,40 @@ class Evidence(VariantAnnotations):
 
         return not has_predictive
 
+    def is_clinvar_benign(self) -> bool:
+        """Check if ClinVar classifies this variant as benign/likely benign.
+
+        This is critical for gene-class approvals (e.g., BRCA-mutated) where
+        the approval is for PATHOGENIC mutations only. Benign variants should
+        NOT be matched against these approvals.
+
+        Examples:
+        - BRCA2 K3326* is a known benign polymorphism despite being a stop codon
+        - Should NOT be eligible for PARP inhibitor therapy
+        """
+        if not self.clinvar:
+            return False
+
+        for cv in self.clinvar:
+            sig = (cv.clinical_significance or '').lower()
+            # Check for benign classifications
+            if 'benign' in sig and 'pathogenic' not in sig:
+                # "Benign", "Likely benign", "Benign/Likely benign" all match
+                # But "Conflicting interpretations of pathogenicity" or
+                # "Uncertain significance" don't match
+                return True
+
+        return False
+
     def get_tier_hint(self, tumor_type: str | None = None) -> str:
         """Generate explicit tier guidance based on evidence structure."""
+
+        # PRIORITY 0: Check for BENIGN classification in ClinVar
+        # Benign variants are Tier IV and should NOT be matched against
+        # gene-class FDA approvals (e.g., BRCA2 K3326* is benign, not PARP eligible)
+        if self.is_clinvar_benign():
+            logger.info(f"Tier IV: {self.gene} {self.variant} is classified as benign/likely benign in ClinVar")
+            return "TIER IV INDICATOR: ClinVar classifies this variant as Benign/Likely benign - NOT eligible for gene-class targeted therapy approvals"
 
         # PRIORITY 1: Check for FDA approval FOR variant in tumor (highest priority)
         # Structured FDA data takes precedence over literature extraction because:
