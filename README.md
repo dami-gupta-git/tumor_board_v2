@@ -180,6 +180,8 @@ See **[Logging Documentation](logging.md)** for log format, analysis examples wi
 
 See **[Full CLI Documentation](CLI.md)** for all options, output formats, and alternative model configuration.
 
+See **[Batch Processing & Validation](BATCH_PROCESSING.md)** for detailed batch assessment, validation framework, and gold standard creation.
+
 ## AMP/ASCO/CAP Tier System
 
 - **Tier I**: Variants with strong clinical significance
