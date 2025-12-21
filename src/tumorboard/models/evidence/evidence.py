@@ -9,6 +9,7 @@ from tumorboard.config.variant_classes import load_variant_classes
 from tumorboard.models.gene_context import (
     get_gene_context, get_therapeutic_implication, get_lof_assessment, GeneRole,
     load_gene_classes, get_pathway_actionable_info, is_high_prevalence_tumor,
+    get_oncogene_mutation_class, is_oncogene_class_fda_tumor,
 )
 from tumorboard.constants import TUMOR_TYPE_MAPPINGS
 from tumorboard.models.annotations import VariantAnnotations
@@ -1356,7 +1357,40 @@ class Evidence(VariantAnnotations):
                     )
 
             elif gene_context.role == GeneRole.ONCOGENE:
-                # For oncogenes, we need variant-specific evidence (hotspots matter)
+                # Check if this variant belongs to a known mutation class with therapeutic implications
+                # Example: BRAF G469A is Class II (non-V600), which responds to MEK inhibitors
+                mutation_class = get_oncogene_mutation_class(self.gene, self.variant)
+
+                if mutation_class:
+                    class_name = mutation_class["class_name"]
+                    drugs_str = ", ".join(mutation_class["drugs"][:3])
+                    mechanism = mutation_class["mechanism"]
+                    fda_context = mutation_class.get("fda_context", "")
+                    note = mutation_class.get("note", "")
+
+                    # Check if FDA approval exists for this mutation class in patient's tumor
+                    is_fda_tumor = is_oncogene_class_fda_tumor(self.gene, self.variant, tumor_type)
+
+                    if is_fda_tumor:
+                        # Tier I-B: FDA approval for this mutation class in this tumor type
+                        logger.info(f"Tier I-B: {self.gene} {self.variant} {class_name} in FDA-approved tumor {tumor_type}")
+                        return (
+                            f"TIER I-B INDICATOR: {self.gene} {self.variant} is a {class_name} mutation. "
+                            f"{mechanism}. "
+                            f"FDA-approved therapy in {tumor_type}: {drugs_str}. "
+                            f"{fda_context}"
+                        )
+                    else:
+                        # Tier II-A: FDA approval for this mutation class exists but in different tumor
+                        logger.info(f"Tier II-A: {self.gene} {self.variant} {class_name} (FDA in other tumors)")
+                        return (
+                            f"TIER II-A INDICATOR: {self.gene} {self.variant} is a {class_name} mutation. "
+                            f"{mechanism}. "
+                            f"Therapeutic options: {drugs_str} (FDA-approved in other tumor types). "
+                            f"{note} {fda_context}"
+                        )
+
+                # For oncogenes without known mutation class, we need variant-specific evidence
                 # Gene-level reasoning doesn't apply the same way
                 logger.info(f"Tier III-B: {self.gene} {self.variant} oncogene without variant-specific evidence")
                 return (

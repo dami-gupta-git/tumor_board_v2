@@ -260,6 +260,136 @@ PATHWAY_ACTIONABLE_TSGS: dict[str, dict] = {
 }
 
 
+# =============================================================================
+# ONCOGENE MUTATION CLASSES
+# =============================================================================
+# Some oncogenes have distinct mutation classes with different therapeutic profiles.
+# Unlike simple hotspot detection, mutation class determines mechanism of action
+# and drug sensitivity.
+#
+# BRAF is the canonical example:
+# - Class I (V600): RAS-independent monomers → V600 inhibitors work
+# - Class II (non-V600 activating): RAS-independent dimers → MEK inhibitors, not V600 inhibitors
+# - Class III (kinase-impaired): RAS-dependent → context-dependent
+#
+# Per AMP/ASCO/CAP 2017:
+# - Class II/III in tumors with FDA approval (NSCLC): Tier I
+# - Class II/III in other tumors with evidence: Tier II
+
+ONCOGENE_MUTATION_CLASSES: dict[str, dict] = {
+    "BRAF": {
+        "class_i": {
+            "name": "Class I (V600)",
+            "variants": ["V600E", "V600K", "V600D", "V600R", "V600M", "V600G"],
+            "mechanism": "RAS-independent monomer signaling",
+            "drugs": ["vemurafenib", "dabrafenib", "encorafenib"],
+            "fda_tumors": ["melanoma", "nsclc", "lung", "colorectal", "thyroid", "hairy cell leukemia"],
+            "note": "Standard V600-specific inhibitors are effective",
+        },
+        "class_ii": {
+            "name": "Class II (non-V600 activating)",
+            # These variants signal as RAS-independent dimers
+            # They are RESISTANT to V600-specific inhibitors but SENSITIVE to MEK inhibitors
+            "variants": [
+                "G469A", "G469V", "G469E", "G469R", "G469S",  # Glycine-rich loop
+                "K601E", "K601N", "K601T",  # Activation loop
+                "L597Q", "L597R", "L597S", "L597V",  # Catalytic loop
+                "G464V", "G464E", "G464R",  # P-loop
+                "G466V", "G466E", "G466A", "G466R",  # P-loop
+                "N581S", "N581I", "N581K",  # Catalytic loop
+                "F595L",  # DFG motif
+                "A598V", "A598T",
+                "T599I", "T599_V600insT",
+                "V600_K601delinsE",
+            ],
+            "mechanism": "RAS-independent dimer signaling - RESISTANT to V600 inhibitors",
+            "drugs": ["trametinib", "binimetinib", "cobimetinib", "selumetinib", "encorafenib + binimetinib"],
+            "fda_tumors": ["nsclc", "lung"],  # 2024 FDA approval for encorafenib + binimetinib
+            "fda_context": "Encorafenib + binimetinib FDA-approved for BRAF Class II/III NSCLC (2024)",
+            "note": "V600 inhibitors cause paradoxical pathway activation - use MEK inhibitors",
+        },
+        "class_iii": {
+            "name": "Class III (kinase-impaired)",
+            # These have impaired kinase activity but still activate MAPK via RAS
+            "variants": [
+                "D594G", "D594N", "D594E", "D594H", "D594A", "D594V",  # Kinase-dead
+                "G596R", "G596D", "G596C",
+            ],
+            "mechanism": "Kinase-impaired, RAS-dependent signaling",
+            "drugs": ["trametinib", "binimetinib", "cobimetinib"],
+            "fda_tumors": ["nsclc", "lung"],
+            "fda_context": "Encorafenib + binimetinib FDA-approved for BRAF Class II/III NSCLC (2024)",
+            "note": "Only effective in RAS-wildtype tumors; check KRAS/NRAS status",
+        },
+    },
+}
+
+
+def get_oncogene_mutation_class(gene: str, variant: str) -> dict | None:
+    """Determine if an oncogene variant belongs to a known mutation class.
+
+    Args:
+        gene: Gene symbol (case-insensitive)
+        variant: Variant notation (e.g., V600E, G469A)
+
+    Returns:
+        Dict with class info (name, mechanism, drugs, fda_tumors) or None if not classified
+    """
+    gene_upper = gene.upper()
+    variant_upper = variant.upper()
+
+    # Strip common prefixes
+    if variant_upper.startswith("P."):
+        variant_upper = variant_upper[2:]
+
+    gene_classes = ONCOGENE_MUTATION_CLASSES.get(gene_upper)
+    if not gene_classes:
+        return None
+
+    # Check each class
+    for class_key, class_info in gene_classes.items():
+        if variant_upper in class_info.get("variants", []):
+            return {
+                "gene": gene_upper,
+                "variant": variant_upper,
+                "class_key": class_key,
+                "class_name": class_info["name"],
+                "mechanism": class_info["mechanism"],
+                "drugs": class_info["drugs"],
+                "fda_tumors": class_info.get("fda_tumors", []),
+                "fda_context": class_info.get("fda_context"),
+                "note": class_info.get("note"),
+            }
+
+    return None
+
+
+def is_oncogene_class_fda_tumor(gene: str, variant: str, tumor_type: str | None) -> bool:
+    """Check if tumor type has FDA approval for this oncogene mutation class.
+
+    Args:
+        gene: Gene symbol
+        variant: Variant notation
+        tumor_type: Patient's tumor type
+
+    Returns:
+        True if FDA approval exists for this mutation class in this tumor type
+    """
+    if not tumor_type:
+        return False
+
+    class_info = get_oncogene_mutation_class(gene, variant)
+    if not class_info:
+        return False
+
+    tumor_lower = tumor_type.lower()
+    for fda_tumor in class_info.get("fda_tumors", []):
+        if fda_tumor in tumor_lower or tumor_lower in fda_tumor:
+            return True
+
+    return False
+
+
 @dataclass
 class GeneContext:
     """Context about a gene from multiple sources."""
