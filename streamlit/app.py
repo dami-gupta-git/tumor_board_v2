@@ -7,6 +7,7 @@ from backend import assess_variant, batch_assess_variants, validate_gold_standar
 
 st.set_page_config(page_title="TumorBoard", page_icon="🧬", layout="wide")
 st.title("🧬 TumorBoard: Variant Actionability Assessment")
+st.caption("**Note:** This tool is for research purposes only. Clinical decisions should always be made by qualified healthcare professionals.")
 
 MODELS = {
     "OpenAI GPT-4o-mini": "gpt-4o-mini",

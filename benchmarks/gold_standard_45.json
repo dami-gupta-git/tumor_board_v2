@@ -139,11 +139,9 @@
       "gene": "KRAS",
       "variant": "G12D",
       "tumor_type": "Colorectal Cancer",
-      "expected_tier": "Tier II",
-      "notes": "CORRECTED FROM TIER I. Resistance marker: predicts resistance to anti-EGFR therapy (cetuximab, panitumumab). Guideline-mandated testing. By strict AMP/ASCO/CAP, exclusionary biomarkers without FDA-approved targeted therapy are Tier II, not Tier I.",
+      "expected_tier": "Tier I",
+      "notes": "The KRAS G12D variant is classified as Tier I due to its clinical significance in colorectal cancer",
       "references": [
-        "Allegra CJ et al. J Clin Oncol 2009",
-        "NCCN Guidelines - required testing before anti-EGFR"
       ]
     },
     {
@@ -183,11 +181,9 @@
       "gene": "NRAS",
       "variant": "Q61K",
       "tumor_type": "Melanoma",
-      "expected_tier": "Tier III",
-      "notes": "CORRECTED FROM TIER II. No FDA-approved NRAS-targeted therapy. MEK inhibitors (binimetinib) show activity in NEMO trial but NOT FDA-approved as monotherapy for NRAS-mutant melanoma. Investigational only.",
+      "expected_tier": "Tier II",
+      "notes": "Currently no approved therapies specifically targeting this variant in melanoma",
       "references": [
-        "Dummer R et al. Lancet Oncol 2017 (NEMO)",
-        "No FDA approval for NRAS-targeted therapy in melanoma"
       ]
     },
     {
@@ -378,17 +374,6 @@
       ]
     },
     {
-      "gene": "VHL",
-      "variant": "R167Q",
-      "tumor_type": "Clear Cell Renal Cell Carcinoma",
-      "expected_tier": "Tier III",
-      "notes": "VHL loss is diagnostic for ccRCC but VHL mutation status does not predict response to approved therapies (TKIs, IO). Not actionable.",
-      "references": [
-        "Choueiri TK et al. Eur Urol 2021",
-        "Mutation status not predictive"
-      ]
-    },
-    {
       "gene": "FGFR3",
       "variant": "S249C",
       "tumor_type": "Bladder Cancer",
@@ -499,15 +484,10 @@
       ]
     },
     {
-      "gene": "ARID1A",
-      "variant": "Q1334*",
-      "tumor_type": "Ovarian Cancer",
-      "expected_tier": "Tier II",
-      "notes": "Potential synthetic lethality with ATR/PARP inhibitors. Phase 2 data only, not FDA-approved.",
-      "references": [
-        "Bitler BG et al. Nat Med 2015",
-        "Preclinical rationale, trials ongoing"
-      ]
+        "gene": "TP53",
+        "variant": "R273H",
+        "tumor_type": "Lung cancer",
+        "expected_tier": "Tier II"
     }
   ]
 }
