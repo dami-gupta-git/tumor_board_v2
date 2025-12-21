@@ -817,6 +817,22 @@ class MyVariantClient:
                 query = f"{gene} {variant}"
                 result = await self._query(query, fields=fields)
 
+            # Strategy 4: Use VEP to get genomic coordinates, then re-query MyVariant
+            # VEP converts protein notation to HGVS genomic, which MyVariant indexes better
+            vep_annotation = None
+            if result.get("total", 0) == 0:
+                try:
+                    from tumorboard.api.vep import VEPClient
+                    vep_client = VEPClient()
+                    vep_annotation = await vep_client.annotate_variant(gene, variant)
+
+                    if vep_annotation and vep_annotation.myvariant_query:
+                        # Re-query MyVariant with genomic notation
+                        result = await self._query(vep_annotation.myvariant_query, fields=fields)
+                except Exception:
+                    # VEP failed - continue with existing result
+                    pass
+
             # Parse response using Pydantic
             parsed_response = MyVariantResponse(**result)
 
@@ -834,7 +850,22 @@ class MyVariantClient:
                     clinvar_significance = clinvar_fallback.get("clinical_significance")
                     clinvar_accession = clinvar_fallback.get("accession")
 
-                # Return evidence with fallback data
+                # Use VEP predictions if available (from Strategy 4)
+                vep_hgvs_genomic = None
+                vep_hgvs_transcript = None
+                vep_polyphen = None
+                vep_cadd = None
+                vep_alphamissense_score = None
+                vep_alphamissense_pred = None
+                if vep_annotation:
+                    vep_hgvs_genomic = vep_annotation.hgvs_genomic
+                    vep_hgvs_transcript = vep_annotation.hgvs_transcript
+                    vep_polyphen = vep_annotation.polyphen_prediction
+                    vep_cadd = vep_annotation.cadd_phred
+                    vep_alphamissense_score = vep_annotation.alphamissense_score
+                    vep_alphamissense_pred = vep_annotation.alphamissense_prediction
+
+                # Return evidence with fallback data (CIViC, ClinVar, and VEP predictions)
                 return Evidence(
                     variant_id=f"{gene}:{variant}",
                     gene=gene,
@@ -845,15 +876,15 @@ class MyVariantClient:
                     clinvar_id=clinvar_id,
                     clinvar_clinical_significance=clinvar_significance,
                     clinvar_accession=clinvar_accession,
-                    hgvs_genomic=None,
+                    hgvs_genomic=vep_hgvs_genomic,
                     hgvs_protein=None,
-                    hgvs_transcript=None,
+                    hgvs_transcript=vep_hgvs_transcript,
                     snpeff_effect=None,
-                    polyphen2_prediction=None,
-                    cadd_score=None,
+                    polyphen2_prediction=vep_polyphen,
+                    cadd_score=vep_cadd,
                     gnomad_exome_af=None,
-                    alphamissense_score=None,
-                    alphamissense_prediction=None,
+                    alphamissense_score=vep_alphamissense_score,
+                    alphamissense_prediction=vep_alphamissense_pred,
                     transcript_id=None,
                     transcript_consequence=None,
                     civic=civic_fallback,  # Use CIViC fallback evidence

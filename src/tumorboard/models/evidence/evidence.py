@@ -1176,6 +1176,30 @@ class Evidence(VariantAnnotations):
                     logger.info(f"Tier II-D: {self.gene} {self.variant} DDR gene with Level C/D sensitivity evidence")
                     return f"TIER II-D INDICATOR: {self.gene} is a DDR gene. Preclinical/early evidence suggests sensitivity to {drugs_str} in other cancers ({disease_str}). Limited clinical validation."
 
+        # Use functional predictions to inform VUS classification
+        # If we have PolyPhen-2, CADD, or AlphaMissense predictions, use them to refine the tier
+        if self.polyphen2_prediction or self.cadd_score or self.alphamissense_prediction:
+            is_predicted_damaging = (
+                self.polyphen2_prediction in ["probably_damaging", "possibly_damaging", "D", "P"] or
+                (self.cadd_score is not None and self.cadd_score >= 20) or  # CADD >= 20 is often used as damaging threshold
+                self.alphamissense_prediction in ["likely_pathogenic", "ambiguous", "pathogenic"]
+            )
+
+            if is_predicted_damaging:
+                # Build prediction summary
+                pred_parts = []
+                if self.polyphen2_prediction:
+                    pred_parts.append(f"PolyPhen2: {self.polyphen2_prediction}")
+                if self.cadd_score is not None:
+                    pred_parts.append(f"CADD: {self.cadd_score:.1f}")
+                if self.alphamissense_prediction:
+                    pred_parts.append(f"AlphaMissense: {self.alphamissense_prediction}")
+                pred_summary = ", ".join(pred_parts)
+
+                # Predicted damaging VUS - still Tier III-B but with additional context
+                logger.info(f"Tier III-B: {self.gene} {self.variant} is VUS but predicted damaging ({pred_summary})")
+                return f"TIER III-B INDICATOR: VUS in {self.gene} with predicted functional impact ({pred_summary}). Consider functional testing."
+
         # Check for VUS in known cancer gene (Tier III-B)
         # Per decision tree: "Is the variant in a known cancer gene? → YES, but function unknown → TIER III-B (VUS)"
         if self.is_vus_in_known_cancer_gene():
