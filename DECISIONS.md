@@ -1040,3 +1040,183 @@ def is_molecular_subtype_defining(self, tumor_type: str | None) -> tuple[bool, s
 - `filter_low_quality_minority_signals()` - Documented in DECISIONS.md, tested
 
 **Impact:** Cleaner codebase with less confusion about unused fields and methods.
+
+---
+
+### 34. Tier II Sub-Level Classification (II-A, II-B, II-C, II-D)
+
+**Location:** `src/tumorboard/models/evidence/evidence.py` - `_get_tier_ii_sublevel()`
+
+**Background:** Per AMP/ASCO/CAP 2017 guidelines, Tier II is split into four sub-levels based on evidence quality and context:
+
+| Sub-level | Description | Example |
+|-----------|-------------|---------|
+| **II-A** | FDA approved in DIFFERENT tumor type | BRAF V600E in thyroid (melanoma approval) |
+| **II-B** | Well-powered studies without guideline endorsement | KRAS G12C before sotorasib approval |
+| **II-C** | Case reports/small studies, OR prognostic with established clinical value | TP53 in breast cancer (poor prognosis) |
+| **II-D** | Preclinical evidence, early clinical trials, OR resistance without alternatives | EGFR C797S (osimertinib resistance) |
+
+**Implementation:**
+
+```python
+def _get_tier_ii_sublevel(self, tumor_type: str | None, context: str = "general") -> str:
+    """Determine Tier II sub-level (A, B, C, or D) per AMP/ASCO/CAP 2017."""
+    # Context-based classification
+    if context == "fda_different_tumor":
+        return "A"
+    if context == "trials":
+        return "D"
+    if context == "resistance":
+        return "D"
+    if context == "prognostic":
+        return "C"
+    
+    # Evidence-based fallback
+    # Check FDA/Level A elsewhere → II-A
+    # Check Level B → II-B
+    # Check Level C → II-C
+    # Check Level D or trials → II-D
+    ...
+```
+
+**Usage in `get_tier_hint()`:**
+
+```python
+# Clinical trials → II-D
+if has_trials:
+    sublevel = self._get_tier_ii_sublevel(tumor_type, context="trials")
+    return f"TIER II-{sublevel} INDICATOR: Active clinical trials..."
+
+# Resistance without alternative → II-D (per guidelines/tier2.md scenario 5)
+if is_resistance_only:
+    sublevel = self._get_tier_ii_sublevel(tumor_type, context="resistance")
+    return f"TIER II-{sublevel} INDICATOR: Resistance marker that EXCLUDES..."
+
+# FDA in different tumor → II-A
+if has_fda_elsewhere:
+    sublevel = self._get_tier_ii_sublevel(tumor_type, context="fda_different_tumor")
+    return f"TIER II-{sublevel} INDICATOR: FDA-approved therapy exists in different tumor..."
+```
+
+**Impact:** Tier II variants now have granular sub-classification matching AMP/ASCO/CAP 2017 guidelines.
+
+---
+
+### 35. Prognostic Markers with Established Clinical Value (Tier II-C)
+
+**Location:** `src/tumorboard/models/evidence/evidence.py` - `get_tier_hint()` prognostic section
+
+**Background:** Per guidelines/tier2.md, prognostic markers should be classified based on evidence quality:
+- **Strong evidence** (Level A/B/C) → Tier II-C
+- **Weak/uncertain evidence** → Tier III
+
+**Previous State:** All prognostic-only variants went to Tier III regardless of evidence strength.
+
+**Current Approach:**
+
+```python
+if self.is_prognostic_or_diagnostic_only():
+    # Check for strong prognostic/diagnostic evidence
+    has_strong_prognostic = any(
+        ev.evidence_level in ['A', 'B', 'C'] and
+        ev.evidence_type in ['PROGNOSTIC', 'DIAGNOSTIC']
+        for ev in self.civic
+    )
+    if has_strong_prognostic:
+        sublevel = self._get_tier_ii_sublevel(tumor_type, context="prognostic")
+        return f"TIER II-{sublevel} INDICATOR: Prognostic/diagnostic marker with established clinical significance"
+    else:
+        return "TIER III INDICATOR: Prognostic/diagnostic only - limited evidence"
+```
+
+**Examples:**
+- TP53 mutation in breast cancer (Level B prognostic) → Tier II-C
+- TERT promoter in glioblastoma (strong prognostic) → Tier II-C
+- Novel variant with unknown prognostic value → Tier III
+
+**Impact:** Established prognostic biomarkers now correctly classified as Tier II-C instead of Tier III.
+
+---
+
+### 36. Tier I vs Tier II Conflict Resolution
+
+**Location:** `src/tumorboard/models/evidence/evidence.py` - `get_tier_hint()` priority order
+
+**Background:** Per guidelines/tier2.md, there are 7 scenarios where a variant should be Tier II instead of Tier I:
+
+1. **No FDA approval for THIS cancer type** - FDA in different tumor → II-A
+2. **Guidelines don't recommend it yet** - Strong evidence, no NCCN → II-B
+3. **Evidence is promising but not definitive** - Phase 2, retrospective → II-C
+4. **Prognostic without treatment implications** - Strong prognostic → II-C
+5. **Resistance mutations without alternatives** - No FDA alternative → II-D
+6. **Basket/umbrella trial enrollment only** - Investigational → II-D
+7. **Companion diagnostic used off-label** - FDA test, wrong indication → II-A
+
+**Implementation:** The `get_tier_hint()` method checks these scenarios in priority order:
+
+```python
+# PRIORITY 1: Tier IV (benign)
+if self.is_clinvar_benign(): return "TIER IV..."
+
+# PRIORITY 2: Tier I (FDA in THIS tumor, guidelines, Level A/B)
+if self.has_fda_for_variant_in_tumor(tumor_type): return "TIER I..."
+
+# PRIORITY 3: Literature-based Tier I
+if literature_says_tier_i: return "TIER I-B..."
+
+# PRIORITY 4: Tier II scenarios
+if has_trials: return "TIER II-D..."
+if is_investigational_only: return "TIER III..."
+if is_resistance_only: return "TIER II-D..."
+if is_prognostic_with_strong_evidence: return "TIER II-C..."
+if has_fda_elsewhere: return "TIER II-A..."
+if has_level_b_evidence: return "TIER II-B..."
+if has_level_c_d_evidence: return "TIER II-C/D..."
+
+# PRIORITY 5: Tier III (unknown)
+return "TIER III..."
+```
+
+**Impact:** All 7 conflict scenarios from guidelines/tier2.md are now correctly handled.
+
+---
+
+### 37. Updated LLM Prompts with Tier II Sub-Levels
+
+**Location:** `src/tumorboard/llm/prompts.py`
+
+**Changes:**
+
+1. **Updated TIER DEFINITIONS:**
+```
+- Tier I-A: FDA-approved OR professional guidelines (NCCN/ASCO)
+- Tier I-B: Well-powered studies with consensus (guidelines pending)
+- Tier II-A: FDA-approved in DIFFERENT tumor type
+- Tier II-B: Well-powered studies without guideline endorsement
+- Tier II-C: Case reports or strong prognostic
+- Tier II-D: Preclinical, early trials, or resistance without alternatives
+- Tier III: Unknown significance - investigational only
+- Tier IV: Benign/likely benign
+```
+
+2. **Updated Prognostic/Diagnostic principle (#4):**
+```
+- Strong prognostic evidence → Tier II-C
+- Weak/uncertain prognostic → Tier III
+- Example: TP53 in breast cancer (established) → II-C
+- Example: Novel variant (unknown) → III
+```
+
+3. **Updated Confidence Scoring:**
+```
+Tier I-A: 0.90-1.00
+Tier I-B: 0.80-0.90
+Tier II-A: 0.75-0.85
+Tier II-B: 0.65-0.80
+Tier II-C: 0.60-0.75
+Tier II-D: 0.55-0.70
+Tier III: 0.50-0.60
+Tier IV: 0.90-1.00
+```
+
+**Impact:** LLM now has detailed guidance for all Tier I and II sub-levels.

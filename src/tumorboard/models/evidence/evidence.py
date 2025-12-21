@@ -468,6 +468,93 @@ class Evidence(VariantAnnotations):
         # Default to A if we can't determine
         return "A"
 
+    def _get_tier_ii_sublevel(self, tumor_type: str | None, context: str = "general") -> str:
+        """Determine Tier II sub-level (A, B, C, or D) per AMP/ASCO/CAP 2017.
+
+        Per guidelines/tier2.md:
+        Tier II-A: FDA approved in DIFFERENT tumor type (off-label)
+        Tier II-B: Well-powered studies (Phase 2/3) without guideline endorsement
+        Tier II-C: Case reports/small studies, OR prognostic with established clinical value
+        Tier II-D: Preclinical evidence, early clinical trials, OR resistance without alternatives
+
+        Args:
+            tumor_type: Patient's tumor type
+            context: Hint about why this is Tier II ("fda_different_tumor", "resistance",
+                     "trials", "prognostic", "general")
+
+        Returns: "A", "B", "C", or "D"
+        """
+        # Context-based classification (when caller knows why it's Tier II)
+        if context == "fda_different_tumor":
+            return "A"
+        if context == "trials":
+            # Check if trials are Phase 1 (II-D) vs Phase 2/3 (II-B)
+            return "D"  # Default to D for clinical trials (investigational)
+        if context == "resistance":
+            # Per guidelines/tier2.md scenario 5: Resistance mutations WITHOUT approved alternatives
+            # Example: EGFR C797S = "Tier II-D (explains resistance, trial eligibility, no approved therapy)"
+            return "D"
+        if context == "prognostic":
+            # Prognostic without treatment implications = II-C
+            return "C"
+
+        # Analyze evidence to determine sub-level
+
+        # Check for FDA approval in different tumor (II-A)
+        for approval in self.fda_approvals:
+            parsed = approval.parse_indication_for_tumor(tumor_type or "")
+            if not parsed.get('tumor_match'):
+                # Has FDA approval but NOT in this tumor
+                return "A"
+
+        # Check for CIViC Level A evidence in different tumor (II-A)
+        has_level_a_elsewhere = False
+        for ev in self.civic:
+            if ev.evidence_level == 'A' and ev.evidence_type == 'PREDICTIVE':
+                if not self._tumor_matches(tumor_type, ev.disease):
+                    has_level_a_elsewhere = True
+                    break
+        if has_level_a_elsewhere:
+            return "A"
+
+        # Check for CGI FDA-approved in different tumor (II-A)
+        for biomarker in self.cgi_biomarkers:
+            if biomarker.fda_approved:
+                if not self._tumor_matches(tumor_type, biomarker.tumor_type):
+                    return "A"
+
+        # Check for well-powered studies (Level B/C) without guidelines (II-B)
+        has_level_b = any(
+            ev.evidence_level == 'B' and ev.evidence_type == 'PREDICTIVE'
+            for ev in self.civic
+        )
+        if has_level_b:
+            return "B"
+
+        # Check for case reports / small studies (Level C) (II-C)
+        has_level_c = any(
+            ev.evidence_level == 'C' and ev.evidence_type == 'PREDICTIVE'
+            for ev in self.civic
+        )
+        if has_level_c:
+            return "C"
+
+        # Check for preclinical / early phase (Level D) (II-D)
+        has_level_d = any(
+            ev.evidence_level == 'D'
+            for ev in self.civic
+        )
+        if has_level_d:
+            return "D"
+
+        # Check for active clinical trials (II-D)
+        has_trials, _ = self.has_active_clinical_trials(variant_specific_only=True)
+        if has_trials:
+            return "D"
+
+        # Default to C (moderate evidence)
+        return "C"
+
     def is_resistance_marker_without_targeted_therapy(self, tumor_type: str | None = None) -> tuple[bool, list[str]]:
         """Detect resistance-only markers WITHOUT FDA-approved therapy FOR the variant.
 
@@ -729,12 +816,13 @@ class Evidence(VariantAnnotations):
                 logger.info(f"Tier I-B (literature): {self.gene} {self.variant} has therapeutic options: {sensitive_drugs}")
                 return f"TIER I-B INDICATOR (LITERATURE): Therapeutic options: {sensitive_drugs}. {tier_rec.rationale}"
 
-        # Check for active clinical trials - overrides investigational-only (Tier II)
+        # Check for active clinical trials - overrides investigational-only (Tier II-D)
         has_trials, trial_drugs = self.has_active_clinical_trials(variant_specific_only=True)
         if has_trials:
             drugs_str = ', '.join(trial_drugs[:3]) if trial_drugs else 'investigational agents'
-            logger.info(f"Tier II: {self.gene} {self.variant} has variant-specific clinical trials ({drugs_str})")
-            return f"TIER II INDICATOR: Active clinical trials specifically enrolling {self.variant} patients ({drugs_str})"
+            sublevel = self._get_tier_ii_sublevel(tumor_type, context="trials")
+            logger.info(f"Tier II-{sublevel}: {self.gene} {self.variant} has variant-specific clinical trials ({drugs_str})")
+            return f"TIER II-{sublevel} INDICATOR: Active clinical trials specifically enrolling {self.variant} patients ({drugs_str})"
 
         # Check investigational-only (but no active variant-specific trials)
         if self.is_investigational_only(tumor_type):
@@ -745,25 +833,41 @@ class Evidence(VariantAnnotations):
         # Per AMP/ASCO/CAP: Resistance markers that affect treatment selection are Tier II
         # (e.g., NRAS mutations exclude anti-EGFR therapy in CRC - this IS clinically actionable)
         # Also checks PubMed literature for resistance evidence
+        # Per guidelines/tier2.md scenario 5: Resistance without alternatives = Tier II-D
         is_resistance_only, drugs = self.is_resistance_marker_without_targeted_therapy(tumor_type)
         if is_resistance_only:
             drugs_str = ', '.join(drugs) if drugs else 'standard therapies'
+            sublevel = self._get_tier_ii_sublevel(tumor_type, context="resistance")
             # Check if evidence comes from literature
             has_lit_evidence, lit_drugs, lit_pmids = self.has_literature_resistance_evidence()
             if has_lit_evidence:
                 pmid_str = ', '.join(lit_pmids[:3])
-                logger.info(f"Tier II: {self.gene} {self.variant} in {tumor_type} is resistance marker (literature evidence: PMIDs {pmid_str})")
-                return f"TIER II INDICATOR: Resistance marker that EXCLUDES {drugs_str} - supported by peer-reviewed literature (PMIDs: {pmid_str})"
+                logger.info(f"Tier II-{sublevel}: {self.gene} {self.variant} in {tumor_type} is resistance marker (literature: PMIDs {pmid_str})")
+                return f"TIER II-{sublevel} INDICATOR: Resistance marker that EXCLUDES {drugs_str} - supported by peer-reviewed literature (PMIDs: {pmid_str})"
             else:
-                logger.info(f"Tier II: {self.gene} {self.variant} in {tumor_type} is resistance marker excluding {drugs_str}")
-                return f"TIER II INDICATOR: Resistance marker that EXCLUDES {drugs_str} (no FDA-approved therapy FOR this variant)"
+                logger.info(f"Tier II-{sublevel}: {self.gene} {self.variant} in {tumor_type} is resistance marker excluding {drugs_str}")
+                return f"TIER II-{sublevel} INDICATOR: Resistance marker that EXCLUDES {drugs_str} (no FDA-approved therapy FOR this variant)"
 
         # Check for prognostic/diagnostic only
+        # Per AMP/ASCO/CAP: Prognostic without treatment implications = Tier II-C if well-established
+        # Tier III if unknown significance
         if self.is_prognostic_or_diagnostic_only():
-            logger.info(f"Tier III: {self.gene} {self.variant} is prognostic/diagnostic only")
-            return "TIER III INDICATOR: Prognostic/diagnostic only - no therapeutic impact"
+            # Check for strong prognostic/diagnostic evidence (Level A/B/C)
+            has_strong_prognostic = any(
+                ev.evidence_level in ['A', 'B', 'C'] and
+                ev.evidence_type in ['PROGNOSTIC', 'DIAGNOSTIC']
+                for ev in self.civic
+            )
+            if has_strong_prognostic:
+                sublevel = self._get_tier_ii_sublevel(tumor_type, context="prognostic")
+                logger.info(f"Tier II-{sublevel}: {self.gene} {self.variant} has strong prognostic/diagnostic evidence")
+                return f"TIER II-{sublevel} INDICATOR: Prognostic/diagnostic marker with established clinical significance - no therapeutic impact"
+            else:
+                logger.info(f"Tier III: {self.gene} {self.variant} is prognostic/diagnostic only (weak evidence)")
+                return "TIER III INDICATOR: Prognostic/diagnostic only - no therapeutic impact, limited evidence"
 
-        # Check for FDA approval in different tumor type
+        # Check for FDA approval in different tumor type (Tier II-A)
+        # Per AMP/ASCO/CAP: FDA approved in different tumor = Tier II-A
         has_fda_elsewhere = False
         if self.fda_approvals:
             has_fda_elsewhere = True
@@ -773,19 +877,33 @@ class Evidence(VariantAnnotations):
             has_fda_elsewhere = True
 
         if has_fda_elsewhere:
-            return "TIER II INDICATOR: FDA-approved therapy exists in different tumor type (off-label potential)"
+            sublevel = self._get_tier_ii_sublevel(tumor_type, context="fda_different_tumor")
+            logger.info(f"Tier II-{sublevel}: {self.gene} {self.variant} has FDA approval in different tumor type")
+            return f"TIER II-{sublevel} INDICATOR: FDA-approved therapy exists in different tumor type (off-label potential)"
 
         # Otherwise evaluate based on evidence strength
+        # Use sub-level classification based on CIViC evidence level
         stats = self.compute_evidence_stats(tumor_type)
 
-        has_strong_evidence = any(
-            ev.evidence_level in ['A', 'B']
+        # Level B = well-powered studies (Tier II-B)
+        has_level_b = any(
+            ev.evidence_level == 'B' and ev.evidence_type == 'PREDICTIVE'
             for ev in self.civic
-            if ev.evidence_type == 'PREDICTIVE'
         )
+        if has_level_b or stats['sensitivity_count'] > 0:
+            sublevel = self._get_tier_ii_sublevel(tumor_type, context="general")
+            logger.info(f"Tier II-{sublevel}: {self.gene} {self.variant} has Level B evidence")
+            return f"TIER II-{sublevel} INDICATOR: Well-powered studies show clinical significance but no FDA approval"
 
-        if has_strong_evidence or stats['sensitivity_count'] > 0:
-            return "TIER II/III: Strong evidence but no FDA approval - evaluate trial data and guidelines"
+        # Level C/D = case reports/preclinical (Tier II-C/D or Tier III)
+        has_level_c_or_d = any(
+            ev.evidence_level in ['C', 'D'] and ev.evidence_type == 'PREDICTIVE'
+            for ev in self.civic
+        )
+        if has_level_c_or_d:
+            sublevel = self._get_tier_ii_sublevel(tumor_type, context="general")
+            logger.info(f"Tier II-{sublevel}: {self.gene} {self.variant} has Level C/D evidence")
+            return f"TIER II-{sublevel} INDICATOR: Case reports or preclinical evidence suggest potential significance"
 
         return "TIER III: Investigational/emerging evidence only"
 
