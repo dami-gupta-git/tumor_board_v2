@@ -21,7 +21,7 @@ Variant: {variant}
 Tumor Type: {tumor_type}
 Assigned Tier: {tier}
 Classification Reason: {tier_reason}
-
+{resistance_note_section}
 Evidence Summary:
 {evidence_summary}
 
@@ -42,6 +42,7 @@ def create_narrative_prompt(
     tier: str,
     tier_reason: str,
     evidence_summary: str,
+    resistance_note: str | None = None,
 ) -> list[dict]:
     """
     Create a prompt for the LLM to write a narrative explanation of a pre-computed tier.
@@ -53,11 +54,17 @@ def create_narrative_prompt(
         tier: The pre-computed tier (e.g., "Tier I-B", "Tier II-A")
         tier_reason: The reason from get_tier_hint() explaining why this tier
         evidence_summary: Formatted evidence for context
+        resistance_note: Optional note about resistance/sensitivity (e.g., for BRAF Class II mutations)
 
     Returns:
         Messages list for LLM API call
     """
     tumor_display = tumor_type if tumor_type else "Unspecified"
+
+    # Format resistance note section if provided
+    resistance_note_section = ""
+    if resistance_note:
+        resistance_note_section = f"\nIMPORTANT - Resistance/Sensitivity Note: {resistance_note}\n"
 
     user_content = NARRATIVE_USER_PROMPT.format(
         gene=gene,
@@ -65,6 +72,7 @@ def create_narrative_prompt(
         tumor_type=tumor_display,
         tier=tier,
         tier_reason=tier_reason,
+        resistance_note_section=resistance_note_section,
         evidence_summary=evidence_summary.strip()[:3000],  # Limit context size
     )
 

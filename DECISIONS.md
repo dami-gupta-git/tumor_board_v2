@@ -324,7 +324,85 @@ Enables detection of KRAS G13D, G12D as resistance markers for cetuximab/panitum
 
 ---
 
-## LLM Integration
+## Literature Search & LLM Integration
+
+### Literature Search Pipeline
+
+**Location:** [engine.py](src/tumorboard/engine.py), [semantic_scholar.py](src/tumorboard/api/semantic_scholar.py), [pubmed.py](src/tumorboard/api/pubmed.py)
+
+The system uses a two-stage LLM-powered literature search:
+
+```
+Semantic Scholar / PubMed → Paper Search → LLM Relevance Scoring → LLM Knowledge Extraction → Evidence Model
+```
+
+**Stage 1: Paper Search**
+- Primary: Semantic Scholar API (includes AI-generated TLDRs)
+- Fallback: PubMed (on rate limits)
+- Searches both resistance literature AND general variant literature
+- Returns up to 6 merged papers per query
+
+**Stage 2: LLM Paper Relevance Scoring**
+
+**Location:** [service.py:179-331](src/tumorboard/llm/service.py#L179-L331) - `score_paper_relevance()`
+
+Each paper is scored for relevance using gpt-4o-mini:
+
+| Score | Criteria |
+|-------|----------|
+| 1.0 | Directly studies gene+variant in exact tumor type |
+| 0.9 | Studies drugs targeting gene mutations in tumor |
+| 0.8 | Studies gene exon/codon mutations including variant's class |
+| 0.7 | Studies gene resistance mechanisms in tumor |
+| 0.6 | Studies gene+variant in related tumor context |
+| <0.6 | Not relevant (filtered out) |
+
+Key distinctions enforced:
+- **PREDICTIVE** (resistance/sensitivity): Affects drug selection → Tier II+
+- **PROGNOSTIC**: Affects prognosis only → Tier III
+
+**Stage 3: LLM Knowledge Extraction**
+
+**Location:** [service.py:333-514](src/tumorboard/llm/service.py#L333-L514) - `extract_variant_knowledge()`
+
+From relevant papers, extracts:
+- `mutation_type`: primary (driver) vs secondary (resistance/acquired)
+- `resistant_to`: drugs with evidence level and mechanism
+- `sensitive_to`: drugs with evidence level
+- `clinical_significance`: 2-3 sentence summary
+- `evidence_level`: FDA-approved, Phase 3, Phase 2, Preclinical, Case reports
+- `tier_recommendation`: with rationale
+
+### LLM Role: Narrative Only (No Tier Decisions)
+
+**Location:** [service.py:45-148](src/tumorboard/llm/service.py#L45-L148) - `assess_variant()`
+
+The tier classification is **deterministic** (computed by `Evidence.get_tier_hint()`). The LLM's role is to:
+1. Write a clear clinical explanation for the pre-computed tier
+2. Summarize key evidence supporting the classification
+3. Note therapeutic implications
+
+```python
+# Tier is determined by preprocessing, NOT LLM
+tier_hint = evidence.get_tier_hint(tumor_type=tumor_type)
+tier, sublevel = extract_tier_from_hint(tier_hint)
+
+# LLM only generates narrative
+messages = create_narrative_prompt(
+    gene=gene, variant=variant, tumor_type=tumor_type,
+    tier=full_tier, tier_reason=tier_hint,
+    evidence_summary=evidence_summary,
+)
+```
+
+**Rationale:**
+- Deterministic tiers are testable and reproducible
+- LLM adds value through synthesis and clear communication
+- Prevents hallucinated tier assignments
+
+---
+
+## LLM System Prompt Design
 
 ### System Prompt Design
 

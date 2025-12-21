@@ -1,8 +1,12 @@
 """Assessment and actionability models."""
 
+import textwrap
 from enum import Enum
 
 from pydantic import BaseModel, Field, field_validator
+from rich.console import Console
+from rich.panel import Panel
+from rich.text import Text
 
 from tumorboard.models.annotations import VariantAnnotations
 
@@ -58,53 +62,51 @@ class ActionabilityAssessment(VariantAnnotations):
     )
 
     def to_report(self) -> str:
-        """Simple report output."""
+        """Pretty report output with Rich formatting and soft-wrapping."""
+        console = Console(width=80, force_terminal=True)
+
+        # Build content sections
         tumor_display = self.tumor_type if self.tumor_type else "Not specified"
-        report = f"\nVariant: {self.gene} {self.variant} | Tumor: {tumor_display}\n"
-        report += f"Tier: {self.tier.value} | Confidence: {self.confidence_score:.1%}\n"
+
+        # Header line
+        header = f"[bold cyan]{self.gene} {self.variant}[/bold cyan]  |  Tumor: [italic]{tumor_display}[/italic]"
+
+        # Tier with color coding
+        tier_colors = {
+            "Tier I": "bold green",
+            "Tier II": "bold yellow",
+            "Tier III": "bold red",
+            "Tier IV": "dim",
+            "Unknown": "dim",
+        }
+        tier_style = tier_colors.get(self.tier.value, "white")
+        tier_line = f"[{tier_style}]{self.tier.value}[/{tier_style}]  |  Confidence: {self.confidence_score:.1%}"
+
+        content_lines = [header, tier_line, ""]
 
         # Add identifiers if available
         identifiers = []
         if self.cosmic_id:
             identifiers.append(f"COSMIC: {self.cosmic_id}")
         if self.ncbi_gene_id:
-            identifiers.append(f"NCBI Gene: {self.ncbi_gene_id}")
+            identifiers.append(f"NCBI: {self.ncbi_gene_id}")
         if self.dbsnp_id:
             identifiers.append(f"dbSNP: {self.dbsnp_id}")
         if self.clinvar_id:
             identifiers.append(f"ClinVar: {self.clinvar_id}")
-
         if identifiers:
-            report += f"Identifiers: {' | '.join(identifiers)}\n"
+            content_lines.append(f"[dim]IDs:[/dim] {' | '.join(identifiers)}")
 
-        # Add HGVS notations if available
-        hgvs_notations = []
+        # Add HGVS notations if available (compact)
         if self.hgvs_protein:
-            hgvs_notations.append(f"Protein: {self.hgvs_protein}")
-        if self.hgvs_transcript:
-            hgvs_notations.append(f"Transcript: {self.hgvs_transcript}")
-        if self.hgvs_genomic:
-            hgvs_notations.append(f"Genomic: {self.hgvs_genomic}")
+            content_lines.append(f"[dim]HGVS:[/dim] {self.hgvs_protein}")
 
-        if hgvs_notations:
-            report += f"HGVS: {' | '.join(hgvs_notations)}\n"
-
-        # Add ClinVar details if available
-        clinvar_details = []
+        # Add ClinVar significance if available
         if self.clinvar_clinical_significance:
-            clinvar_details.append(f"Significance: {self.clinvar_clinical_significance}")
-        if self.clinvar_accession:
-            clinvar_details.append(f"Accession: {self.clinvar_accession}")
+            content_lines.append(f"[dim]ClinVar:[/dim] {self.clinvar_clinical_significance}")
 
-        if clinvar_details:
-            report += f"ClinVar: {' | '.join(clinvar_details)}\n"
-
-        # Add functional annotations if available
+        # Add key functional annotations if available
         annotations = []
-        if self.snpeff_effect:
-            annotations.append(f"Effect: {self.snpeff_effect}")
-        if self.polyphen2_prediction:
-            annotations.append(f"PolyPhen2: {self.polyphen2_prediction}")
         if self.alphamissense_prediction:
             am_display = {"P": "Pathogenic", "B": "Benign", "A": "Ambiguous"}.get(
                 self.alphamissense_prediction, self.alphamissense_prediction
@@ -113,25 +115,43 @@ class ActionabilityAssessment(VariantAnnotations):
             annotations.append(f"AlphaMissense: {am_display}{score_str}")
         if self.cadd_score is not None:
             annotations.append(f"CADD: {self.cadd_score:.2f}")
-        if self.gnomad_exome_af is not None:
-            annotations.append(f"gnomAD AF: {self.gnomad_exome_af:.6f}")
-
         if annotations:
-            report += f"Annotations: {' | '.join(annotations)}\n"
+            content_lines.append(f"[dim]Scores:[/dim] {' | '.join(annotations)}")
 
-        # Add transcript information if available
-        transcript_info = []
-        if self.transcript_id:
-            transcript_info.append(f"ID: {self.transcript_id}")
-        if self.transcript_consequence:
-            transcript_info.append(f"Consequence: {self.transcript_consequence}")
+        # Summary section - soft-wrapped
+        content_lines.append("")
+        content_lines.append("[bold]Summary[/bold]")
+        # Wrap summary text to fit in box (accounting for panel borders)
+        wrapped_summary = textwrap.fill(self.summary, width=74)
+        content_lines.append(wrapped_summary)
 
-        if transcript_info:
-            report += f"Transcript: {' | '.join(transcript_info)}\n"
+        # Rationale section - soft-wrapped
+        if self.rationale:
+            content_lines.append("")
+            content_lines.append("[bold]Rationale[/bold]")
+            wrapped_rationale = textwrap.fill(self.rationale, width=74)
+            content_lines.append(wrapped_rationale)
 
-        report += f"\n{self.summary}\n"
-
+        # Therapies section
         if self.recommended_therapies:
-            report += f"\nTherapies: {', '.join([t.drug_name for t in self.recommended_therapies])}\n"
+            content_lines.append("")
+            therapy_names = ", ".join([t.drug_name for t in self.recommended_therapies])
+            wrapped_therapies = textwrap.fill(f"Therapies: {therapy_names}", width=74)
+            content_lines.append(f"[bold green]{wrapped_therapies}[/bold green]")
 
-        return report
+        # Join all content
+        content = "\n".join(content_lines)
+
+        # Create panel with box styling
+        panel = Panel(
+            content,
+            title="[bold white]Variant Assessment[/bold white]",
+            border_style="blue",
+            padding=(1, 2),
+        )
+
+        # Render to string
+        with console.capture() as capture:
+            console.print(panel)
+
+        return capture.get()

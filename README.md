@@ -9,7 +9,7 @@ Precision oncology depends on expert molecular tumor boards to determine whether
 tumors are clinically 'actionable'—that is, whether they have associated FDA-approved therapies or clinical 
 guidelines. This is a complex, manual process involving synthesis of evidence from multiple databases.
 
-TumorBoard v2 automates and mimics this expert workflow by aggregating evidence from key genomic and drug-labeling 
+TumorBoardLite automates and mimics this expert workflow by aggregating evidence from key genomic and drug-labeling 
 databases (e.g. CIViC, ClinVar, COSMIC, FDA). It applies an explicit AMP/ASCO/CAP decision tree (including Tier II 
 scenarios and Tier III sub‑levels), and produces standardized tier assignments with confidence scores and 
 human‑readable rationales. There is an LLM wrapper that explains decision making and provides detailed evidence. 

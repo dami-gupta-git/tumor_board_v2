@@ -285,6 +285,10 @@ ONCOGENE_MUTATION_CLASSES: dict[str, dict] = {
             "drugs": ["vemurafenib", "dabrafenib", "encorafenib"],
             "fda_tumors": ["melanoma", "nsclc", "lung", "colorectal", "thyroid", "hairy cell leukemia"],
             "note": "Standard V600-specific inhibitors are effective",
+            "tumor_specific": {
+                "colorectal": "Encorafenib + cetuximab (Braftovi + Erbitux) is FDA-approved standard-of-care for BRAF V600E mCRC. BRAF inhibitor monotherapy is ineffective in CRC due to EGFR feedback.",
+                "melanoma": "Dabrafenib + trametinib or encorafenib + binimetinib are FDA-approved first-line for BRAF V600 melanoma.",
+            },
         },
         "class_ii": {
             "name": "Class II (non-V600 activating)",
@@ -359,6 +363,7 @@ def get_oncogene_mutation_class(gene: str, variant: str) -> dict | None:
                 "fda_tumors": class_info.get("fda_tumors", []),
                 "fda_context": class_info.get("fda_context"),
                 "note": class_info.get("note"),
+                "tumor_specific": class_info.get("tumor_specific", {}),
             }
 
     return None
