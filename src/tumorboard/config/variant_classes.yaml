@@ -102,16 +102,48 @@ EGFR:
       variants:
         - T790M
       require_positive_context: true  # Must be in approval context, not exclusion
-    # Generic EGFR-mutated (covers most mutations except resistance)
+    # Extracellular domain mutations (exon 1-16) - NOT responsive to TKIs
+    # These mutations are found primarily in glioblastoma (not NSCLC)
+    # Reference: PMID 25636926 (R108K in GBM), PMID 28371874
+    extracellular:
+      patterns:
+        - "extracellular"
+        - "ectodomain"
+      variants:
+        - R108K  # Exon 3 - insensitive to gefitinib/erlotinib
+        - R108G
+        - A289V  # Exon 7 - glioblastoma variant
+        - A289T
+        - A289D
+        - G598V  # Exon 15
+        - G598A
+      clinical_guidance:
+        tier: "III"
+        rationale: "Extracellular domain mutations are NOT responsive to TKIs (gefitinib, erlotinib, osimertinib)"
+        note: "These mutations are primarily found in glioblastoma, not NSCLC"
+    # Generic EGFR-mutated (covers KINASE DOMAIN mutations only)
+    # FDA approvals for "EGFR mutation" in NSCLC refer to exon 18-21 (kinase domain)
+    # Extracellular domain mutations (exon 1-16) are NOT responsive to TKIs
     any_mutation:
       patterns:
         - "egfr mutation"
         - "egfr-mutated"
         - "egfr-positive"
+        - "(egfr) mutation"  # FDA label format with parentheses
+        - "egfr) mutation"   # Partial match for "(egfr) mutation"
       variants: ["*"]
       exclude_variants:
         - T790M  # Resistance mutations need explicit approval
         - C797S
+        # Extracellular domain mutations (exon 1-16) - NOT responsive to TKIs
+        # Reference: PMID 25636926, PMID 28371874
+        - R108K  # Exon 3 - insensitive to gefitinib/erlotinib
+        - R108G
+        - A289V  # Exon 7 - glioblastoma variant
+        - A289T
+        - A289D
+        - G598V  # Exon 15
+        - G598A
 
 KIT:
   description: "KIT mutations in GIST have exon-specific responses. Exon 17 mutations (D816V, Y823D) cause imatinib resistance."

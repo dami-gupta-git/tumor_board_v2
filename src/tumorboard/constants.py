@@ -188,3 +188,5 @@ STRUCTURAL_VARIANT_TYPES: set[str] = {
     'truncating',
     'splice',
 }
+
+

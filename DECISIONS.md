@@ -1220,3 +1220,291 @@ Tier IV: 0.90-1.00
 ```
 
 **Impact:** LLM now has detailed guidance for all Tier I and II sub-levels.
+
+---
+
+### 38. Tier III Classification for Case Reports and Preclinical Evidence
+
+**Location:** `src/tumorboard/models/evidence/evidence.py` - `get_tier_hint()` and `_get_tier_ii_sublevel()`
+
+**Background:** Per guidelines/tier3.md, CIViC evidence levels C and D should map to Tier III, not Tier II:
+
+| Evidence Level | Description | Tier (per tier3.md) |
+|----------------|-------------|---------------------|
+| **Level C** | Case reports (n<5) | **Tier III** |
+| **Level D** | Preclinical only (no human data) | **Tier III** |
+
+**Key Rules from tier3.md:**
+1. "Need at least small case series (n≥5-10) for Tier II-C" (line 279)
+2. "Tier II-D requires at least early-phase human data or active clinical trials" (line 219)
+3. "Pure preclinical = Tier III-C" (line 219)
+
+**Previous State:** Level C/D evidence returned Tier II sub-levels.
+
+**Current Approach:**
+
+```python
+# Level C = case reports → Tier III (insufficient)
+has_level_c = any(ev.evidence_level == 'C' and ev.evidence_type == 'PREDICTIVE' for ev in self.civic)
+if has_level_c:
+    return "TIER III INDICATOR: Case reports only (n<5) - insufficient evidence for clinical use"
+
+# Level D = preclinical → Tier III (no human data)  
+has_level_d = any(ev.evidence_level == 'D' and ev.evidence_type == 'PREDICTIVE' for ev in self.civic)
+if has_level_d:
+    return "TIER III INDICATOR: Preclinical data only - no human clinical evidence"
+```
+
+**Updated Tier II Sub-Level Logic:**
+- Removed Level C/D from `_get_tier_ii_sublevel()` method
+- Tier II now requires at least Level B evidence OR FDA approval elsewhere OR active trials
+
+**Impact:** More conservative tier assignment aligned with AMP/ASCO/CAP 2017 guidelines.
+
+---
+
+### 39. Updated Tier Definitions per tier3.md
+
+**Corrected Tier Mapping:**
+
+| Tier | Definition | Requirements |
+|------|------------|--------------|
+| **I-A** | FDA-approved OR professional guidelines | Level A evidence |
+| **I-B** | Well-powered studies (guidelines pending) | Level B + consensus |
+| **II-A** | FDA approved in different tumor | Level A elsewhere |
+| **II-B** | Well-powered studies, no guidelines | Level B, no FDA |
+| **II-C** | Strong prognostic (established value) | Level A/B/C prognostic |
+| **II-D** | Active trials OR resistance marker | Trials enrolling |
+| **III** | Case reports, preclinical, or unknown | Level C/D only |
+| **IV** | Benign/likely benign | ClinVar benign |
+
+**Key Distinction (Tier II vs III):**
+- **Tier II** = "Potentially actionable (investigational)" - has trials or therapeutic path
+- **Tier III** = "Not actionable currently" - insufficient evidence, no clear path
+
+**Updated Confidence Scoring:**
+```
+Tier III: 0.40-0.55 (was 0.50-0.60)
+```
+
+**Impact:** Clearer distinction between actionable (Tier II) and non-actionable (Tier III) variants.
+
+---
+
+### 40. Tier III Sub-Level Classification (III-A, III-B, III-C, III-D)
+
+**Location:** `src/tumorboard/models/evidence/evidence.py` - `_get_tier_iii_sublevel()` method
+
+**Problem:** Tier III was reported as a single undifferentiated category, but guidelines/tier3.md specifies four sub-levels with distinct clinical meanings.
+
+**Guidelines Reference (tier3.md):**
+
+| Sub-Level | Definition | Example |
+|-----------|------------|---------|
+| **III-A** | FDA/guideline support in OTHER tumor type BUT zero evidence in patient's tumor | EGFR L858R in hepatocellular carcinoma (approved for NSCLC, no evidence in HCC) |
+| **III-B** | VUS in established cancer gene (functional impact unknown) | BRCA2 A2951T in ovarian cancer (novel missense, unknown if disrupts DNA repair) |
+| **III-C** | Preclinical data only OR case reports (n<5) | ATM loss → ATR inhibitor (cell line data only, no Phase 1 trials) |
+| **III-D** | No evidence at all (truly unknown) | Novel missense in low-confidence cancer gene |
+
+**Current Approach:** Added `_get_tier_iii_sublevel()` method that determines sub-level based on context and evidence:
+
+```python
+def _get_tier_iii_sublevel(self, tumor_type: str | None, context: str = "general") -> str:
+    """Determine Tier III sub-level (A, B, C, or D) per AMP/ASCO/CAP 2017.
+
+    Per guidelines/tier3.md:
+    Tier III-A: FDA/guideline support in other tumor types BUT NO evidence in patient's tumor
+    Tier III-B: VUS in established cancer gene (functional impact unknown)
+    Tier III-C: Preclinical data only OR case reports (n<5) - insufficient for clinical use
+    Tier III-D: No evidence at all (truly unknown)
+    """
+    if context == "actionable_elsewhere":
+        return "A"
+    if context == "vus":
+        return "B"
+    if context == "case_reports" or context == "preclinical":
+        return "C"
+    if context == "no_evidence":
+        return "D"
+    # Evidence-based fallback logic...
+```
+
+**Updated Tier III Indicators:**
+- `TIER III-A INDICATOR: Known investigational-only (no approved therapy exists)` - actionable elsewhere
+- `TIER III-C INDICATOR: Case reports only (n<5) - insufficient evidence for clinical use` - case reports
+- `TIER III-C INDICATOR: Preclinical data only - no human clinical evidence` - preclinical
+- `TIER III-C INDICATOR: Prognostic/diagnostic only - no therapeutic impact, limited evidence` - weak prognostic
+- `TIER III-D INDICATOR: Investigational/emerging evidence only` - no evidence
+
+**Updated Confidence Scoring:**
+```
+Tier III-A: 0.45-0.55 (actionable elsewhere, no evidence in tumor)
+Tier III-B: 0.40-0.50 (VUS in known cancer gene)
+Tier III-C: 0.35-0.45 (case reports, preclinical, weak prognostic)
+Tier III-D: 0.30-0.40 (no evidence at all)
+```
+
+**Clinical Utility:**
+- **III-A:** Flag for cross-tumor research; inappropriate for off-label use
+- **III-B:** May warrant germline follow-up for VUS in cancer predisposition genes
+- **III-C:** Track for emerging evidence; monitor literature for updates
+- **III-D:** Research hypothesis only; not clinically actionable
+
+**Impact:** More granular Tier III classification helps clinicians understand WHY a variant is unknown significance and what actions (if any) are appropriate.
+
+---
+
+### 41. EGFR Extracellular Domain Mutations Excluded from TKI Approvals
+
+**Location:** `src/tumorboard/config/variant_classes.yaml` - EGFR section
+
+**Problem:** EGFR R108K (and other extracellular domain mutations) were incorrectly classified as Tier I in NSCLC because the `any_mutation` class had `variants: ["*"]` which matched ANY EGFR mutation.
+
+**Clinical Background:**
+- FDA approvals for "EGFR mutation" in NSCLC refer to **kinase domain mutations** (exons 18-21)
+- Extracellular domain mutations (exons 1-16, e.g., R108K, A289V) are:
+  - **NOT responsive** to EGFR TKIs (gefitinib, erlotinib, osimertinib)
+  - Primarily found in **glioblastoma**, not NSCLC
+  - Signal through different mechanisms (ligand-independent dimerization)
+- Reference: PMID 25636926 (R108K in GBM), PMID 28371874
+
+**Solution:**
+
+1. **Added `extracellular` variant class** with explicit tier guidance:
+```yaml
+extracellular:
+  patterns:
+    - "extracellular"
+    - "ectodomain"
+  variants:
+    - R108K  # Exon 3 - insensitive to gefitinib/erlotinib
+    - R108G
+    - A289V  # Exon 7 - glioblastoma variant
+    - A289T
+    - A289D
+    - G598V  # Exon 15
+    - G598A
+  clinical_guidance:
+    tier: "III"
+    rationale: "Extracellular domain mutations are NOT responsive to TKIs"
+```
+
+2. **Updated `any_mutation` class** to exclude extracellular variants:
+```yaml
+any_mutation:
+  patterns:
+    - "egfr mutation"
+    - "egfr-mutated"
+    - "egfr-positive"
+    - "(egfr) mutation"  # FDA label format with parentheses
+    - "egfr) mutation"   # Partial match
+  variants: ["*"]
+  exclude_variants:
+    - T790M    # Resistance mutations need explicit approval
+    - C797S
+    - R108K   # Extracellular domain (exon 3)
+    - R108G
+    - A289V   # Exon 7
+    - A289T
+    - A289D
+    - G598V   # Exon 15
+    - G598A
+```
+
+3. **Fixed `get_tier_hint()` "FDA elsewhere" check** to verify variant matches approval criteria:
+```python
+# Must verify the variant actually matches the approval criteria
+for approval in self.fda_approvals:
+    if self._variant_matches_approval_class(
+        self.gene, self.variant, indication_lower, approval, tumor_type=None
+    ):
+        has_fda_elsewhere = True
+        break
+```
+
+**Test Results:**
+- **L858R in NSCLC:** Tier I-A (FDA-approved) ✓
+- **R108K in NSCLC:** Tier III-B (VUS in known cancer gene) ✓
+
+**Impact:** Prevents false Tier I assignments for EGFR extracellular domain mutations, which could lead to inappropriate TKI prescriptions.
+
+---
+
+### 42. VUS in Known Cancer Gene Detection (Tier III-B)
+
+**Location:**
+- `src/tumorboard/api/oncokb.py` - OncoKB API client for cancer gene list
+- `src/tumorboard/models/evidence/evidence.py` - `is_vus_in_known_cancer_gene()` method
+
+**Problem:** The decision tree from guidelines specifies Tier III-B for VUS (Variant of Uncertain Significance) in known cancer genes:
+
+```
+Is the variant in a known cancer gene?
+├─ YES, but function unknown → TIER III-B (VUS)
+├─ YES, clearly benign → TIER IV
+└─ NO evidence at all → TIER III-D
+```
+
+But the implementation was missing this check, causing VUS in known cancer genes to be classified as Tier III-D.
+
+**Solution:**
+
+1. **Created OncoKB API client** (`src/tumorboard/api/oncokb.py`):
+   - Fetches cancer gene list from OncoKB public API: `https://www.oncokb.org/api/v1/utils/cancerGeneList`
+   - Caches results to avoid repeated API calls
+   - Includes fallback list of ~100 major cancer genes for offline use
+
+2. **Added `is_vus_in_known_cancer_gene()` method**:
+```python
+def is_vus_in_known_cancer_gene(self) -> bool:
+    """Check if this variant is a VUS in a known cancer gene.
+
+    Returns True if:
+    1. Gene is in OncoKB cancer gene list (or fallback list)
+    2. No curated evidence exists for this specific variant
+    """
+    from tumorboard.api.oncokb import is_known_cancer_gene_sync, FALLBACK_CANCER_GENES
+
+    gene_upper = self.gene.upper()
+    is_cancer_gene = is_known_cancer_gene_sync(gene_upper)
+    if not is_cancer_gene:
+        is_cancer_gene = gene_upper in FALLBACK_CANCER_GENES
+
+    if not is_cancer_gene:
+        return False
+
+    # Check if variant has strong evidence (Level A/B, FDA, assertions)
+    has_strong_evidence = any([
+        any(ev.evidence_level in ['A', 'B'] for ev in self.civic),
+        bool(self.civic_assertions),
+        any(b.fda_approved for b in self.cgi_biomarkers),
+        bool(self.fda_approvals),
+    ])
+
+    return not has_strong_evidence
+```
+
+3. **Added VUS check to `get_tier_hint()`** decision tree:
+```python
+# Check for VUS in known cancer gene (Tier III-B)
+if self.is_vus_in_known_cancer_gene():
+    sublevel = self._get_tier_iii_sublevel(tumor_type, context="vus")
+    return f"TIER III-{sublevel} INDICATOR: VUS in established cancer gene ({self.gene})"
+```
+
+4. **Fixed prognostic check** to distinguish between:
+   - Variant with actual prognostic evidence (even weak) → Tier III-C
+   - Variant with NO evidence in known cancer gene → Tier III-B (VUS)
+   - Variant with NO evidence in unknown gene → Tier III-D
+
+**Test Results:**
+- **EGFR R108K (VUS in known cancer gene):** Tier III-B ✓
+- **UNKNOWNGENE X123Y (unknown gene):** Tier III-D ✓
+- **EGFR L858R (has FDA approval):** Tier I-A ✓
+
+**OncoKB Cancer Gene List Source:**
+- API: https://www.oncokb.org/api/v1/utils/cancerGeneList
+- Fallback list includes ~100 major oncogenes and tumor suppressors
+- Source: COSMIC Cancer Gene Census Tier 1 genes
+
+**Impact:** VUS in established cancer genes (like EGFR R108K) are now correctly classified as Tier III-B instead of Tier III-D, which has clinical utility for germline follow-up in cancer predisposition genes.

@@ -144,11 +144,22 @@ class Evidence(VariantAnnotations):
         """Check if variant is in investigational-only context.
 
         Some gene-tumor combinations have NO approved therapies despite active research.
+        This includes gene-tumor pairs where:
+        1. Targeted therapies have FAILED in clinical trials for this tumor type
+        2. FDA approval exists in OTHER tumor types but has no evidence of efficacy here
+        3. The biomarker is prognostic only in this tumor type
+
+        Example: PTEN mutations in GBM are prognostic (poor outcome) but NOT actionable.
+        mTOR/PI3K inhibitors have failed in GBM trials despite approvals elsewhere.
         """
         gene_lower = self.gene.lower()
         tumor_lower = (tumor_type or '').lower()
 
         # Known investigational-only combinations
+        # These are gene-tumor pairs where:
+        # - Targeted therapies have failed in clinical trials for this specific tumor
+        # - FDA approval may exist for OTHER tumors but has NO efficacy here
+        # - Biomarker is prognostic only (not therapeutically actionable)
         investigational_pairs = {
             ('kras', 'pancreatic'): True,
             ('kras', 'pancreas'): True,
@@ -162,6 +173,14 @@ class Evidence(VariantAnnotations):
             ('smad4', 'pancreas'): True,
             ('cdkn2a', 'melanoma'): True,
             ('arid1a', '*'): True,
+            # PTEN in GBM: mTOR/PI3K inhibitors have FAILED in clinical trials
+            # PTEN loss is prognostic (worse outcome) but NOT therapeutically actionable
+            # Reference: PMID 26066373 (Phase II temsirolimus), PMID 25260750 (mTOR inhibitors in GBM)
+            # Despite PTEN being targetable in breast cancer (capivasertib/TRUQAP),
+            # this does NOT translate to GBM
+            ('pten', 'glioblastoma'): True,
+            ('pten', 'gbm'): True,
+            ('pten', 'glioma'): True,
         }
 
         for (gene, tumor), is_investigational in investigational_pairs.items():
@@ -471,11 +490,15 @@ class Evidence(VariantAnnotations):
     def _get_tier_ii_sublevel(self, tumor_type: str | None, context: str = "general") -> str:
         """Determine Tier II sub-level (A, B, C, or D) per AMP/ASCO/CAP 2017.
 
-        Per guidelines/tier2.md:
+        Per guidelines/tier2.md and tier3.md:
         Tier II-A: FDA approved in DIFFERENT tumor type (off-label)
         Tier II-B: Well-powered studies (Phase 2/3) without guideline endorsement
-        Tier II-C: Case reports/small studies, OR prognostic with established clinical value
-        Tier II-D: Preclinical evidence, early clinical trials, OR resistance without alternatives
+        Tier II-C: Prognostic with established clinical value (Level A/B/C evidence)
+        Tier II-D: Active clinical trials, OR resistance without approved alternatives
+
+        NOTE: Case reports only (Level C) and preclinical only (Level D) are now
+        Tier III per guidelines/tier3.md, NOT Tier II. Tier II requires at least
+        well-powered studies (Level B) or active clinical trials.
 
         Args:
             tumor_type: Patient's tumor type
@@ -531,7 +554,87 @@ class Evidence(VariantAnnotations):
         if has_level_b:
             return "B"
 
-        # Check for case reports / small studies (Level C) (II-C)
+        # NOTE: Level C (case reports) and Level D (preclinical) without other context
+        # should now be Tier III per guidelines/tier3.md, NOT Tier II.
+        # This method should only be called when we've already determined it's Tier II.
+
+        # Check for active clinical trials (II-D)
+        has_trials, _ = self.has_active_clinical_trials(variant_specific_only=True)
+        if has_trials:
+            return "D"
+
+        # Default to B (well-powered studies) since if we're calling this for Tier II,
+        # we should have Level B evidence or FDA approval elsewhere
+        return "B"
+
+    def _get_tier_iii_sublevel(self, tumor_type: str | None, context: str = "general") -> str:
+        """Determine Tier III sub-level (A, B, C, or D) per AMP/ASCO/CAP 2017.
+
+        Per guidelines/tier3.md:
+        Tier III-A: FDA/guideline support in other tumor types BUT NO evidence in patient's tumor
+        Tier III-B: VUS in established cancer gene (functional impact unknown)
+        Tier III-C: Preclinical data only OR case reports (n<5) - insufficient for clinical use
+        Tier III-D: No evidence at all (truly unknown)
+
+        Args:
+            tumor_type: Patient's tumor type
+            context: Hint about why this is Tier III ("actionable_elsewhere", "vus",
+                     "case_reports", "preclinical", "prognostic_only", "no_evidence", "general")
+
+        Returns: "A", "B", "C", or "D"
+        """
+        # Context-based classification (when caller knows why it's Tier III)
+        if context == "actionable_elsewhere":
+            # FDA/guideline support elsewhere but zero evidence in patient's tumor
+            return "A"
+        if context == "vus":
+            # VUS in established cancer gene
+            return "B"
+        if context == "case_reports":
+            # Case reports only (n<5)
+            return "C"
+        if context == "preclinical":
+            # Preclinical data only (no human clinical evidence)
+            return "C"
+        if context == "prognostic_only":
+            # Prognostic only with limited evidence
+            return "C"
+        if context == "no_evidence":
+            # No evidence at all
+            return "D"
+
+        # Evidence-based fallback classification
+
+        # Check for FDA approval or Level A evidence in OTHER tumor types (III-A)
+        # This is biomarkers actionable elsewhere but with zero evidence in patient's tumor
+        has_fda_or_level_a_elsewhere = False
+        for approval in self.fda_approvals:
+            parsed = approval.parse_indication_for_tumor(tumor_type or "")
+            if not parsed.get('tumor_match'):
+                has_fda_or_level_a_elsewhere = True
+                break
+        if not has_fda_or_level_a_elsewhere:
+            for ev in self.civic:
+                if ev.evidence_level == 'A' and ev.evidence_type == 'PREDICTIVE':
+                    if not self._tumor_matches(tumor_type, ev.disease):
+                        has_fda_or_level_a_elsewhere = True
+                        break
+
+        # But for III-A, there must be ZERO evidence in the patient's tumor
+        has_any_evidence_in_tumor = False
+        for ev in self.civic:
+            if self._tumor_matches(tumor_type, ev.disease):
+                has_any_evidence_in_tumor = True
+                break
+        for ev in self.vicc:
+            if self._tumor_matches(tumor_type, ev.disease):
+                has_any_evidence_in_tumor = True
+                break
+
+        if has_fda_or_level_a_elsewhere and not has_any_evidence_in_tumor:
+            return "A"
+
+        # Check for Level C (case reports) evidence → III-C
         has_level_c = any(
             ev.evidence_level == 'C' and ev.evidence_type == 'PREDICTIVE'
             for ev in self.civic
@@ -539,21 +642,29 @@ class Evidence(VariantAnnotations):
         if has_level_c:
             return "C"
 
-        # Check for preclinical / early phase (Level D) (II-D)
+        # Check for Level D (preclinical) evidence → III-C
         has_level_d = any(
-            ev.evidence_level == 'D'
+            ev.evidence_level == 'D' and ev.evidence_type == 'PREDICTIVE'
             for ev in self.civic
         )
         if has_level_d:
-            return "D"
+            return "C"
 
-        # Check for active clinical trials (II-D)
-        has_trials, _ = self.has_active_clinical_trials(variant_specific_only=True)
-        if has_trials:
-            return "D"
+        # Check for prognostic/diagnostic with weak evidence → III-C
+        has_weak_prognostic = any(
+            ev.evidence_level in ['C', 'D'] and
+            ev.evidence_type in ['PROGNOSTIC', 'DIAGNOSTIC']
+            for ev in self.civic
+        )
+        if has_weak_prognostic:
+            return "C"
 
-        # Default to C (moderate evidence)
-        return "C"
+        # If we have any evidence at all, default to C (limited evidence)
+        if self.civic or self.vicc or self.cgi_biomarkers:
+            return "C"
+
+        # No evidence at all → III-D
+        return "D"
 
     def is_resistance_marker_without_targeted_therapy(self, tumor_type: str | None = None) -> tuple[bool, list[str]]:
         """Detect resistance-only markers WITHOUT FDA-approved therapy FOR the variant.
@@ -705,6 +816,60 @@ class Evidence(VariantAnnotations):
 
         return False
 
+    def is_vus_in_known_cancer_gene(self) -> bool:
+        """Check if this variant is a VUS (Variant of Uncertain Significance) in a known cancer gene.
+
+        Per AMP/ASCO/CAP 2017 Tier III-B definition:
+        - The gene is a known cancer gene (established oncogene or tumor suppressor)
+        - BUT the functional impact of THIS specific variant is unknown
+
+        This uses OncoKB's curated cancer gene list to determine if the gene is a known
+        cancer gene. The variant is considered a VUS if:
+        1. Gene is in OncoKB cancer gene list (or fallback list)
+        2. No curated evidence exists for this specific variant (no FDA, CIViC Level A/B, etc.)
+
+        Returns:
+            True if variant is a VUS in a known cancer gene (Tier III-B candidate)
+        """
+        # Lazy import to avoid circular dependency
+        from tumorboard.api.oncokb import is_known_cancer_gene_sync, FALLBACK_CANCER_GENES
+
+        gene_upper = self.gene.upper()
+
+        # Check if gene is in OncoKB cancer gene list (cached from API) or fallback list
+        is_cancer_gene = is_known_cancer_gene_sync(gene_upper)
+        if not is_cancer_gene:
+            # Fallback to hardcoded list if API cache not available
+            is_cancer_gene = gene_upper in FALLBACK_CANCER_GENES
+
+        if not is_cancer_gene:
+            return False  # Gene is not a known cancer gene
+
+        # Gene is a known cancer gene - check if variant has curated evidence
+        # If variant has strong evidence (Level A/B), it's NOT a VUS
+        has_strong_evidence = False
+
+        # Check for Level A/B CIViC evidence for THIS variant
+        for ev in self.civic:
+            if ev.evidence_level in ['A', 'B']:
+                has_strong_evidence = True
+                break
+
+        # Check for CIViC assertions
+        if self.civic_assertions:
+            has_strong_evidence = True
+
+        # Check for CGI FDA-approved biomarkers
+        if any(b.fda_approved for b in self.cgi_biomarkers):
+            has_strong_evidence = True
+
+        # Check for FDA approvals that match this variant
+        if self.fda_approvals:
+            has_strong_evidence = True
+
+        # If no strong evidence, this is a VUS in a known cancer gene
+        return not has_strong_evidence
+
     def is_molecular_subtype_defining(self, tumor_type: str | None = None) -> tuple[bool, str | None]:
         """Check if this variant defines a molecular subtype with Level A clinical utility.
 
@@ -826,8 +991,9 @@ class Evidence(VariantAnnotations):
 
         # Check investigational-only (but no active variant-specific trials)
         if self.is_investigational_only(tumor_type):
-            logger.info(f"Tier III: {self.gene} {self.variant} in {tumor_type} is investigational-only")
-            return "TIER III INDICATOR: Known investigational-only (no approved therapy exists)"
+            sublevel = self._get_tier_iii_sublevel(tumor_type, context="general")
+            logger.info(f"Tier III-{sublevel}: {self.gene} {self.variant} in {tumor_type} is investigational-only")
+            return f"TIER III-{sublevel} INDICATOR: Known investigational-only (no approved therapy exists)"
 
         # Check for resistance-only marker (excludes therapy but no targeted alternative)
         # Per AMP/ASCO/CAP: Resistance markers that affect treatment selection are Tier II
@@ -858,23 +1024,49 @@ class Evidence(VariantAnnotations):
                 ev.evidence_type in ['PROGNOSTIC', 'DIAGNOSTIC']
                 for ev in self.civic
             )
+            # Check if there's ANY prognostic/diagnostic evidence (even weak Level D)
+            has_any_prognostic = any(
+                ev.evidence_type in ['PROGNOSTIC', 'DIAGNOSTIC']
+                for ev in self.civic
+            )
             if has_strong_prognostic:
                 sublevel = self._get_tier_ii_sublevel(tumor_type, context="prognostic")
                 logger.info(f"Tier II-{sublevel}: {self.gene} {self.variant} has strong prognostic/diagnostic evidence")
                 return f"TIER II-{sublevel} INDICATOR: Prognostic/diagnostic marker with established clinical significance - no therapeutic impact"
-            else:
-                logger.info(f"Tier III: {self.gene} {self.variant} is prognostic/diagnostic only (weak evidence)")
-                return "TIER III INDICATOR: Prognostic/diagnostic only - no therapeutic impact, limited evidence"
+            elif has_any_prognostic:
+                # Has weak prognostic evidence (Level D) → Tier III-C
+                sublevel = self._get_tier_iii_sublevel(tumor_type, context="prognostic_only")
+                logger.info(f"Tier III-{sublevel}: {self.gene} {self.variant} is prognostic/diagnostic only (weak evidence)")
+                return f"TIER III-{sublevel} INDICATOR: Prognostic/diagnostic only - no therapeutic impact, limited evidence"
+            # No actual prognostic evidence - fall through to VUS/no evidence check below
 
         # Check for FDA approval in different tumor type (Tier II-A)
         # Per AMP/ASCO/CAP: FDA approved in different tumor = Tier II-A
+        # IMPORTANT: Must verify the variant actually matches the approval criteria
+        # (e.g., EGFR R108K does NOT match "EGFR mutation" approval - extracellular domain)
         has_fda_elsewhere = False
-        if self.fda_approvals:
-            has_fda_elsewhere = True
-        elif any(b.fda_approved for b in self.cgi_biomarkers):
-            has_fda_elsewhere = True
-        elif any(ev.evidence_level == 'A' and ev.evidence_type == 'PREDICTIVE' for ev in self.civic):
-            has_fda_elsewhere = True
+        for approval in self.fda_approvals:
+            indication_lower = (approval.indication or '').lower()
+            # Check if variant matches approval criteria (not just gene mention)
+            if self._variant_matches_approval_class(
+                self.gene, self.variant, indication_lower, approval, tumor_type=None
+            ):
+                has_fda_elsewhere = True
+                break
+        if not has_fda_elsewhere:
+            for biomarker in self.cgi_biomarkers:
+                if biomarker.fda_approved:
+                    alt = (biomarker.alteration or '').upper()
+                    if self.variant.upper() in alt or 'MUT' in alt:
+                        has_fda_elsewhere = True
+                        break
+        if not has_fda_elsewhere:
+            for ev in self.civic:
+                if ev.evidence_level == 'A' and ev.evidence_type == 'PREDICTIVE':
+                    sig = (ev.clinical_significance or '').upper()
+                    if 'SENSITIVITY' in sig or 'RESPONSE' in sig:
+                        has_fda_elsewhere = True
+                        break
 
         if has_fda_elsewhere:
             sublevel = self._get_tier_ii_sublevel(tumor_type, context="fda_different_tumor")
@@ -895,17 +1087,41 @@ class Evidence(VariantAnnotations):
             logger.info(f"Tier II-{sublevel}: {self.gene} {self.variant} has Level B evidence")
             return f"TIER II-{sublevel} INDICATOR: Well-powered studies show clinical significance but no FDA approval"
 
-        # Level C/D = case reports/preclinical (Tier II-C/D or Tier III)
-        has_level_c_or_d = any(
-            ev.evidence_level in ['C', 'D'] and ev.evidence_type == 'PREDICTIVE'
+        # Level C = case reports → Tier III-C per guidelines/tier3.md (n<5 = insufficient)
+        # Level D = preclinical ONLY → Tier III-C per guidelines/tier3.md (no human data)
+        # Per tier3.md rule: "Need at least small case series (n≥5-10) for Tier II-C"
+        # CIViC Level C/D without trials or FDA approval elsewhere = Tier III
+        has_level_c = any(
+            ev.evidence_level == 'C' and ev.evidence_type == 'PREDICTIVE'
             for ev in self.civic
         )
-        if has_level_c_or_d:
-            sublevel = self._get_tier_ii_sublevel(tumor_type, context="general")
-            logger.info(f"Tier II-{sublevel}: {self.gene} {self.variant} has Level C/D evidence")
-            return f"TIER II-{sublevel} INDICATOR: Case reports or preclinical evidence suggest potential significance"
+        has_level_d = any(
+            ev.evidence_level == 'D' and ev.evidence_type == 'PREDICTIVE'
+            for ev in self.civic
+        )
 
-        return "TIER III: Investigational/emerging evidence only"
+        if has_level_c:
+            # Case reports only - Tier III-C (insufficient for clinical use)
+            sublevel = self._get_tier_iii_sublevel(tumor_type, context="case_reports")
+            logger.info(f"Tier III-{sublevel}: {self.gene} {self.variant} has Level C evidence only (case reports)")
+            return f"TIER III-{sublevel} INDICATOR: Case reports only (n<5) - insufficient evidence for clinical use"
+
+        if has_level_d:
+            # Preclinical only - Tier III-C (no human data)
+            sublevel = self._get_tier_iii_sublevel(tumor_type, context="preclinical")
+            logger.info(f"Tier III-{sublevel}: {self.gene} {self.variant} has Level D evidence only (preclinical)")
+            return f"TIER III-{sublevel} INDICATOR: Preclinical data only - no human clinical evidence"
+
+        # Check for VUS in known cancer gene (Tier III-B)
+        # Per decision tree: "Is the variant in a known cancer gene? → YES, but function unknown → TIER III-B (VUS)"
+        if self.is_vus_in_known_cancer_gene():
+            sublevel = self._get_tier_iii_sublevel(tumor_type, context="vus")
+            logger.info(f"Tier III-{sublevel}: {self.gene} {self.variant} is VUS in known cancer gene")
+            return f"TIER III-{sublevel} INDICATOR: VUS in established cancer gene ({self.gene}) - functional impact unknown"
+
+        # Default fallback - no evidence at all (gene not in known cancer gene list)
+        sublevel = self._get_tier_iii_sublevel(tumor_type, context="no_evidence")
+        return f"TIER III-{sublevel} INDICATOR: Investigational/emerging evidence only"
 
     def compute_evidence_stats(self, tumor_type: str | None = None) -> dict:
         """Compute summary statistics and detect conflicts in the evidence."""

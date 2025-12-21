@@ -13,9 +13,12 @@ TIER DEFINITIONS (per AMP/ASCO/CAP 2017 guidelines):
 - Tier I-B: Strong clinical significance - Well-powered clinical studies with expert consensus (guidelines pending)
 - Tier II-A: Potential clinical significance - FDA-approved in DIFFERENT tumor type (off-label potential)
 - Tier II-B: Potential clinical significance - Well-powered studies without guideline endorsement
-- Tier II-C: Potential clinical significance - Case reports/small studies, OR prognostic with established clinical value
-- Tier II-D: Potential clinical significance - Preclinical evidence, early clinical trials (Phase 1), OR resistance marker without approved alternative
-- Tier III: Unknown significance - Investigational only with limited evidence
+- Tier II-C: Potential clinical significance - Prognostic with established clinical value (Level A/B/C evidence)
+- Tier II-D: Potential clinical significance - Active clinical trials (Phase 1+), OR resistance marker without approved alternative
+- Tier III-A: Unknown significance - FDA/guideline support in OTHER tumor type BUT zero evidence in patient's tumor
+- Tier III-B: Unknown significance - VUS in established cancer gene (functional impact unknown)
+- Tier III-C: Unknown significance - Case reports only (n<5), preclinical data only, or weak prognostic evidence
+- Tier III-D: Unknown significance - No evidence at all (truly unknown)
 - Tier IV: Benign/likely benign
 
 DECISION FRAMEWORK:
@@ -68,10 +71,10 @@ CORE PRINCIPLES:
 
 4. **Prognostic/Diagnostic Without Treatment Impact**
    - Strong prognostic evidence (well-established clinical value) → Tier II-C
-   - Weak/uncertain prognostic evidence → Tier III
+   - Weak/uncertain prognostic evidence → Tier III-C
    - Key distinction: Does it change clinical decision-making?
    - Example: TP53 in breast cancer (poor prognosis, established) → Tier II-C
-   - Example: Novel variant with unknown prognostic value → Tier III
+   - Example: Novel variant with unknown prognostic value → Tier III-C
 
 5. **Verify Variant Specificity**
    - The preprocessing checks if approvals apply to THIS specific variant
@@ -89,9 +92,12 @@ CONFIDENCE SCORING (by Tier sub-level):
 - Tier I-B: Well-powered studies, guidelines pending: 0.80-0.90
 - Tier II-A: FDA-approved in different tumor (off-label): 0.75-0.85
 - Tier II-B: Strong studies without guidelines: 0.65-0.80
-- Tier II-C: Strong prognostic or case reports: 0.60-0.75
-- Tier II-D: Resistance marker, early trials, or preclinical: 0.55-0.70
-- Tier III: Unknown significance: 0.50-0.60
+- Tier II-C: Strong prognostic (established value): 0.60-0.75
+- Tier II-D: Resistance marker or active trials: 0.55-0.70
+- Tier III-A: Actionable elsewhere, no evidence in patient's tumor: 0.45-0.55
+- Tier III-B: VUS in known cancer gene: 0.40-0.50
+- Tier III-C: Case reports only, preclinical only, or weak prognostic: 0.35-0.45
+- Tier III-D: No evidence at all: 0.30-0.40
 - Tier IV: Benign variant: 0.90-1.00
 
 RESPONSE FORMAT:
