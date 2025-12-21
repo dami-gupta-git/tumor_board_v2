@@ -1112,6 +1112,69 @@ class Evidence(VariantAnnotations):
             logger.info(f"Tier III-{sublevel}: {self.gene} {self.variant} has Level D evidence only (preclinical)")
             return f"TIER III-{sublevel} INDICATOR: Preclinical data only - no human clinical evidence"
 
+        # PRIORITY: DDR gene with gene-level therapeutic evidence
+        # For DNA Damage Repair genes, gene-level loss-of-function has known therapeutic implications
+        # even if this specific variant is uncharacterized
+        DDR_GENES = {"ATM", "BRCA1", "BRCA2", "PALB2", "CHEK2", "RAD51C", "RAD51D", "BRIP1", "FANCA", "RAD51B", "BARD1", "CDK12"}
+
+        if self.gene.upper() in DDR_GENES:
+            # Check if we have ANY gene-level predictive evidence from CIViC
+            predictive_evidence = [
+                ev for ev in self.civic
+                if ev.evidence_type == "PREDICTIVE"
+            ]
+
+            if predictive_evidence:
+                # Check evidence quality and direction
+                sensitivity_evidence = [
+                    ev for ev in predictive_evidence
+                    if "SENSITIVITY" in (ev.clinical_significance or "").upper()
+                    or "RESPONSE" in (ev.clinical_significance or "").upper()
+                ]
+
+                resistance_evidence = [
+                    ev for ev in predictive_evidence
+                    if (ev.evidence_direction or "").upper() == "DOES_NOT_SUPPORT"
+                    or "RESISTANCE" in (ev.clinical_significance or "").upper()
+                ]
+
+                # Get best evidence levels
+                sens_levels = [ev.evidence_level for ev in sensitivity_evidence if ev.evidence_level]
+                res_levels = [ev.evidence_level for ev in resistance_evidence if ev.evidence_level]
+
+                has_high_quality_sensitivity = any(l in ["A", "B"] for l in sens_levels)
+                has_high_quality_resistance = any(l in ["A", "B"] for l in res_levels)
+
+                # Check which diseases the evidence comes from
+                diseases = list(set(ev.disease for ev in predictive_evidence if ev.disease))
+                disease_str = ", ".join(diseases[:3]) + ("..." if len(diseases) > 3 else "")
+
+                # Determine tier based on evidence pattern
+                if has_high_quality_sensitivity and has_high_quality_resistance:
+                    # Conflicting high-quality evidence (like ATM + PARP inhibitors)
+                    logger.info(f"Tier II-C: {self.gene} {self.variant} DDR gene with CONFLICTING Level A/B evidence")
+                    return f"TIER II-C INDICATOR: {self.gene} is a DDR gene with conflicting therapeutic evidence. Sensitivity shown in some contexts, resistance/no-benefit in others. Evidence from: {disease_str}. Requires careful disease-specific evaluation."
+
+                elif has_high_quality_sensitivity:
+                    # Strong sensitivity evidence from other cancers
+                    drugs = list(set(
+                        drug for ev in sensitivity_evidence
+                        for drug in (ev.drugs or [])
+                    ))[:3]
+                    drugs_str = ", ".join(drugs) if drugs else "targeted therapies"
+                    logger.info(f"Tier II-D: {self.gene} {self.variant} DDR gene with Level A/B sensitivity evidence")
+                    return f"TIER II-D INDICATOR: {self.gene} is a DDR gene with therapeutic sensitivity ({drugs_str}) demonstrated in other cancers ({disease_str}). Variant-specific functional impact unknown but gene-level evidence suggests potential actionability."
+
+                elif sensitivity_evidence:
+                    # Lower quality sensitivity evidence (Level C/D)
+                    drugs = list(set(
+                        drug for ev in sensitivity_evidence
+                        for drug in (ev.drugs or [])
+                    ))[:3]
+                    drugs_str = ", ".join(drugs) if drugs else "targeted therapies"
+                    logger.info(f"Tier II-D: {self.gene} {self.variant} DDR gene with Level C/D sensitivity evidence")
+                    return f"TIER II-D INDICATOR: {self.gene} is a DDR gene. Preclinical/early evidence suggests sensitivity to {drugs_str} in other cancers ({disease_str}). Limited clinical validation."
+
         # Check for VUS in known cancer gene (Tier III-B)
         # Per decision tree: "Is the variant in a known cancer gene? → YES, but function unknown → TIER III-B (VUS)"
         if self.is_vus_in_known_cancer_gene():
@@ -1215,6 +1278,24 @@ class Evidence(VariantAnnotations):
         lines.append(tier_hint)
         lines.append("=" * 60)
         lines.append("")
+
+        # Flag if CIViC evidence is from different cancer types
+        if tumor_type and self.civic:
+            civic_diseases = [ev.disease for ev in self.civic if ev.disease]
+            tumor_lower = tumor_type.lower()
+
+            # Check if any CIViC evidence matches the queried tumor
+            matching_diseases = [
+                d for d in civic_diseases
+                if tumor_lower in d.lower() or d.lower() in tumor_lower
+            ]
+
+            if civic_diseases and not matching_diseases:
+                unique_diseases = list(set(civic_diseases))[:5]
+                lines.append("⚠️ DISEASE CONTEXT WARNING: No CIViC evidence specific to " + tumor_type + ".")
+                lines.append("   All evidence is from: " + ", ".join(unique_diseases))
+                lines.append("   Gene-level extrapolation may not apply to this tumor type.")
+                lines.append("")
 
         total = stats['sensitivity_count'] + stats['resistance_count']
         if total > 0:
