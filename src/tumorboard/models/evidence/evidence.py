@@ -520,18 +520,23 @@ class Evidence(VariantAnnotations):
 
         Examples:
         - BRCA2 K3326* is a known benign polymorphism despite being a stop codon
-        - Should NOT be eligible for PARP inhibitor therapy
+        - MLH1 V716M is a common missense polymorphism classified as benign
+        - These should NOT be eligible for targeted therapy
         """
-        if not self.clinvar:
-            return False
-
-        for cv in self.clinvar:
-            sig = (cv.clinical_significance or '').lower()
+        # Check the annotation field first (primary source from MyVariant)
+        if self.clinvar_clinical_significance:
+            sig = self.clinvar_clinical_significance.lower()
             # Check for benign classifications
             if 'benign' in sig and 'pathogenic' not in sig:
                 # "Benign", "Likely benign", "Benign/Likely benign" all match
                 # But "Conflicting interpretations of pathogenicity" or
                 # "Uncertain significance" don't match
+                return True
+
+        # Also check the clinvar list entries as fallback
+        for cv in self.clinvar:
+            sig = (cv.clinical_significance or '').lower()
+            if 'benign' in sig and 'pathogenic' not in sig:
                 return True
 
         return False

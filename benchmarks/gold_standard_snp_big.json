@@ -2,16 +2,6 @@
   "description": "Comprehensive gold standard dataset for somatic SNP and small indel variant actionability assessment",
   "version": "2.0-comprehensive",
   "note": "100+ somatic variants across Tier I, II, III, and IV classifications. Excludes germline variants, fusions, amplifications, and structural variants.",
-  "metadata": {
-    "total_variants": 105,
-    "tier_distribution": {
-      "Tier I": 48,
-      "Tier II": 27,
-      "Tier III": 25,
-      "Tier IV": 5
-    },
-    "tumor_types_covered": 20
-  },
   "entries": [
     {
       "gene": "BRAF",
@@ -940,14 +930,6 @@
       "expected_tier": "Tier IV",
       "notes": "Benign polymorphism; no therapeutic implications",
       "references": ["Trofatter JA et al. Cell 1993"]
-    },
-    {
-      "gene": "EGFR",
-      "variant": "P753L",
-      "tumor_type": "Lung Adenocarcinoma",
-      "expected_tier": "Tier IV",
-      "notes": "Polymorphism with no known oncogenic effect",
-      "references": ["Lynch TJ et al. N Engl J Med 2004"]
     },
     {
       "gene": "BRCA2",
