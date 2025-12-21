@@ -34,6 +34,4 @@ class CIViCAssertionEvidence(BaseModel):
     fda_companion_test: bool | None = None
     nccn_guideline: str | None = None
     description: str | None = None
-    is_sensitivity: bool = False
-    is_resistance: bool = False
 

@@ -221,7 +221,7 @@ class TestFDAIntegration:
             ]
         )
 
-        summary = evidence.summary()
+        summary = evidence.summary_compact()
 
         # Verify FDA section exists in summary
         assert "FDA Approved Drugs" in summary

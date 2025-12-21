@@ -854,3 +854,189 @@ if later_line_approvals and not first_line_approvals:
 ```
 
 **Impact:** This single bug fix improved accuracy from 52% → 72%.
+
+---
+
+### 29. Tier I Sub-Level Classification (A vs B) per AMP/ASCO/CAP 2017
+
+**Location:** `src/tumorboard/models/evidence/evidence.py` - `_get_tier_i_sublevel()` and `get_tier_hint()`
+
+**Background:** The AMP/ASCO/CAP 2017 guidelines distinguish between Tier I-A and Tier I-B:
+- **Tier I-A:** FDA-approved therapy OR professional guidelines (NCCN/ASCO)
+- **Tier I-B:** Well-powered clinical studies with expert consensus (not yet FDA/guideline)
+
+**Previous State:** Tier I was reported as a single tier without sub-level distinction.
+
+**Current Approach:** Added `_get_tier_i_sublevel()` method that determines A vs B:
+
+```python
+def _get_tier_i_sublevel(self, tumor_type: str | None) -> str:
+    """Determine Tier I sub-level (A or B) per AMP/ASCO/CAP 2017."""
+    # Tier I-A sources (FDA/guidelines)
+    for approval in self.fda_approvals:
+        if approval.parse_indication_for_tumor(tumor_type).get('tumor_match'):
+            return "A"
+
+    for ev in self.civic:
+        if ev.evidence_level == 'A' and ev.evidence_type == 'PREDICTIVE':
+            return "A"
+
+    if self._get_nccn_guideline_for_tumor(tumor_type):
+        return "A"
+
+    # Tier I-B sources (well-powered studies)
+    for ev in self.civic:
+        if ev.evidence_level == 'B' and ev.evidence_type == 'PREDICTIVE':
+            return "B"
+
+    return "A"  # Default
+```
+
+**Tier Hint Output Examples:**
+- `TIER I-A INDICATOR: FDA-approved therapy or professional guideline FOR this variant`
+- `TIER I-A INDICATOR: Included in NCCN guidelines (Non-Small Cell Lung Cancer)`
+- `TIER I-B INDICATOR: POLE-ultramutated molecular subtype (guideline-supported)`
+- `TIER I-B INDICATOR (LITERATURE): Therapeutic options: Drug1, Drug2`
+
+**Evidence Source Mapping:**
+| Source | Sub-Level |
+|--------|-----------|
+| FDA approval in tumor | A |
+| CIViC Level A evidence | A |
+| NCCN guideline reference | A |
+| CIViC Tier I assertion | A |
+| CGI FDA-approved biomarker | A |
+| CIViC Level B evidence | B |
+| Molecular subtype (POLE) | B |
+| Literature-based sensitivity | B |
+
+**Impact:** Provides clinicians with more granular tier information aligned with AMP/ASCO/CAP 2017 guidelines.
+
+---
+
+### 30. NCCN Guideline Detection for Tier I Classification
+
+**Location:** `src/tumorboard/models/evidence/evidence.py` - `_get_nccn_guideline_for_tumor()` and `has_fda_for_variant_in_tumor()`
+
+**Background:** Per AMP/ASCO/CAP 2017, Tier I includes variants in professional guidelines (NCCN/ASCO), not just FDA approvals.
+
+**Previous State:** NCCN guideline field from CIViC assertions was not being used for Tier I detection.
+
+**Current Approach:** Added NCCN guideline detection:
+
+```python
+def _get_nccn_guideline_for_tumor(self, tumor_type: str | None) -> str | None:
+    """Get NCCN guideline name if variant is in NCCN guidelines for this tumor."""
+    for assertion in self.civic_assertions:
+        if (assertion.nccn_guideline and
+            assertion.assertion_type == 'PREDICTIVE' and
+            self._tumor_matches(tumor_type, assertion.disease)):
+            sig = (assertion.significance or '').upper()
+            if 'SENSITIVITY' in sig or 'RESPONSE' in sig:
+                return assertion.nccn_guideline
+    return None
+```
+
+**Also added to `has_fda_for_variant_in_tumor()`:**
+```python
+# Check CIViC assertions for NCCN guideline backing
+if assertion.nccn_guideline and assertion.assertion_type == 'PREDICTIVE':
+    sig = (assertion.significance or '').upper()
+    if 'SENSITIVITY' in sig or 'RESPONSE' in sig:
+        logger.debug(f"Tier I via NCCN guideline: {assertion.nccn_guideline}")
+        return True
+```
+
+**Impact:** Variants with NCCN guideline backing (but without explicit FDA label mention) now correctly classified as Tier I-A.
+
+---
+
+### 31. CIViC Level B Evidence for Tier I Classification
+
+**Location:** `src/tumorboard/models/evidence/evidence.py` - `has_fda_for_variant_in_tumor()`
+
+**Background:** Per AMP/ASCO/CAP 2017:
+- Level A = FDA-approved or professional guidelines → Tier I-A
+- Level B = Well-powered clinical studies with consensus → Tier I-B
+
+**Previous State:** Only CIViC Level A was checked for Tier I. Level B evidence was ignored.
+
+**Current Approach:** Extended CIViC check to include Level A AND Level B:
+
+```python
+# Check CIViC Level A/B with tumor matching
+for ev in self.civic:
+    if (ev.evidence_level in ['A', 'B'] and  # Was: ev.evidence_level == 'A'
+        ev.evidence_type == 'PREDICTIVE' and
+        self._tumor_matches(tumor_type, ev.disease)):
+        sig = (ev.clinical_significance or '').upper()
+        if 'SENSITIVITY' in sig or 'RESPONSE' in sig:
+            logger.debug(f"Tier I via CIViC Level {ev.evidence_level}")
+            return True
+```
+
+**Impact:** Variants with strong Level B evidence (well-powered studies) now correctly classified as Tier I-B instead of being missed.
+
+---
+
+### 32. Molecular Subtype-Defining Biomarkers (Tier I-B)
+
+**Location:** `src/tumorboard/models/evidence/evidence.py` - `is_molecular_subtype_defining()`
+
+**Background:** Some variants DEFINE molecular subtypes that are the gold standard for clinical classification. Per AMP/ASCO/CAP 2017, these are Tier I diagnostic/prognostic biomarkers because they directly impact treatment decisions.
+
+**Example:** POLE P286R in endometrial cancer defines the "POLE-ultramutated" subtype (TCGA 2013, NCCN/ESMO guidelines):
+- Excellent prognosis regardless of histologic grade
+- May de-escalate adjuvant treatment
+- Level A diagnostic/prognostic utility
+
+**Implementation:**
+
+```python
+def is_molecular_subtype_defining(self, tumor_type: str | None) -> tuple[bool, str | None]:
+    """Check if variant defines a molecular subtype with Level A clinical utility."""
+    gene_upper = self.gene.upper()
+    variant_upper = self.variant.upper()
+
+    if gene_upper == 'POLE':
+        pole_hotspots = ['P286R', 'P286H', 'V411L', 'S459F', 'A456P', ...]
+        if variant_upper in pole_hotspots:
+            if 'endometrial' in tumor_lower or 'uterine' in tumor_lower:
+                return True, (
+                    "POLE-ultramutated molecular subtype (Tier I-B: guideline-supported). "
+                    "Per TCGA 2013 and NCCN/ESMO guidelines, this mutation defines the "
+                    "POLE-ultramutated subtype with excellent prognosis."
+                )
+    return False, None
+```
+
+**Tier Classification:**
+- Molecular subtype biomarkers are classified as **Tier I-B** (guideline-supported, not FDA label)
+- They appear BEFORE FDA approval check in the priority order
+
+**Impact:** POLE hotspot mutations in endometrial cancer now correctly classified as Tier I-B instead of Tier III.
+
+---
+
+### 33. Dead Code Cleanup
+
+**Removed Items:**
+
+1. **Unused `BaseModel` import** (evidence.py:6)
+   - `Evidence` class inherits from `VariantAnnotations`, not `BaseModel`
+   - Changed: `from pydantic import BaseModel, Field` → `from pydantic import Field`
+
+2. **Unused `is_sensitivity`/`is_resistance` fields** (civic.py:37-38)
+   - `CIViCAssertionEvidence` had two boolean fields never populated or read
+   - These were vestigial from an earlier design
+   - Removed from model definition
+
+3. **Stub `summary()` method** (evidence.py:1258-1262)
+   - Just delegated to `summary_compact()` with unused `max_items` parameter
+   - Removed method, updated test to use `summary_compact()` directly
+
+**Kept for testing/documentation:**
+- `has_evidence()` - Used in tests, provides useful API
+- `filter_low_quality_minority_signals()` - Documented in DECISIONS.md, tested
+
+**Impact:** Cleaner codebase with less confusion about unused fields and methods.

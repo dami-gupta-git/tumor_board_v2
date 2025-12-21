@@ -3,7 +3,7 @@
 from typing import Any
 import logging
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from tumorboard.config.variant_classes import load_variant_classes
 from tumorboard.constants import TUMOR_TYPE_MAPPINGS
@@ -352,23 +352,36 @@ class Evidence(VariantAnnotations):
         if variant_is_approved:
             return True
 
-        # Check CIViC Level A with tumor matching
+        # Check CIViC Level A/B with tumor matching
+        # Per AMP/ASCO/CAP 2017:
+        #   - Level A = FDA-approved or professional guidelines → Tier I-A
+        #   - Level B = Well-powered clinical studies → Tier I-B
         for ev in self.civic:
-            if (ev.evidence_level == 'A' and
+            if (ev.evidence_level in ['A', 'B'] and
                 ev.evidence_type == 'PREDICTIVE' and
                 self._tumor_matches(tumor_type, ev.disease)):
                 sig = (ev.clinical_significance or '').upper()
                 if 'SENSITIVITY' in sig or 'RESPONSE' in sig:
                     desc = (ev.description or '').lower()
                     if self.variant.lower() in desc or self.gene.lower() in desc:
-                        logger.debug(f"FDA approval found via CIViC Level A")
+                        logger.debug(f"Tier I via CIViC Level {ev.evidence_level}")
                         return True
 
-        # Check CIViC Assertions
+        # Check CIViC Assertions (curated AMP/ASCO/CAP classifications)
         for assertion in self.civic_assertions:
-            if (assertion.amp_tier == 'Tier I' and
-                assertion.assertion_type == 'PREDICTIVE' and
-                self._tumor_matches(tumor_type, assertion.disease)):
+            if not self._tumor_matches(tumor_type, assertion.disease):
+                continue
+
+            # Per AMP/ASCO/CAP: Tier I includes variants in professional guidelines (NCCN/ASCO)
+            # CIViC assertions with NCCN guideline references = Tier I
+            if assertion.nccn_guideline and assertion.assertion_type == 'PREDICTIVE':
+                sig = (assertion.significance or '').upper()
+                if 'SENSITIVITY' in sig or 'RESPONSE' in sig:
+                    logger.debug(f"Tier I via NCCN guideline: {assertion.nccn_guideline}")
+                    return True
+
+            # Explicit Tier I assertions
+            if assertion.amp_tier == 'Tier I' and assertion.assertion_type == 'PREDICTIVE':
                 sig = (assertion.significance or '').upper()
                 if 'SENSITIVITY' in sig or 'RESPONSE' in sig:
                     logger.debug(f"FDA approval found via CIViC Assertion Tier I")
@@ -390,6 +403,70 @@ class Evidence(VariantAnnotations):
                         return True
 
         return False
+
+    def _get_nccn_guideline_for_tumor(self, tumor_type: str | None) -> str | None:
+        """Get NCCN guideline name if variant is in NCCN guidelines for this tumor.
+
+        Returns the guideline name (e.g., "Non-Small Cell Lung Cancer") or None.
+        """
+        if not tumor_type:
+            return None
+
+        for assertion in self.civic_assertions:
+            if (assertion.nccn_guideline and
+                assertion.assertion_type == 'PREDICTIVE' and
+                self._tumor_matches(tumor_type, assertion.disease)):
+                sig = (assertion.significance or '').upper()
+                if 'SENSITIVITY' in sig or 'RESPONSE' in sig:
+                    return assertion.nccn_guideline
+
+        return None
+
+    def _get_tier_i_sublevel(self, tumor_type: str | None) -> str:
+        """Determine Tier I sub-level (A or B) per AMP/ASCO/CAP 2017.
+
+        Tier I-A: FDA-approved OR professional guidelines
+        Tier I-B: Well-powered clinical studies (Level B evidence)
+
+        Returns "A", "B", or "A" as default.
+        """
+        # Check for FDA approval (Tier I-A)
+        for approval in self.fda_approvals:
+            parsed = approval.parse_indication_for_tumor(tumor_type or "")
+            if parsed.get('tumor_match'):
+                return "A"
+
+        # Check for Level A evidence (Tier I-A)
+        for ev in self.civic:
+            if (ev.evidence_level == 'A' and
+                ev.evidence_type == 'PREDICTIVE' and
+                self._tumor_matches(tumor_type, ev.disease)):
+                return "A"
+
+        # Check for NCCN guidelines (Tier I-A)
+        if self._get_nccn_guideline_for_tumor(tumor_type):
+            return "A"
+
+        # Check for CIViC Tier I assertions (usually Tier I-A)
+        for assertion in self.civic_assertions:
+            if (assertion.amp_tier == 'Tier I' and
+                self._tumor_matches(tumor_type, assertion.disease)):
+                return "A"
+
+        # Check for CGI FDA-approved biomarkers (Tier I-A)
+        for biomarker in self.cgi_biomarkers:
+            if biomarker.fda_approved and self._tumor_matches(tumor_type, biomarker.tumor_type):
+                return "A"
+
+        # Check for Level B evidence (Tier I-B)
+        for ev in self.civic:
+            if (ev.evidence_level == 'B' and
+                ev.evidence_type == 'PREDICTIVE' and
+                self._tumor_matches(tumor_type, ev.disease)):
+                return "B"
+
+        # Default to A if we can't determine
+        return "A"
 
     def is_resistance_marker_without_targeted_therapy(self, tumor_type: str | None = None) -> tuple[bool, list[str]]:
         """Detect resistance-only markers WITHOUT FDA-approved therapy FOR the variant.
@@ -541,6 +618,64 @@ class Evidence(VariantAnnotations):
 
         return False
 
+    def is_molecular_subtype_defining(self, tumor_type: str | None = None) -> tuple[bool, str | None]:
+        """Check if this variant defines a molecular subtype with Level A clinical utility.
+
+        Some variants DEFINE molecular subtypes that are the gold standard for clinical
+        classification, even without FDA-approved targeted therapy. These are Tier I
+        diagnostic/prognostic biomarkers per AMP/ASCO/CAP guidelines.
+
+        Examples:
+        - POLE P286R, V411L, S459F in endometrial cancer → defines "POLE-ultramutated" subtype
+          (TCGA 2013, NCCN/ESMO guidelines) - excellent prognosis, may de-escalate treatment
+        - MPL W515L/K in myeloproliferative neoplasm → defines MPN (already handled via FDA)
+        - MMR mutations → define dMMR/MSI-H (already handled via tumor-agnostic approval)
+
+        Returns:
+            Tuple of (is_defining, subtype_description) if variant defines a molecular subtype.
+        """
+        gene_upper = self.gene.upper()
+        variant_upper = self.variant.upper()
+        tumor_lower = (tumor_type or '').lower()
+
+        # POLE exonuclease domain hotspot mutations define POLE-ultramutated subtype
+        # in endometrial cancer (TCGA 2013 landmark study, NCCN/ESMO guidelines)
+        if gene_upper == 'POLE':
+            # Hotspot mutations in the exonuclease domain (codons 268-471)
+            # These mutations cause ultramutation phenotype with exceptional prognosis
+            pole_hotspots = [
+                'P286R', 'P286H', 'P286S',  # Most common hotspot (~50% of POLE-mutated EC)
+                'V411L', 'V411M',            # Second most common hotspot
+                'S459F',                      # Other recurrent hotspots
+                'A456P',
+                'F367S', 'F367C', 'F367V',
+                'S297F', 'S297Y',
+                'M444K',
+                'L424V', 'L424I',
+            ]
+
+            if variant_upper in pole_hotspots:
+                # Check if tumor type is endometrial/uterine
+                endometrial_keywords = ['endometrial', 'endometrium', 'uterine', 'uterus']
+                if any(kw in tumor_lower for kw in endometrial_keywords):
+                    return True, (
+                        "POLE-ultramutated molecular subtype (Tier I-B: guideline-supported). "
+                        "Per TCGA 2013 and NCCN/ESMO guidelines, this mutation defines the "
+                        "POLE-ultramutated subtype with excellent prognosis regardless of "
+                        "histologic grade. May de-escalate adjuvant treatment."
+                    )
+
+                # POLE mutations also have prognostic value in colorectal cancer
+                colorectal_keywords = ['colorectal', 'colon', 'rectal', 'crc']
+                if any(kw in tumor_lower for kw in colorectal_keywords):
+                    return True, (
+                        "POLE-ultramutated subtype (Tier I-B: well-powered studies). "
+                        "POLE exonuclease domain mutations are associated with hypermutation "
+                        "phenotype and favorable prognosis in colorectal cancer."
+                    )
+
+        return False, None
+
     def get_tier_hint(self, tumor_type: str | None = None) -> str:
         """Generate explicit tier guidance based on evidence structure."""
 
@@ -551,14 +686,28 @@ class Evidence(VariantAnnotations):
             logger.info(f"Tier IV: {self.gene} {self.variant} is classified as benign/likely benign in ClinVar")
             return "TIER IV INDICATOR: ClinVar classifies this variant as Benign/Likely benign - NOT eligible for gene-class targeted therapy approvals"
 
-        # PRIORITY 1: Check for FDA approval FOR variant in tumor (highest priority)
-        # Structured FDA data takes precedence over literature extraction because:
-        # - FDA approval is definitive evidence of clinical utility
-        # - Literature extraction may find resistance to OTHER drugs (e.g., sunitinib)
-        #   while FDA-approved therapy (e.g., imatinib) exists for the same variant
+        # PRIORITY 0.5: Check for molecular subtype-defining biomarkers (Level A diagnostic)
+        # These variants DEFINE molecular subtypes that are the gold standard for classification
+        # Examples: POLE P286R → POLE-ultramutated in endometrial cancer (TCGA 2013)
+        is_subtype_defining, subtype_description = self.is_molecular_subtype_defining(tumor_type)
+        if is_subtype_defining:
+            # Molecular subtype-defining biomarkers are typically Tier I-B (guideline-supported, not FDA label)
+            logger.info(f"Tier I-B: {self.gene} {self.variant} in {tumor_type} defines molecular subtype")
+            return f"TIER I-B INDICATOR: {subtype_description}"
+
+        # PRIORITY 1: Check for FDA approval or professional guidelines FOR variant in tumor
+        # Per AMP/ASCO/CAP: Tier I = FDA-approved OR in professional guidelines (NCCN/ASCO)
+        # OR well-powered clinical studies with expert consensus
         if self.has_fda_for_variant_in_tumor(tumor_type):
-            logger.info(f"Tier I: {self.gene} {self.variant} in {tumor_type} has FDA approval")
-            return "TIER I INDICATOR: FDA-approved therapy FOR this variant in this tumor type"
+            # Determine Tier I sub-level (A vs B) per AMP/ASCO/CAP 2017
+            sublevel = self._get_tier_i_sublevel(tumor_type)
+            # Check if this is specifically via NCCN guideline (for better messaging)
+            nccn_guideline = self._get_nccn_guideline_for_tumor(tumor_type)
+            if nccn_guideline:
+                logger.info(f"Tier I-{sublevel}: {self.gene} {self.variant} in {tumor_type} - NCCN guideline: {nccn_guideline}")
+                return f"TIER I-{sublevel} INDICATOR: Included in NCCN guidelines ({nccn_guideline}) for this tumor type"
+            logger.info(f"Tier I-{sublevel}: {self.gene} {self.variant} in {tumor_type} has FDA approval or guideline backing")
+            return f"TIER I-{sublevel} INDICATOR: FDA-approved therapy or professional guideline FOR this variant in this tumor type"
 
         # PRIORITY 2: Check LLM-extracted literature knowledge
         # Only use literature if no FDA approval exists for this variant in tumor
@@ -574,10 +723,11 @@ class Evidence(VariantAnnotations):
             # So we skip literature resistance classification here and let the curated check handle it.
 
             # If literature says Tier I and has sensitivity evidence with high confidence
+            # Literature-based Tier I is typically Tier I-B (well-powered studies without FDA approval)
             if tier_rec.tier == "I" and lit.has_therapeutic_options():
                 sensitive_drugs = ", ".join(lit.get_sensitivity_drugs()[:2])
-                logger.info(f"Tier I (literature): {self.gene} {self.variant} has therapeutic options: {sensitive_drugs}")
-                return f"TIER I INDICATOR (LITERATURE): Therapeutic options: {sensitive_drugs}. {tier_rec.rationale}"
+                logger.info(f"Tier I-B (literature): {self.gene} {self.variant} has therapeutic options: {sensitive_drugs}")
+                return f"TIER I-B INDICATOR (LITERATURE): Therapeutic options: {sensitive_drugs}. {tier_rec.rationale}"
 
         # Check for active clinical trials - overrides investigational-only (Tier II)
         has_trials, trial_drugs = self.has_active_clinical_trials(variant_specific_only=True)
@@ -1104,9 +1254,3 @@ class Evidence(VariantAnnotations):
                 lines.append("")
 
         return "\n".join(lines) if len(lines) > 1 else ""
-
-    def summary(self, tumor_type: str | None = None, max_items: int = 15) -> str:
-        """Generate a text summary of all evidence."""
-        # Implementation continues with existing logic...
-        # (Keeping existing summary method as-is for brevity)
-        return self.summary_compact(tumor_type)
