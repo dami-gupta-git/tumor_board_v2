@@ -19,19 +19,9 @@ A built-in validation framework benchmarks predictions against expert-labeled �
 Note: Currently, this tool supports only single nucleotide polymorphisms (SNPs) and small insertions/deletions (indels).  
 It is a research prototype and is not intended for clinical use.  
 
-**Coming Soon TL;DR – The Real AI Tumor Board**
-- Full RAG stack (NCCN/ESMO guidelines, semantic search over literature)
+**Coming Soon**
 - New evidence sources: SpliceAI, TCGA prevalence
-- Patient VCF Files:
-Supports analysis from single variants to whole patient exomes/genomes by uploading VCF files, performing 
-variant prioritization, and generating comprehensive clinical reports with trial matching.
-- Two-phase agentic architecture:  
-  → Collaborative phase: parallel specialized agents (Literature, Pathways, Trials, Guidelines, etc.)  
-  → Adversarial phase: Advocate vs. Skeptic debate → Arbiter assigns final tier  
-  → Configurable meta-rules decide who speaks when, when to dig deeper, and when to escalate  
-  → Semantic embeddings and a knowledge graph to store and retrieve the history of agent debates
-
-The result: higher accuracy, transparent debate traces, and reasoning that closely resembles a real multidisciplinary panel.
+- Patient VCF Files: Supports analysis from single variants to whole patient exomes/genomes by uploading VCF files, performing variant prioritization, and generating comprehensive clinical reports with trial matching.
 
 ### Quick Start (Docker)
 
@@ -112,16 +102,6 @@ be made by qualified healthcare professionals.
 
 ### Enhanced Evidence Sources
 SpliceAI and TCGA prevalence data. AlphaMissense pathogenicity predictions, PubMed literature search, and ClinicalTrials.gov matching are now integrated.
-
-### RAG Pipeline
-Semantic search over indexed literature, NCCN/ESMO guideline retrieval, and variant lookups for rare mutations.
-
-### Agentic AI Architecture
-A two-phase multi-agent system that first performs collaborative evidence gathering through specialized agents 
-(e.g., Literature, Trials, Pathways), followed by an adversarial debate between Advocate and Skeptic agents 
-where an Arbiter assigns the final clinical actionability tier; this process leverages semantic embeddings and a 
-knowledge graph to store and retrieve the complete history of agent debates, enhancing reasoning transparency and 
-accuracy.
 
 ### Patient-Level Analysis
 VCF upload, whole-exome/genome processing, variant prioritization, and comprehensive clinical report generation.

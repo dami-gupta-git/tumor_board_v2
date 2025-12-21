@@ -488,6 +488,12 @@
         "variant": "R273H",
         "tumor_type": "Lung cancer",
         "expected_tier": "Tier II"
+    },
+    {
+        "gene": "SMO",
+        "variant": "W535L",
+        "tumor_type": "Basal cell carcinoma",
+        "expected_tier": "Tier I"
     }
   ]
 }

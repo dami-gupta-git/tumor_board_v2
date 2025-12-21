@@ -1,6 +1,23 @@
 # Variant Annotations
 
-TumorBoard automatically extracts comprehensive variant annotations from MyVariant.info, FDA drug approval data, Cancer Genome Interpreter (CGI) biomarkers, and VICC MetaKB.
+TumorBoard automatically extracts comprehensive variant annotations from Ensembl VEP, MyVariant.info, FDA drug approval data, Cancer Genome Interpreter (CGI) biomarkers, and VICC MetaKB.
+
+## Ensembl VEP (Variant Effect Predictor)
+
+The Ensembl VEP REST API is used for variant normalization and functional annotation:
+
+- **HGVS Genomic**: Converts protein notation (e.g., ATM E1978K) to genomic coordinates (e.g., chr11:g.108236086G>A)
+- **PolyPhen-2**: Pathogenicity prediction (benign, possibly_damaging, probably_damaging) with score
+- **SIFT**: Tolerance prediction (tolerated, deleterious) with score
+- **CADD**: Combined Annotation Dependent Depletion scores (phred and raw)
+- **Consequence Terms**: Variant effect types (missense_variant, stop_gained, frameshift_variant, etc.)
+- **Impact**: Severity classification (HIGH, MODERATE, LOW, MODIFIER)
+- **Transcript Info**: Ensembl transcript ID, gene ID, protein ID
+
+VEP is particularly useful for:
+- Normalizing protein-level variant notation to HGVS genomic format
+- Enabling MyVariant.info queries that require genomic coordinates
+- Obtaining functional predictions when MyVariant.info lacks coverage
 
 ## Database Identifiers
 
