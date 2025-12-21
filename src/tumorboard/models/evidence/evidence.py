@@ -5,6 +5,7 @@ import logging
 
 from pydantic import Field
 
+from tumorboard.config.gene_classes import load_gene_classes
 from tumorboard.config.variant_classes import load_variant_classes
 from tumorboard.constants import TUMOR_TYPE_MAPPINGS
 from tumorboard.models.annotations import VariantAnnotations
@@ -1115,9 +1116,9 @@ class Evidence(VariantAnnotations):
         # PRIORITY: DDR gene with gene-level therapeutic evidence
         # For DNA Damage Repair genes, gene-level loss-of-function has known therapeutic implications
         # even if this specific variant is uncharacterized
-        DDR_GENES = {"ATM", "BRCA1", "BRCA2", "PALB2", "CHEK2", "RAD51C", "RAD51D", "BRIP1", "FANCA", "RAD51B", "BARD1", "CDK12"}
+        _gene_config = load_gene_classes()
 
-        if self.gene.upper() in DDR_GENES:
+        if _gene_config.is_ddr_gene(self.gene):
             # Check if we have ANY gene-level predictive evidence from CIViC
             predictive_evidence = [
                 ev for ev in self.civic

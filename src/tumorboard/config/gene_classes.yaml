@@ -1,0 +1,103 @@
+# Gene Class Configuration
+#
+# This file defines gene-level properties for tier classification when
+# variant-specific evidence is lacking. Unlike variant_classes.yaml (which
+# matches variants to FDA approvals), this file captures gene-level
+# therapeutic implications.
+#
+# Structure:
+#   gene_class_name:
+#     description: "What this gene class represents"
+#     genes: [list of genes in this class]
+#     therapeutic_implications:
+#       drugs: [typical drugs/drug classes]
+#       mechanism: "Why these genes are therapeutically relevant"
+#     tier_rules:
+#       conflicting_evidence: "Tier when high-quality sensitivity AND resistance exist"
+#       sensitivity_only: "Tier when only sensitivity evidence exists"
+#       preclinical_only: "Tier when only preclinical/early evidence exists"
+
+# DNA Damage Repair (DDR) genes
+# Loss-of-function in these genes creates synthetic lethality with PARP inhibitors
+# and increases sensitivity to platinum-based chemotherapy
+ddr:
+  description: "DNA Damage Repair genes with therapeutic implications via synthetic lethality"
+  genes:
+    - ATM
+    - BRCA1
+    - BRCA2
+    - PALB2
+    - CHEK2
+    - RAD51C
+    - RAD51D
+    - BRIP1
+    - FANCA
+    - RAD51B
+    - BARD1
+    - CDK12
+    - NBN
+    - RAD50
+    - MRE11
+  therapeutic_implications:
+    drugs:
+      - PARP inhibitors (olaparib, rucaparib, niraparib, talazoparib)
+      - Platinum agents (cisplatin, carboplatin)
+    mechanism: >
+      Loss-of-function mutations in DDR genes impair homologous recombination
+      repair, creating synthetic lethality with PARP inhibition. These tumors
+      are also typically platinum-sensitive.
+  tier_rules:
+    # When CIViC has both Level A/B sensitivity AND resistance evidence
+    # Example: ATM + PARP inhibitors show sensitivity in some contexts but
+    # clinical trials (e.g., PROfound) showed no benefit in ATM subgroup
+    conflicting_evidence: "II-C"
+    # When only high-quality (Level A/B) sensitivity evidence exists
+    sensitivity_only: "II-D"
+    # When only preclinical/case report (Level C/D) evidence exists
+    preclinical_only: "II-D"
+
+# Mismatch Repair (MMR) genes
+# Loss leads to MSI-H phenotype which predicts immunotherapy response
+mmr:
+  description: "Mismatch Repair genes - loss leads to MSI-H and immunotherapy sensitivity"
+  genes:
+    - MLH1
+    - MSH2
+    - MSH6
+    - PMS2
+    - EPCAM  # Deletions can silence MSH2
+  therapeutic_implications:
+    drugs:
+      - Immune checkpoint inhibitors (pembrolizumab, nivolumab, ipilimumab)
+    mechanism: >
+      Loss of MMR function leads to microsatellite instability (MSI-H),
+      increased tumor mutational burden, and neoantigen formation.
+      MSI-H tumors have FDA-approved tumor-agnostic indication for
+      pembrolizumab (KEYTRUDA).
+  tier_rules:
+    # MMR loss typically has FDA approval via MSI-H, so this is fallback
+    conflicting_evidence: "II-C"
+    sensitivity_only: "II-B"  # Higher tier due to tumor-agnostic approval
+    preclinical_only: "II-D"
+
+# Splicing Factor genes
+# Recurrent mutations in MDS/AML with emerging therapeutic implications
+splicing:
+  description: "Splicing factor genes with diagnostic/prognostic significance in MDS/AML"
+  genes:
+    - SF3B1
+    - SRSF2
+    - U2AF1
+    - ZRSR2
+  therapeutic_implications:
+    drugs:
+      - Luspatercept (SF3B1-mutant MDS)
+      - Splicing modulators (investigational)
+    mechanism: >
+      Splicing factor mutations are defining features of MDS subtypes.
+      SF3B1 mutations predict response to luspatercept and favorable
+      prognosis. Other splicing mutations have prognostic implications.
+  tier_rules:
+    conflicting_evidence: "II-C"
+    sensitivity_only: "II-C"  # Often prognostic, less therapeutic
+    preclinical_only: "III-C"
