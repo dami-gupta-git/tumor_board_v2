@@ -210,30 +210,64 @@ KIT:
           unless_explicit: true  # Only match GIST if D816V explicitly in label
 
 FGFR2:
-  description: "FGFR2 fusions and mutations in cholangiocarcinoma."
+  description: "FGFR2 fusions/rearrangements in cholangiocarcinoma. Kinase domain point mutations are acquired resistance."
+  require_explicit: true  # Must match fusion/rearrangement pattern, NOT point mutations
   classes:
-    susceptible:
+    # FDA approval is for FUSIONS/REARRANGEMENTS only
+    fusion:
       patterns:
-        - "susceptible fgfr2"
-        - "fgfr2 genetic alteration"
-        - "fgfr2 alteration"
-        - "fgfr2 mutation"
-        - "fgfr2-mutated"
         - "fgfr2 fusion"
         - "fgfr2 rearrangement"
+        - "other rearrangement"
+      variants:
+        - FUSION
+        - REARRANGEMENT
+        # Specific fusion partners if needed
+    # Kinase domain point mutations are ACQUIRED RESISTANCE mutations
+    # NOT covered by pemigatinib approval (which is for fusions only)
+    # Reference: PMID 33096036, PMID 32203698 - acquired resistance mutations
+    kinase_domain_resistance:
+      patterns:
+        - "n549"  # Only match if explicitly mentioned in approval context
+        - "v564"
+        - "e565"
+        - "l617"
+        - "k659"
       variants:
         - N549H
         - N549K
         - N549S
-        - E565A
-        - K659E
-        - K659M
-        - K659N
         - V564F
         - V564I
         - V564L
+        - E565A
         - L617V
         - L617M
+        - K659E
+        - K659M
+        - K659N
+      resistance_profile:
+        pemigatinib:
+          status: "resistant"
+          note: "Acquired gatekeeper/hinge mutations cause resistance"
+          reference: "PMID 33096036"
+        infigratinib:
+          status: "resistant"
+          reference: "PMID 32203698"
+        futibatinib:
+          status: "sensitive"
+          note: "Irreversible inhibitor retains activity against some resistance mutations"
+          reference: "PMID 33096036"
+      clinical_guidance:
+        tier: "II"
+        rationale: "Acquired resistance mutation - excludes reversible FGFR inhibitors"
+        excludes_drugs:
+          - pemigatinib
+          - infigratinib
+        potential_therapies:
+          - drug: futibatinib
+            evidence_level: "clinical"
+            note: "Irreversible inhibitor may retain activity"
 
 FGFR3:
   description: "FGFR3 mutations in bladder cancer."

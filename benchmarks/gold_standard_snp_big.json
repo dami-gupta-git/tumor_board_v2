@@ -911,8 +911,8 @@
       "gene": "WT1",
       "variant": "R394W",
       "tumor_type": "Wilms Tumor",
-      "expected_tier": "Tier IV",
-      "notes": "Benign germline variant; not actionable in tumor context",
+      "expected_tier": "Tier I",
+      "notes": "germline pathogenic mutation causing Denys-Drash syndrome (DDS)",
       "references": ["Huff V. Annu Rev Pathol 2011"]
     },
     {
