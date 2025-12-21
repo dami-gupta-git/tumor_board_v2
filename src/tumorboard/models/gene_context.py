@@ -193,9 +193,71 @@ class GeneRole(Enum):
     """Functional role of a gene in cancer."""
     ONCOGENE = "oncogene"
     TSG = "tumor_suppressor"
+    TSG_PATHWAY_ACTIONABLE = "tsg_pathway_actionable"  # TSGs where LOF activates druggable pathway
     FUSION = "fusion"
     DDR = "ddr"  # DNA Damage Repair - special therapeutic handling
     UNKNOWN = "unknown"
+
+
+# =============================================================================
+# PATHWAY-ACTIONABLE TUMOR SUPPRESSORS
+# =============================================================================
+# These TSGs are special: LOF doesn't just confirm pathogenicity, it activates
+# a downstream pathway that IS druggable. Unlike generic TSGs, these have
+# FDA-approved therapies based on the TSG loss itself.
+#
+# Key distinction:
+# - Generic TSG (e.g., RB1, APC): LOF = pathogenic but not directly targetable
+# - Pathway-actionable TSG (e.g., PTEN): LOF = pathway activation = druggable
+#
+# Per AMP/ASCO/CAP 2017:
+# - In high-prevalence tumors: Tier I-B (FDA-approved or well-powered studies)
+# - In other tumors: Tier II-A (FDA approval in different tumor type)
+
+PATHWAY_ACTIONABLE_TSGS: dict[str, dict] = {
+    "PTEN": {
+        "pathway": "PI3K/AKT/mTOR",
+        "mechanism": "PTEN loss → unrestrained PI3K signaling → AKT/mTOR activation",
+        "drugs": ["alpelisib", "capivasertib", "everolimus", "ipatasertib"],
+        "high_prevalence_tumors": ["endometrial", "endometrium", "prostate", "breast", "glioblastoma", "gbm"],
+        "fda_context": "Capivasertib (TRUQAP) FDA-approved for PIK3CA/AKT1/PTEN-altered breast cancer",
+    },
+    "TSC1": {
+        "pathway": "mTOR",
+        "mechanism": "TSC1 loss → mTORC1 hyperactivation → cell growth/proliferation",
+        "drugs": ["everolimus", "sirolimus", "temsirolimus"],
+        "high_prevalence_tumors": ["renal", "kidney", "bladder", "subependymal giant cell astrocytoma", "sega"],
+        "fda_context": "Everolimus FDA-approved for TSC-associated tumors",
+    },
+    "TSC2": {
+        "pathway": "mTOR",
+        "mechanism": "TSC2 loss → mTORC1 hyperactivation → cell growth/proliferation",
+        "drugs": ["everolimus", "sirolimus", "temsirolimus"],
+        "high_prevalence_tumors": ["renal", "kidney", "bladder", "subependymal giant cell astrocytoma", "sega"],
+        "fda_context": "Everolimus FDA-approved for TSC-associated tumors",
+    },
+    "NF1": {
+        "pathway": "RAS/MAPK",
+        "mechanism": "NF1 loss → unrestrained RAS signaling → MEK/ERK activation",
+        "drugs": ["selumetinib", "trametinib", "binimetinib", "cobimetinib"],
+        "high_prevalence_tumors": ["neurofibroma", "plexiform neurofibroma", "mpnst", "glioma", "melanoma"],
+        "fda_context": "Selumetinib FDA-approved for NF1-associated plexiform neurofibromas",
+    },
+    "STK11": {
+        "pathway": "AMPK/mTOR",
+        "mechanism": "STK11/LKB1 loss → AMPK inactivation → mTOR activation, metabolic dysregulation",
+        "drugs": ["everolimus", "metformin"],
+        "high_prevalence_tumors": ["lung", "nsclc", "non-small cell lung", "cervical"],
+        "fda_context": "Emerging evidence for mTOR inhibitors; also negative predictor for immunotherapy",
+    },
+    "VHL": {
+        "pathway": "HIF",
+        "mechanism": "VHL loss → HIF stabilization → VEGF/angiogenesis activation",
+        "drugs": ["belzutifan", "axitinib", "pazopanib", "cabozantinib"],
+        "high_prevalence_tumors": ["renal", "kidney", "clear cell renal", "ccRCC", "hemangioblastoma"],
+        "fda_context": "Belzutifan FDA-approved for VHL-associated tumors including RCC",
+    },
+}
 
 
 @dataclass
@@ -262,6 +324,43 @@ FUSION_GENES = {
 }
 
 
+def get_pathway_actionable_info(gene: str) -> dict | None:
+    """Get pathway-actionable TSG information if the gene qualifies.
+
+    Args:
+        gene: Gene symbol (case-insensitive)
+
+    Returns:
+        Dict with pathway, drugs, high_prevalence_tumors, etc. or None if not pathway-actionable
+    """
+    return PATHWAY_ACTIONABLE_TSGS.get(gene.upper())
+
+
+def is_high_prevalence_tumor(gene: str, tumor_type: str | None) -> bool:
+    """Check if tumor type is high-prevalence for a pathway-actionable TSG.
+
+    Args:
+        gene: Gene symbol
+        tumor_type: Patient's tumor type
+
+    Returns:
+        True if this tumor type has high prevalence of the gene alteration
+    """
+    if not tumor_type:
+        return False
+
+    info = get_pathway_actionable_info(gene)
+    if not info:
+        return False
+
+    tumor_lower = tumor_type.lower()
+    for high_prev_tumor in info.get("high_prevalence_tumors", []):
+        if high_prev_tumor in tumor_lower or tumor_lower in high_prev_tumor:
+            return True
+
+    return False
+
+
 def get_gene_context(gene: str) -> GeneContext:
     """Determine gene context from curated lists.
 
@@ -322,7 +421,24 @@ def get_gene_context(gene: str) -> GeneContext:
             therapeutic_summary="Oncogene - activating mutations may be targetable",
         )
 
-    # Check TSGs
+    # Check pathway-actionable TSGs BEFORE generic TSGs
+    # These are TSGs where LOF activates a druggable downstream pathway
+    pathway_info = get_pathway_actionable_info(gene_upper)
+    if pathway_info:
+        drugs_str = ", ".join(pathway_info["drugs"][:3])
+        return GeneContext(
+            gene=gene_upper,
+            is_cancer_gene=True,
+            role=GeneRole.TSG_PATHWAY_ACTIONABLE,
+            source="pathway_actionable_tsg",
+            has_therapeutic_evidence=True,
+            therapeutic_summary=(
+                f"Pathway-actionable TSG - LOF activates {pathway_info['pathway']} pathway. "
+                f"May confer sensitivity to {drugs_str}. {pathway_info.get('fda_context', '')}"
+            ),
+        )
+
+    # Check generic TSGs (not pathway-actionable)
     if gene_upper in TUMOR_SUPPRESSORS:
         return GeneContext(
             gene=gene_upper,

@@ -8,7 +8,7 @@ from pydantic import Field
 from tumorboard.config.variant_classes import load_variant_classes
 from tumorboard.models.gene_context import (
     get_gene_context, get_therapeutic_implication, get_lof_assessment, GeneRole,
-    load_gene_classes,
+    load_gene_classes, get_pathway_actionable_info, is_high_prevalence_tumor,
 )
 from tumorboard.constants import TUMOR_TYPE_MAPPINGS
 from tumorboard.models.annotations import VariantAnnotations
@@ -171,8 +171,7 @@ class Evidence(VariantAnnotations):
             ('tp53', '*'): True,
             ('apc', 'colorectal'): True,
             ('apc', 'colon'): True,
-            ('vhl', 'renal'): True,
-            ('vhl', 'kidney'): True,
+            # NOTE: VHL in renal was removed - belzutifan (2021) is FDA-approved for VHL-associated RCC
             ('smad4', 'pancreatic'): True,
             ('smad4', 'pancreas'): True,
             ('cdkn2a', 'melanoma'): True,
@@ -820,6 +819,35 @@ class Evidence(VariantAnnotations):
 
         return False
 
+    def is_clinvar_pathogenic(self) -> bool:
+        """Check if ClinVar classifies this variant as pathogenic/likely pathogenic.
+
+        This provides high-confidence evidence that a variant is loss-of-function
+        for pathway-actionable TSGs. When ClinVar says pathogenic, we can skip
+        computational predictions and confidently assign LOF status.
+
+        Examples:
+        - PTEN R130* is classified as pathogenic in ClinVar → high confidence LOF
+        - STK11 Q37* is pathogenic → high confidence LOF
+        - This helps upgrade tier for pathway-actionable TSGs
+        """
+        # Check the annotation field first (primary source from MyVariant)
+        if self.clinvar_clinical_significance:
+            sig = self.clinvar_clinical_significance.lower()
+            # Check for pathogenic classifications
+            if 'pathogenic' in sig and 'benign' not in sig and 'conflict' not in sig:
+                # "Pathogenic", "Likely pathogenic", "Pathogenic/Likely pathogenic" all match
+                # But "Conflicting interpretations" doesn't match
+                return True
+
+        # Also check the clinvar list entries as fallback
+        for cv in self.clinvar:
+            sig = (cv.clinical_significance or '').lower()
+            if 'pathogenic' in sig and 'benign' not in sig and 'conflict' not in sig:
+                return True
+
+        return False
+
     def is_vus_in_known_cancer_gene(self) -> bool:
         """Check if this variant is a VUS (Variant of Uncertain Significance) in a known cancer gene.
 
@@ -1337,6 +1365,51 @@ class Evidence(VariantAnnotations):
                     "Oncogene therapeutic implications depend on specific activating mutations - "
                     "this variant's effect is unknown."
                 )
+
+            elif gene_context.role == GeneRole.TSG_PATHWAY_ACTIONABLE:
+                # Pathway-actionable TSGs: LOF activates a druggable downstream pathway
+                # Examples: PTEN (PI3K/AKT/mTOR), TSC1/2 (mTOR), NF1 (RAS/MAPK), STK11 (AMPK/mTOR), VHL (HIF)
+                pathway_info = get_pathway_actionable_info(self.gene)
+                if pathway_info:
+                    drugs_str = ", ".join(pathway_info["drugs"][:3])
+                    pathway = pathway_info["pathway"]
+                    fda_context = pathway_info.get("fda_context", "")
+
+                    # Determine if LOF (need high confidence for actionable tier)
+                    # ClinVar pathogenic = high confidence LOF
+                    is_clinvar_path = self.is_clinvar_pathogenic()
+
+                    if is_lof or is_clinvar_path:
+                        # High confidence LOF - check if high-prevalence tumor
+                        lof_source = "ClinVar pathogenic" if is_clinvar_path else lof_rationale
+                        is_high_prev = is_high_prevalence_tumor(self.gene, tumor_type)
+
+                        if is_high_prev:
+                            # Tier I-B: High-prevalence tumor with FDA-approved pathway inhibitors
+                            logger.info(f"Tier I-B: {self.gene} {self.variant} pathway-actionable TSG LOF in high-prevalence tumor {tumor_type}")
+                            return (
+                                f"TIER I-B INDICATOR: {self.gene} is a pathway-actionable tumor suppressor. "
+                                f"LOF variant {self.variant} ({lof_source}) activates the {pathway} pathway. "
+                                f"In {tumor_type} (high-prevalence tumor), FDA-approved pathway inhibitors apply: {drugs_str}. "
+                                f"{fda_context}"
+                            )
+                        else:
+                            # Tier II-A: FDA approval exists for pathway but in different tumor
+                            logger.info(f"Tier II-A: {self.gene} {self.variant} pathway-actionable TSG LOF in {tumor_type}")
+                            return (
+                                f"TIER II-A INDICATOR: {self.gene} is a pathway-actionable tumor suppressor. "
+                                f"LOF variant {self.variant} ({lof_source}) activates the {pathway} pathway. "
+                                f"FDA-approved pathway inhibitors ({drugs_str}) may apply off-label. "
+                                f"{fda_context}"
+                            )
+                    else:
+                        # Not LOF - can't assume pathway activation
+                        logger.info(f"Tier III-B: {self.gene} {self.variant} pathway-actionable TSG but not LOF")
+                        return (
+                            f"TIER III-B INDICATOR: {self.gene} is a pathway-actionable TSG ({pathway} pathway), "
+                            f"but {self.variant} is not clearly loss-of-function ({lof_rationale}). "
+                            f"LOF confirmation needed before pathway inhibitors ({drugs_str}) can be considered."
+                        )
 
             elif gene_context.role == GeneRole.TSG:
                 if is_lof:
