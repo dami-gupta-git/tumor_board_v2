@@ -165,10 +165,15 @@ class Evidence(VariantAnnotations):
         # - Targeted therapies have failed in clinical trials for this specific tumor
         # - FDA approval may exist for OTHER tumors but has NO efficacy here
         # - Biomarker is prognostic only (not therapeutically actionable)
+        #
+        # NOTE: NRAS in melanoma was REMOVED - it IS clinically actionable:
+        # - MEK inhibitors (binimetinib) show efficacy in NRAS-mutant melanoma (NEMO trial)
+        # - NRAS mutation status affects treatment selection (excludes BRAF inhibitors)
+        # - Immunotherapy response is relevant
+        # This should be Tier II (predictive biomarker), not Tier III
         investigational_pairs = {
             ('kras', 'pancreatic'): True,
             ('kras', 'pancreas'): True,
-            ('nras', 'melanoma'): True,
             ('tp53', '*'): True,
             ('apc', 'colorectal'): True,
             ('apc', 'colon'): True,
@@ -375,19 +380,20 @@ class Evidence(VariantAnnotations):
         if variant_is_approved:
             return True
 
-        # Check CIViC Level A/B with tumor matching
+        # Check CIViC Level A with tumor matching
         # Per AMP/ASCO/CAP 2017:
         #   - Level A = FDA-approved or professional guidelines → Tier I-A
-        #   - Level B = Well-powered clinical studies → Tier I-B
+        #   - Level B = Well-powered clinical studies → Tier II-B (NOT Tier I)
+        # NOTE: We only check Level A here. Level B goes to Tier II via gene-level evidence.
         for ev in self.civic:
-            if (ev.evidence_level in ['A', 'B'] and
+            if (ev.evidence_level == 'A' and  # Level A only - Level B is Tier II, not I
                 ev.evidence_type == 'PREDICTIVE' and
                 self._tumor_matches(tumor_type, ev.disease)):
                 sig = (ev.clinical_significance or '').upper()
                 if 'SENSITIVITY' in sig or 'RESPONSE' in sig:
                     desc = (ev.description or '').lower()
                     if self.variant.lower() in desc or self.gene.lower() in desc:
-                        logger.debug(f"Tier I via CIViC Level {ev.evidence_level}")
+                        logger.debug(f"Tier I via CIViC Level A (FDA/guideline)")
                         return True
 
         # Check CIViC Assertions (curated AMP/ASCO/CAP classifications)

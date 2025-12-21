@@ -31,9 +31,9 @@ Evidence Collection → Preprocessing (get_tier_hint) → LLM Validation → Fin
 | Tier | Definition | Evidence Requirements |
 |------|------------|----------------------|
 | **I-A** | FDA-approved OR professional guidelines | FDA label, NCCN/ASCO guidelines, CIViC Level A |
-| **I-B** | Well-powered studies, guidelines pending | CIViC Level B, molecular subtype-defining |
+| **I-B** | In NCCN/ASCO guidelines OR molecular subtype-defining | Guideline inclusion, subtype-defining variants |
 | **II-A** | FDA-approved in DIFFERENT tumor type | Off-label potential |
-| **II-B** | Well-powered studies, no guidelines | Strong evidence, no FDA/NCCN |
+| **II-B** | Well-powered studies, no FDA/guidelines | CIViC Level B sensitivity, phase 2/3 trials |
 | **II-C** | Strong prognostic with established value | Level A/B/C prognostic evidence |
 | **II-D** | Active trials OR resistance without alternative | Clinical trials enrolling |
 | **III-A** | Actionable elsewhere, zero evidence in tumor | Cross-tumor extrapolation |
@@ -132,12 +132,14 @@ Hardcoded pairs that always return Tier III:
 | Gene | Tumor Type | Rationale |
 |------|------------|-----------|
 | KRAS | Pancreatic | No approved KRAS-targeted therapy |
-| NRAS | Melanoma | No approved NRAS-targeted therapy |
 | TP53 | Any | Prognostic only, not targetable |
 | APC | Colorectal | Not directly targetable |
-| VHL | Renal | Different mechanism than HIF-targeted therapies |
 | SMAD4 | Pancreatic | Not targetable |
 | ARID1A | Any | No approved therapy |
+
+**Removed from investigational-only:**
+- **NRAS in melanoma**: MEK inhibitors (binimetinib) show efficacy in NRAS-mutant melanoma per NEMO trial. NRAS status affects treatment selection (excludes BRAF inhibitors). → Tier II-B
+- **VHL in renal**: Belzutifan (2021) is FDA-approved for VHL-associated RCC → Tier I
 
 ---
 
@@ -162,13 +164,15 @@ Hardcoded pairs that always return Tier III:
 
 ## Evidence Source Integration
 
-### Priority Order for FDA Detection
+### Priority Order for FDA Detection (Tier I)
 
 1. **Explicit variant mention** in FDA indication text
 2. **Gene + variant class validation** via variant_classes.yaml
-3. **CIViC Level A/B** predictive evidence with tumor matching
-4. **CIViC Assertions** with NCCN guideline references
+3. **CIViC Level A only** predictive evidence with tumor matching (Level A = FDA-approved)
+4. **CIViC Assertions** with NCCN guideline references or explicit Tier I
 5. **CGI FDA-approved** sensitivity biomarkers
+
+**Important**: CIViC Level B (well-powered clinical studies) does NOT qualify for Tier I. Level B evidence without FDA approval or guideline inclusion → Tier II-B.
 
 ### CIViC Assertions
 

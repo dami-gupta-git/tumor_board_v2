@@ -58,7 +58,8 @@ class LLMService:
         # Step 1: Get deterministic tier classification
         tier_hint = evidence.get_tier_hint(tumor_type=tumor_type)
         tier, sublevel = extract_tier_from_hint(tier_hint)
-        full_tier = f"{tier}-{sublevel}" if sublevel else tier
+        # Note: sublevel (A/B/C/D) is used for confidence calculation but NOT displayed
+        # We only show "Tier I", "Tier II", etc. to users (sublevel not validated)
 
         # Step 2: Get evidence summary for context
         evidence_summary = evidence.summary_compact(tumor_type=tumor_type)
@@ -94,12 +95,12 @@ class LLMService:
             if notes:
                 resistance_note = " | ".join(notes)
 
-        # Step 4: Create narrative prompt
+        # Step 4: Create narrative prompt (pass tier without sublevel)
         messages = create_narrative_prompt(
             gene=gene,
             variant=variant,
             tumor_type=tumor_type,
-            tier=full_tier,
+            tier=tier,  # Just "Tier I", "Tier II", etc. - no sublevel
             tier_reason=tier_hint,
             evidence_summary=evidence_summary,
             resistance_note=resistance_note,
