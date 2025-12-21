@@ -5,10 +5,10 @@ import logging
 
 from pydantic import Field
 
-from tumorboard.config.gene_classes import load_gene_classes
 from tumorboard.config.variant_classes import load_variant_classes
 from tumorboard.models.gene_context import (
-    get_gene_context, get_therapeutic_implication, get_lof_assessment, GeneRole
+    get_gene_context, get_therapeutic_implication, get_lof_assessment, GeneRole,
+    load_gene_classes,
 )
 from tumorboard.constants import TUMOR_TYPE_MAPPINGS
 from tumorboard.models.annotations import VariantAnnotations

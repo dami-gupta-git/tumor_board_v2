@@ -13,8 +13,180 @@ determines how we interpret variants:
 
 from dataclasses import dataclass
 from enum import Enum
+from functools import lru_cache
+from typing import Any
 
-from tumorboard.config.gene_classes import load_gene_classes
+
+# =============================================================================
+# GENE CLASS CONFIGURATION
+# =============================================================================
+# This replaces gene_classes.yaml - all gene class data is now inline
+
+GENE_CLASS_CONFIG: dict[str, Any] = {
+    # DNA Damage Repair (DDR) genes
+    # Loss-of-function in these genes creates synthetic lethality with PARP inhibitors
+    # and increases sensitivity to platinum-based chemotherapy
+    "ddr": {
+        "description": "DNA Damage Repair genes with therapeutic implications via synthetic lethality",
+        "genes": [
+            "ATM", "BRCA1", "BRCA2", "PALB2", "CHEK2", "RAD51C", "RAD51D",
+            "BRIP1", "FANCA", "RAD51B", "BARD1", "CDK12", "NBN", "RAD50", "MRE11",
+            # Additional DDR genes from curated list
+            "RAD51", "FANCC", "FANCD2", "FANCE", "FANCF", "FANCG", "FANCI",
+            "FANCL", "FANCM", "ATR", "CHEK1", "BLM", "WRN", "RECQL4",
+        ],
+        "therapeutic_implications": {
+            "drugs": [
+                "PARP inhibitors (olaparib, rucaparib, niraparib, talazoparib)",
+                "Platinum agents (cisplatin, carboplatin)",
+            ],
+            "mechanism": (
+                "Loss-of-function mutations in DDR genes impair homologous recombination "
+                "repair, creating synthetic lethality with PARP inhibition. These tumors "
+                "are also typically platinum-sensitive."
+            ),
+        },
+        "tier_rules": {
+            "conflicting_evidence": "II-C",
+            "sensitivity_only": "II-D",
+            "preclinical_only": "II-D",
+        },
+    },
+    # Mismatch Repair (MMR) genes
+    # Loss leads to MSI-H phenotype which predicts immunotherapy response
+    "mmr": {
+        "description": "Mismatch Repair genes - loss leads to MSI-H and immunotherapy sensitivity",
+        "genes": ["MLH1", "MSH2", "MSH6", "PMS2", "EPCAM"],
+        "therapeutic_implications": {
+            "drugs": [
+                "Immune checkpoint inhibitors (pembrolizumab, nivolumab, ipilimumab)",
+            ],
+            "mechanism": (
+                "Loss of MMR function leads to microsatellite instability (MSI-H), "
+                "increased tumor mutational burden, and neoantigen formation. "
+                "MSI-H tumors have FDA-approved tumor-agnostic indication for pembrolizumab."
+            ),
+        },
+        "tier_rules": {
+            "conflicting_evidence": "II-C",
+            "sensitivity_only": "II-B",
+            "preclinical_only": "II-D",
+        },
+    },
+    # Splicing Factor genes
+    # Recurrent mutations in MDS/AML with emerging therapeutic implications
+    "splicing": {
+        "description": "Splicing factor genes with diagnostic/prognostic significance in MDS/AML",
+        "genes": ["SF3B1", "SRSF2", "U2AF1", "ZRSR2"],
+        "therapeutic_implications": {
+            "drugs": [
+                "Luspatercept (SF3B1-mutant MDS)",
+                "Splicing modulators (investigational)",
+            ],
+            "mechanism": (
+                "Splicing factor mutations are defining features of MDS subtypes. "
+                "SF3B1 mutations predict response to luspatercept and favorable prognosis."
+            ),
+        },
+        "tier_rules": {
+            "conflicting_evidence": "II-C",
+            "sensitivity_only": "II-C",
+            "preclinical_only": "III-C",
+        },
+    },
+}
+
+
+class GeneClassConfig:
+    """Configuration for gene class properties and tier rules."""
+
+    def __init__(self, config: dict[str, Any]):
+        self._config = config
+        self._gene_to_class: dict[str, str] = {}
+
+        # Build reverse mapping: gene -> class name
+        for class_name, class_config in config.items():
+            if isinstance(class_config, dict) and 'genes' in class_config:
+                for gene in class_config['genes']:
+                    self._gene_to_class[gene.upper()] = class_name
+
+    def get_gene_class(self, gene: str) -> str | None:
+        """Get the class name for a gene (e.g., 'ddr', 'mmr', 'splicing')."""
+        return self._gene_to_class.get(gene.upper())
+
+    def is_ddr_gene(self, gene: str) -> bool:
+        """Check if a gene is a DNA Damage Repair gene."""
+        return self.get_gene_class(gene) == 'ddr'
+
+    def is_mmr_gene(self, gene: str) -> bool:
+        """Check if a gene is a Mismatch Repair gene."""
+        return self.get_gene_class(gene) == 'mmr'
+
+    def is_splicing_gene(self, gene: str) -> bool:
+        """Check if a gene is a splicing factor gene."""
+        return self.get_gene_class(gene) == 'splicing'
+
+    def get_genes_in_class(self, class_name: str) -> list[str]:
+        """Get all genes in a specific class."""
+        class_config = self._config.get(class_name, {})
+        return class_config.get('genes', [])
+
+    def get_therapeutic_drugs(self, gene: str) -> list[str]:
+        """Get therapeutic drugs/classes for a gene's class."""
+        class_name = self.get_gene_class(gene)
+        if not class_name:
+            return []
+
+        class_config = self._config.get(class_name, {})
+        implications = class_config.get('therapeutic_implications', {})
+        return implications.get('drugs', [])
+
+    def get_tier_for_evidence_pattern(self, gene: str, pattern: str) -> str | None:
+        """Get the tier recommendation based on evidence pattern.
+
+        Args:
+            gene: Gene symbol
+            pattern: One of 'conflicting_evidence', 'sensitivity_only', 'preclinical_only'
+
+        Returns:
+            Tier string (e.g., 'II-C', 'II-D') or None if not configured
+        """
+        class_name = self.get_gene_class(gene)
+        if not class_name:
+            return None
+
+        class_config = self._config.get(class_name, {})
+        tier_rules = class_config.get('tier_rules', {})
+        return tier_rules.get(pattern)
+
+    def get_class_description(self, gene: str) -> str | None:
+        """Get the description for a gene's class."""
+        class_name = self.get_gene_class(gene)
+        if not class_name:
+            return None
+
+        class_config = self._config.get(class_name, {})
+        return class_config.get('description')
+
+    def get_therapeutic_mechanism(self, gene: str) -> str | None:
+        """Get the therapeutic mechanism explanation for a gene's class."""
+        class_name = self.get_gene_class(gene)
+        if not class_name:
+            return None
+
+        class_config = self._config.get(class_name, {})
+        implications = class_config.get('therapeutic_implications', {})
+        return implications.get('mechanism')
+
+
+@lru_cache(maxsize=1)
+def load_gene_classes() -> GeneClassConfig:
+    """Load gene class configuration.
+
+    Returns:
+        GeneClassConfig instance with loaded configuration.
+    """
+    return GeneClassConfig(GENE_CLASS_CONFIG)
 
 
 class GeneRole(Enum):
