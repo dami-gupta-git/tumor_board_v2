@@ -96,7 +96,7 @@ def batch(
             assessments = await engine.batch_assess(variants)
 
             output_data = [assessment.model_dump(mode="json") for assessment in assessments]
-            with open(output, "w") as f:
+            with open("results/output.json", "w") as f:
                 json.dump(output_data, f, indent=2)
 
             print(f"\nSuccessfully assessed {len(assessments)}/{len(variants)} variants")

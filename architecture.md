@@ -123,21 +123,33 @@ User Input (gene, variant, tumor_type)
              │
              ▼
 ┌─────────────────────────────────┐
-│  5. LLM Assessment              │
-│  • Structured prompt generation │
-│  • Temperature=0.1 (low random) │
-│  • JSON response format         │
-│  • FDA-approved rules in prompt │
+│  5. Deterministic Tier (code)   │
+│  Evidence.get_tier_hint():      │
+│  • Benign check → Tier IV       │
+│  • Molecular subtype → Tier I-B │
+│  • FDA approval → Tier I        │
+│  • Oncogene mutation class check│
+│  • Pathway-actionable TSG check │
+│  • Investigational-only pairs   │
+│  • VUS in cancer gene → Tier III│
 └────────────┬────────────────────┘
              │
              ▼
 ┌─────────────────────────────────┐
-│  6. Tier Assignment             │
+│  6. LLM Narrative Generation    │
+│  • Receives pre-computed tier   │
+│  • Writes clinical explanation  │
+│  • Temperature=0.1 (low random) │
+│  • Returns 3-5 sentence summary │
+└────────────┬────────────────────┘
+             │
+             ▼
+┌─────────────────────────────────┐
+│  7. Assessment Output           │
 │  ActionabilityAssessment:       │
 │  • Tier (I/II/III/IV)          │
 │  • Confidence score (0-1)       │
-│  • Recommended therapies        │
-│  • Rationale                    │
+│  • Clinical narrative           │
 │  • Evidence strength            │
 └─────────────────────────────────┘
 ```
@@ -418,7 +430,33 @@ VariantInput → Normalize → MyVariantClient → Evidence → LLMService → A
 - `GET https://clinicaltrials.gov/api/v2/studies`
 
 ### 5. LLM Service (`llm/service.py`)
-**Purpose:** LLM-based variant assessment
+**Purpose:** LLM-based narrative generation and literature analysis
+
+**Architecture:**
+The tier classification is **deterministic** - computed by `Evidence.get_tier_hint()` before LLM is called. The LLM's role is solely to generate a human-readable clinical narrative explaining the pre-computed tier.
+
+```
+Evidence → get_tier_hint() → Deterministic Tier → LLM → Clinical Narrative
+```
+
+**Core Functions:**
+
+1. **`assess_variant()`** - Main assessment endpoint
+   - Receives pre-computed tier from `get_tier_hint()`
+   - Generates 3-5 sentence clinical narrative
+   - Includes oncogene mutation class context (e.g., BRAF Class II notes)
+
+2. **`score_paper_relevance()`** - Literature screening
+   - Scores papers for relevance to specific gene/variant/tumor (0-1)
+   - Classifies signal type: resistance, sensitivity, prognostic, mixed
+   - Extracts drug mentions and key findings
+   - Filters prognostic-only papers from actionability evidence
+
+3. **`extract_variant_knowledge()`** - Knowledge synthesis
+   - Synthesizes structured knowledge from multiple papers
+   - Extracts: mutation type, resistant/sensitive drugs, evidence level
+   - Distinguishes PREDICTIVE (affects drug selection) vs PROGNOSTIC (survival only)
+   - Returns tier recommendation with rationale
 
 **Model Support:**
 - OpenAI: gpt-4, gpt-4o, gpt-4o-mini
@@ -428,13 +466,14 @@ VariantInput → Normalize → MyVariantClient → Evidence → LLMService → A
 
 **Configuration:**
 - Temperature: 0.0-0.1 (low randomness for determinism)
-- Max tokens: 2000
+- Max tokens: 1000 (narrative), 500 (paper scoring), 1500 (knowledge extraction)
 - JSON response mode (OpenAI models)
 
-**Prompt Engineering:**
-- System message: Expert oncologist role + AMP/ASCO/CAP guidelines
-- User message: Evidence summary + classification instructions
-- Embedded FDA-approved rules (BRAF V600E in melanoma, etc.)
+**Why Deterministic Tiers:**
+- Complex tier logic is testable in code, not natural language prompts
+- Achieved 80%+ accuracy vs ~50% with prompt-only approach
+- LLM adds value through synthesis and clear communication
+- Prevents hallucinated tier assignments
 
 **Output Parsing:**
 - Handles markdown code blocks
@@ -460,6 +499,92 @@ VariantInput → Normalize → MyVariantClient → Evidence → LLMService → A
 - Filters by tumor type when provided
 - Sorts by evidence level (A > B > C > D > E)
 - Limits output (default: 15 items)
+
+**Deterministic Tier Classification (`get_tier_hint`):**
+The `Evidence` class includes a `get_tier_hint()` method that computes the tier deterministically in code before LLM is called. See [DECISIONS.md](DECISIONS.md) for the full decision flow.
+
+### 6a. Gene Context (`models/gene_context.py`)
+**Purpose:** Domain knowledge about genes, mutation classes, and pathway-actionable TSGs
+
+**Oncogene Mutation Classes:**
+Some oncogenes have distinct mutation classes with different therapeutic profiles:
+- **BRAF Class I (V600):** RAS-independent monomers → V600 inhibitors work
+- **BRAF Class II (G469A, K601E, etc.):** RAS-independent dimers → MEK inhibitors, NOT V600 inhibitors
+- **BRAF Class III (D594G, etc.):** Kinase-impaired, RAS-dependent → context-dependent
+
+**Pathway-Actionable TSGs:**
+Unlike generic TSGs (not directly targetable), these TSGs activate druggable pathways when lost:
+- **PTEN:** LOF → PI3K/AKT/mTOR activation → alpelisib, capivasertib
+- **VHL:** LOF → HIF stabilization → belzutifan (FDA-approved)
+- **NF1:** LOF → RAS/MAPK activation → selumetinib (FDA-approved for NF1 tumors)
+- **TSC1/TSC2:** LOF → mTOR activation → everolimus
+
+**Usage in Tier Classification:**
+- `get_oncogene_mutation_class()`: Returns mutation class info for therapeutic context
+- `is_high_prevalence_tumor()`: Checks if tumor type has high prevalence for a TSG alteration
+- Gene context is passed to LLM for tumor-specific therapy notes
+
+### 6b. Literature Search Pipeline
+
+**Purpose:** Find resistance/sensitivity evidence for variants not in curated databases
+
+The system uses a two-stage LLM-powered literature search to supplement curated evidence:
+
+```
+Semantic Scholar / PubMed → Paper Search → LLM Relevance Scoring → LLM Knowledge Extraction → Evidence Model
+```
+
+**Stage 1: Paper Search** (`semantic_scholar.py`, `pubmed.py`)
+- Primary: Semantic Scholar API (includes AI-generated TLDRs, citation metrics)
+- Fallback: PubMed (on rate limits)
+- Searches both resistance literature AND general variant literature
+- Returns up to 6 merged papers per query
+
+**Stage 2: LLM Paper Relevance Scoring** (`service.py:score_paper_relevance`)
+Each paper is scored for relevance using gpt-4o-mini:
+
+| Score | Criteria |
+|-------|----------|
+| 1.0 | Directly studies gene+variant in exact tumor type |
+| 0.9 | Studies drugs targeting gene mutations in tumor |
+| 0.8 | Studies gene exon/codon mutations including variant's class |
+| 0.7 | Studies gene resistance mechanisms in tumor |
+| 0.6 | Studies gene+variant in related tumor context |
+| <0.6 | Not relevant (filtered out) |
+
+**Key distinctions enforced:**
+- **PREDICTIVE** (resistance/sensitivity): Affects drug selection → Tier II+
+- **PROGNOSTIC**: Affects prognosis only → Tier III
+
+**Stage 3: LLM Knowledge Extraction** (`service.py:extract_variant_knowledge`)
+From relevant papers, extracts:
+- `mutation_type`: primary (driver) vs secondary (resistance/acquired)
+- `resistant_to`: drugs with evidence level and mechanism
+- `sensitive_to`: drugs with evidence level
+- `clinical_significance`: 2-3 sentence summary
+- `evidence_level`: FDA-approved, Phase 3, Phase 2, Preclinical, Case reports
+- `tier_recommendation`: with rationale
+
+**Use Case Example:**
+- EGFR C797S: Curated databases may lack resistance annotation
+- Literature search finds highly-cited papers documenting osimertinib resistance
+- LLM extracts: "secondary mutation, resistant to osimertinib, sensitive to first-gen TKIs"
+- Result: Tier II-D (resistance without approved alternative)
+
+### 6c. Clinical Trials Integration
+
+**Purpose:** Surface active trials for variants, especially when no approved therapy exists
+
+**Trial Detection** (`clinicaltrials.py`):
+- Variant-specific trial search (explicit mention in eligibility/arms)
+- Gene-level trial search as fallback
+- Phase filtering (Phase 1-4)
+- Recruiting/active status filtering
+
+**Impact on Tier Classification:**
+- Active variant-specific trials → Tier II-D (investigational)
+- Trials provide therapeutic options even when FDA approval is absent
+- Trial count included in evidence summary
 
 ### 7. Assessment Models (`models/assessment.py`)
 **Purpose:** Actionability tier representation
@@ -553,18 +678,28 @@ Gold Standard JSON → Load → Assess Each Variant → Compare Tiers → Metric
 
 ## Validation Performance
 
-**Current Metrics (gpt-4o-mini, SNPs/indels only):**
-- Overall accuracy: 70%
-- Tier I F1 score: 87%
-- Tier II F1 score: Lower (fewer training examples)
+**Current Metrics (deterministic tier + LLM narrative):**
+- Overall accuracy: **80%+**
+- Tier I Recall: **~95%**
+- Consistent and reproducible (deterministic)
 
-**Improvement Strategies (Applied):**
-1. ✅ Evidence prioritization (PREDICTIVE + drugs first)
-2. ✅ Tumor-type filtering in evidence summary
-3. ✅ FDA-approved rules embedded in LLM prompt
-4. ✅ Low temperature (0.1) for determinism
-5. 🔄 Multi-agent architecture (planned)
-6. 🔄 Ensemble LLM voting (planned)
+**Architecture Evolution:**
+| Architecture | Accuracy | Tier I Recall |
+|--------------|----------|---------------|
+| Prompt-only | ~52% | ~53% |
+| Preprocessing-heavy (current) | **80%+** | **~95%** |
+
+**Key Improvements (Applied):**
+1. ✅ Deterministic tier classification in code (`get_tier_hint()`)
+2. ✅ LLM generates narrative only, not tier decisions
+3. ✅ Variant-class validation (BRAF V600 vs non-V600)
+4. ✅ Oncogene mutation class handling (Class I/II/III BRAF)
+5. ✅ Pathway-actionable TSG detection (PTEN, VHL, NF1)
+6. ✅ CIViC Level A vs B distinction for Tier I vs II
+
+**Planned Enhancements:**
+- 🔄 Multi-agent architecture
+- 🔄 Ensemble LLM voting
 
 ## Future Architecture Enhancements
 
@@ -772,10 +907,11 @@ tumor_board_v2/
 │   │
 │   ├── models/               # Pydantic data models
 │   │   ├── variant.py        # Variant input model
-│   │   ├── evidence.py       # Evidence models
+│   │   ├── evidence.py       # Evidence models + get_tier_hint()
 │   │   ├── assessment.py     # Assessment output
 │   │   ├── validation.py     # Validation models
-│   │   └── annotations.py    # Shared annotation fields
+│   │   ├── annotations.py    # Shared annotation fields
+│   │   └── gene_context.py   # Oncogene classes, pathway-actionable TSGs
 │   │
 │   ├── utils/                # Utility modules
 │   │   └── variant_normalization.py  # Normalization logic

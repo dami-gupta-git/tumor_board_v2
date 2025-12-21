@@ -28,6 +28,8 @@ Evidence Collection → Preprocessing (get_tier_hint) → LLM Validation → Fin
 
 ### Tier Definitions
 
+**Note:** Sublevels (A/B/C/D) are used internally for confidence calculation but are NOT displayed to users. Users see only "Tier I", "Tier II", "Tier III", or "Tier IV".
+
 | Tier | Definition | Evidence Requirements |
 |------|------------|----------------------|
 | **I-A** | FDA-approved OR professional guidelines | FDA label, NCCN/ASCO guidelines, CIViC Level A |
@@ -48,7 +50,7 @@ Evidence Collection → Preprocessing (get_tier_hint) → LLM Validation → Fin
 
 ### Decision Flow (`get_tier_hint`)
 
-**Location:** [evidence.py:1119-1496](src/tumorboard/models/evidence/evidence.py#L1119-L1496)
+**Location:** [evidence.py](src/tumorboard/models/evidence/evidence.py) - `get_tier_hint()`
 
 The tier classification follows this priority order:
 
@@ -108,7 +110,7 @@ EGFR:
 
 ### Extracellular Domain Exclusions
 
-**Location:** [variant_classes.yaml:105-123](src/tumorboard/config/variant_classes.yaml#L105-L123)
+**Location:** [variant_classes.yaml](src/tumorboard/config/variant_classes.yaml) - EGFR extracellular domain exclusions
 
 EGFR extracellular domain mutations (exons 1-16) are explicitly excluded from TKI approvals:
 - **NOT responsive** to gefitinib, erlotinib, osimertinib
@@ -348,7 +350,7 @@ Semantic Scholar / PubMed → Paper Search → LLM Relevance Scoring → LLM Kno
 
 **Stage 2: LLM Paper Relevance Scoring**
 
-**Location:** [service.py:179-331](src/tumorboard/llm/service.py#L179-L331) - `score_paper_relevance()`
+**Location:** [service.py](src/tumorboard/llm/service.py) - `score_paper_relevance()`
 
 Each paper is scored for relevance using gpt-4o-mini:
 
@@ -367,7 +369,7 @@ Key distinctions enforced:
 
 **Stage 3: LLM Knowledge Extraction**
 
-**Location:** [service.py:333-514](src/tumorboard/llm/service.py#L333-L514) - `extract_variant_knowledge()`
+**Location:** [service.py](src/tumorboard/llm/service.py) - `extract_variant_knowledge()`
 
 From relevant papers, extracts:
 - `mutation_type`: primary (driver) vs secondary (resistance/acquired)
@@ -379,7 +381,7 @@ From relevant papers, extracts:
 
 ### LLM Role: Narrative Only (No Tier Decisions)
 
-**Location:** [service.py:45-148](src/tumorboard/llm/service.py#L45-L148) - `assess_variant()`
+**Location:** [service.py](src/tumorboard/llm/service.py) - `assess_variant()`
 
 The tier classification is **deterministic** (computed by `Evidence.get_tier_hint()`). The LLM's role is to:
 1. Write a clear clinical explanation for the pre-computed tier
@@ -390,11 +392,13 @@ The tier classification is **deterministic** (computed by `Evidence.get_tier_hin
 # Tier is determined by preprocessing, NOT LLM
 tier_hint = evidence.get_tier_hint(tumor_type=tumor_type)
 tier, sublevel = extract_tier_from_hint(tier_hint)
+# Note: sublevel (A/B/C/D) used for confidence calculation but NOT displayed
 
-# LLM only generates narrative
+# LLM only generates narrative (tier without sublevel)
 messages = create_narrative_prompt(
     gene=gene, variant=variant, tumor_type=tumor_type,
-    tier=full_tier, tier_reason=tier_hint,
+    tier=tier,  # "Tier I", "Tier II", etc. - no sublevel shown to users
+    tier_reason=tier_hint,
     evidence_summary=evidence_summary,
 )
 ```
@@ -403,6 +407,7 @@ messages = create_narrative_prompt(
 - Deterministic tiers are testable and reproducible
 - LLM adds value through synthesis and clear communication
 - Prevents hallucinated tier assignments
+- Sublevel (A/B/C/D) not displayed to users (not fully validated)
 
 ---
 

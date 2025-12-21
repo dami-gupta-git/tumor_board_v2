@@ -7,11 +7,6 @@ services:
       - "8501:8501"
     env_file:
       - ../.env
-    environment:
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
-      - GROQ_API_KEY=${GROQ_API_KEY}
     volumes:
       - ../benchmarks:/app/benchmarks
       - ../data:/app/data
