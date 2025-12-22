@@ -16,11 +16,12 @@ Precision oncology depends on expert molecular tumor boards to determine whether
 clinically “actionable” (e.g., FDA‑approved therapies or guideline‑backed biomarkers). This is a complex, manual 
 process requiring synthesis of evidence from multiple databases and the clinical context.[3]
 
-TumorBoardLite automates part of this workflow by aggregating evidence from key genomic and drug‑labeling databases 
-(CIViC, ClinVar, COSMIC, FDA, CGI, VICC MetaKB, ClinicalTrials.gov, Semantic Scholar, AlphaMissense, etc.). 
-It applies a pragmatic AMP/ASCO/CAP‑inspired decision tree (including Tier II scenarios and Tier III sub‑levels), 
-and produces standardized tier assignments with confidence scores and human‑readable rationales. 
-An LLM wrapper explains decision making and synthesizes the evidence.
+TumorBoardLite automates part of this workflow using a **hybrid rules + LLM architecture**:
+
+- **Rules engine for tier classification**: AMP/ASCO/CAP guidelines are fundamentally a decision tree; a deterministic rules engine applies them consistently (91% accuracy vs ~50% when LLM attempted classification directly)
+- **LLM for narrative and literature**: LLMs excel at synthesizing evidence into clinical rationales and extracting resistance/sensitivity signals from research abstracts
+
+The system aggregates evidence from genomic and drug‑labeling databases (CIViC, ClinVar, COSMIC, FDA, CGI, VICC MetaKB, ClinicalTrials.gov, Semantic Scholar, AlphaMissense, etc.), applies a pragmatic AMP/ASCO/CAP‑inspired decision tree (including Tier II scenarios and Tier III sub‑levels), and produces standardized tier assignments with confidence scores and human‑readable rationales.
 
 A built‑in validation framework benchmarks predictions against expert‑labeled “gold‑standard” variant classifications 
 using several curated datasets (original 15‑case, SNP‑only, and 47‑case comprehensive sets).
@@ -85,8 +86,30 @@ Molecular tumor boards face several challenges in variant interpretation and act
 4. **Rapidly Evolving Landscape**: New clinical trials, approvals, and guidelines appear frequently, 
 making it difficult to stay current.  
 
-TumorBoardLite aims to **automate evidence aggregation and triage** for variant actionability with AI, improving speed, 
+TumorBoardLite aims to **automate evidence aggregation and triage** for variant actionability with AI, improving speed,
 transparency, and standardization of variant‑level reasoning in a research setting.
+
+***
+
+## Why Rules‑Based Classification (Not Pure LLM)
+
+Early versions attempted LLM‑based tier classification directly. Results:
+
+- Inconsistent outputs across runs
+- Poor performance on rules‑based decisions (AMP/ASCO/CAP is fundamentally a decision tree)
+- ~50% accuracy when LLM attempted tier assignment
+
+**Key insight**: LLMs are not well‑suited for strict rules‑based classification tasks. They excel at synthesis and narrative, not applying deterministic logic consistently.
+
+**Current architecture**:
+
+| Component | Approach | Why |
+|-----------|----------|-----|
+| **Tier classification** | Rules engine | AMP/ASCO/CAP guidelines are deterministic; rules yield 91% accuracy vs ~50% with LLM |
+| **Rationale generation** | LLM | Synthesizing evidence into coherent clinical narratives is what LLMs do well |
+| **Literature extraction** | LLM | Parsing abstracts for resistance/sensitivity signals benefits from language understanding |
+
+This hybrid approach leverages each technology for what it does best.
 
 ***
 
