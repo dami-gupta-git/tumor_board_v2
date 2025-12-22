@@ -20,7 +20,7 @@ Evidence Collection → Preprocessing (get_tier_hint) → LLM Validation → Fin
 - Complex tier logic is better expressed in testable code than natural language prompts
 - Preprocessing catches errors LLM would miss (variant-class matching, FDA validation)
 - LLM focuses on synthesis and edge cases, not rule application
-- Achieved 80%+ accuracy vs ~50% with prompt-only approach
+- Achieved 80%+ accuracy vs ~50-80% with prompt-only approach
 
 ---
 

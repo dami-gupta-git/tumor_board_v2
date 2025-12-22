@@ -471,7 +471,7 @@ Evidence → get_tier_hint() → Deterministic Tier → LLM → Clinical Narrati
 
 **Why Deterministic Tiers:**
 - Complex tier logic is testable in code, not natural language prompts
-- Achieved 85%+ accuracy vs ~50% with prompt-only approach
+- Achieved 85%+ accuracy vs ~50-80% with prompt-only approach
 - LLM adds value through synthesis and clear communication
 - Prevents hallucinated tier assignments
 

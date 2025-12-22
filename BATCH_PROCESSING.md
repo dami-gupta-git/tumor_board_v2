@@ -212,4 +212,4 @@ Sample batch and gold standard files are available in the repository:
 
 - `benchmarks/sample_batch.json` - Example batch input
 - `benchmarks/gold_standard.json` - Validation dataset
-- `sample_batch.csv` - Example CSV for Streamlit upload
+- `benchmarks/sample_batch.csv` - Example CSV for Streamlit upload

@@ -20,7 +20,7 @@ Detailed feature documentation for TumorBoard v2.
 ### Tier Classification
 - **Deterministic Tiers**: Tier classification computed in code (`get_tier_hint()`), not by LLM - ensures reproducibility
 - **LLM Narrative Only**: LLM generates clinical explanations for pre-computed tiers
-- **80%+ Accuracy**: Validated against gold standard dataset (up from ~50% with prompt-only approach)
+- **~90%+ Accuracy**: Validated against gold standard dataset (up from ~50-80% with prompt-only approach)
 - **~95% Tier I Recall**: High sensitivity for FDA-approved actionable variants
 
 ### Oncogene Mutation Classes
