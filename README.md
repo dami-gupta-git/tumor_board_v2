@@ -1,5 +1,6 @@
 # TumorBoardLite
-Evidence‑driven AMP/ASCO/CAP tiering with integrated validation. Includes a validation framework to benchmark against gold standard datasets.
+TumorBoardLite aggregates evidence from genomic databases to classify individual cancer variants using
+AMP/ASCO/CAP tiers.
 
 **Current Validation Performance: 91% accuracy | 94% Tier I F1 score**
 
@@ -15,7 +16,10 @@ human‑readable rationales. There is an LLM wrapper that explains decision maki
 
 A built-in validation framework benchmarks predictions against expert-labeled "gold-standard" variant classifications.
 
-**Important**: This tool provides guidelines for individual variants, not comprehensive clinical recommendations. It assesses variants in isolation and does not account for patient context, co-occurring mutations, prior treatments, or the full clinical picture that informs real tumor board decisions. See [Limitations & Shortcomings](#limitations--shortcomings) for details.
+**Important**: This tool provides guidelines for individual variants, not comprehensive clinical recommendations. 
+It assesses variants in isolation and does not account for patient context, co-occurring mutations, prior treatments, 
+or the full clinical picture that informs real tumor board decisions. 
+See [Limitations & Shortcomings](#limitations--shortcomings) for details.
 
 Note: Currently, this tool supports only single nucleotide polymorphisms (SNPs) and small insertions/deletions (indels).  
 It is a research prototype and is not intended for clinical use.  
