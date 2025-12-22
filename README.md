@@ -40,7 +40,7 @@ splice variants) are not tiered and represent many common real‑world biomarker
 - New evidence sources: SpliceAI, TCGA prevalence  
 - Patient VCF Files: End‑to‑end pipeline from VCF upload → variant prioritization → comprehensive 
 clinical‑style reports with trial matching (research only)
-
+(see `ROADMAP.md` for details)
 ***
 
 ## Overview
@@ -89,86 +89,6 @@ TumorBoardLite aims to **automate evidence aggregation and triage** for variant 
 transparency, and standardization of variant‑level reasoning in a research setting.
 
 ***
-
-## Limitations & Shortcomings
-
-**This tool provides guidelines, not definitive clinical recommendations.** It is a research prototype intended to assist—not replace—expert molecular tumor board review.
-
-### Clinical Scope: What This Tool Does NOT Do
-
-| Limitation | Description |
-|-----------|-------------|
-| **No Big Picture Analysis** | Assesses variants in isolation. Does not consider the full mutational profile, co‑occurring mutations, tumor mutation burden (TMB), MSI/TMB biomarkers, or interactions between multiple variants. |
-| **No Patient Context** | Ignores prior treatments, treatment history, disease stage, performance status, comorbidities, and patient preferences that drive real‑world therapy choices. |
-| **No Clonal Architecture** | Does not distinguish primary driver mutations from subclonal or acquired resistance mutations that emerge during therapy. |
-| **No Germline vs Somatic Handling** | Does not differentiate inherited germline variants from acquired somatic mutations, which is critical for hereditary cancer syndromes and genetic counseling. |
-| **No Combination / Sequencing Logic** | Cannot reason about combination regimens, sequencing of targeted therapies, or optimal treatment order across lines of therapy. |
-| **No Resistance Trajectory Modeling** | Does not predict which resistance mechanisms may emerge on a given therapy or how to anticipate next‑line options. |
-| **Limited Structural Variant Support** | Tiering is designed around SNPs and small indels. Fusions, amplifications, large deletions, copy‑number changes, splice variants, and complex structural variants are not currently tiered and many standard‑of‑care biomarkers fall into these categories. |
-
-### Guideline & Validation Scope
-
-- **Partial AMP/ASCO/CAP Implementation**  
-  - The decision logic is a **pragmatic approximation** of the AMP/ASCO/CAP somatic variant interpretation guideline 
-  and does not cover every nuance, edge case, or tumor‑specific rule described in the full guideline.[3]
-  - Internal sub‑tiers (I‑A/B, II‑A/B/C/D, III‑A/B/C/D) are used for confidence and reasoning but are collapsed to 
-the public 4‑tier output, which hides some distinctions in evidence strength/type.
-
-- **Limited and Non‑Representative Validation**  
-  - Reported metrics (e.g., 91% accuracy, 94% Tier I F1) are based on small curated datasets with limited tumor‑type 
-  and gene diversity and are not representative of all real‑world variants.
-  - A 47‑case comprehensive benchmark includes fusions, CNVs, and complex biomarkers and yields lower accuracy 
-  (~74–75%), reflecting the difficulty of full MTB coverage.
-  - Generalization to rare variants, unusual tumor types, noisy clinical notes, or non‑canonical inputs 
-  is unknown and has not been clinically validated.
-
-### Technical Limitations
-
-- **LLM Hallucinations & Model Drift**  
-  - LLMs may fabricate evidence, misinterpret database results, or overstate the strength of associations, despite guardrails.[7]
-  - Behavior is **not stable across models or versions**: GPT‑4o, Claude, Gemini, and other models can generate different rationales and occasionally different tiers for the same case.[4]
-  - Prompt or model updates can change outputs over time, even if the code and inputs remain constant.  
-
-- **Evidence Coverage & API Failures**  
-  - Evidence quality depends on what is curated in CIViC, ClinVar, COSMIC, MetaKB, CGI, and other upstream sources; gaps or biases in those resources propagate directly into the tool’s recommendations.
-  - Network issues, rate limits, or upstream API/schema changes (VEP, MyVariant.info, openFDA, ClinicalTrials.gov, Semantic Scholar, MetaKB, CGI) can result in missing or incomplete annotations.
-  - The system currently does **not reliably distinguish “no evidence exists” from “evidence temporarily unavailable,”** which may under‑ or over‑estimate a tier.  
-
-- **Variant Normalization & Class Rules**  
-  - The variant normalizer focuses on protein‑level SNPs and small indels and uses pattern‑based rules; unusual notations or exon‑level descriptions may be rejected or mis‑normalized.
-  - Variant‑class rules (e.g., BRAF V600‑only approvals, EGFR extracellular domain exclusions, KIT exon‑specific behavior) are hand‑maintained in configuration files and cover only a subset of genes.
-  - Exon‑level and domain‑level literature is only partially surfaced; foundational studies that speak to mutation classes (e.g., KIT exon 11) may be missed by variant‑token‑only searches.
-
-- **Tumor Type Matching**  
-  - Tumor type names must be mapped correctly to database conventions (e.g., “NSCLC” vs “Non‑Small Cell Lung Cancer” vs “Lung Adenocarcinoma”); mismatches can hide relevant evidence.
-
-- **Context Windows & Truncation**  
-  - Long evidence summaries and multi‑paper literature digests may be truncated before LLM processing due to context window limits, potentially dropping important details.[7]
-
-### Regulatory, Privacy, and Governance
-
-- **Not a Medical Device / CDS**  
-  - This software has **not** undergone regulatory review and is **not** an FDA‑cleared clinical decision support system or medical device.[2][4]
-  - Any use with real patient data should be confined to research, sandbox, or educational settings under appropriate institutional oversight.  
-
-- **Logging & PHI**  
-  - By default, LLM decisions and requests are logged to `./logs/llm_decisions_YYYYMMDD.jsonl`, including variant details, tumor types, and rationales.
-  - When real patient data are used, this log content may qualify as Protected Health Information (PHI); users are responsible for de‑identification, secure storage, access control, and compliance with HIPAA/GDPR or local regulations.[8]
-
-### When Expert Review is Essential
-
-Expert molecular tumor board review is **mandatory** (not optional) in at least the following situations:[6]
-
-- Variants with conflicting or sparse evidence across databases  
-- Resistance mutations where treatment sequencing decisions are being considered  
-- Cases requiring integration of patient‑specific factors (co‑mutations, prior therapies, comorbidities, trial eligibility)  
-- **Any variant whose assessment will influence actual clinical decision‑making**  
-
-This tool is for **research purposes only**. Clinical decisions must always be made by qualified healthcare professionals with access to the full clinical picture.
-
-***
-
-## Summary Roadmap (Research)
 
 ### Enhanced Evidence Sources
 
@@ -324,6 +244,85 @@ and FDA approvals via MyVariant.info and other APIs.
 - **Data Sources**: MyVariant.info (CIViC, ClinVar, COSMIC), FDA openFDA API, VEP REST API, VICC MetaKB, CGI Biomarkers, Semantic Scholar, ClinicalTrials.gov, gnomAD, AlphaMissense.
 
 ***
+
+## Limitations & Shortcomings
+
+**This tool provides guidelines, not definitive clinical recommendations.** It is a research prototype intended to assist—not replace—expert molecular tumor board review.
+
+### Clinical Scope: What This Tool Does NOT Do
+
+| Limitation | Description |
+|-----------|-------------|
+| **No Big Picture Analysis** | Assesses variants in isolation. Does not consider the full mutational profile, co‑occurring mutations, tumor mutation burden (TMB), MSI/TMB biomarkers, or interactions between multiple variants. |
+| **No Patient Context** | Ignores prior treatments, treatment history, disease stage, performance status, comorbidities, and patient preferences that drive real‑world therapy choices. |
+| **No Clonal Architecture** | Does not distinguish primary driver mutations from subclonal or acquired resistance mutations that emerge during therapy. |
+| **No Germline vs Somatic Handling** | Does not differentiate inherited germline variants from acquired somatic mutations, which is critical for hereditary cancer syndromes and genetic counseling. |
+| **No Combination / Sequencing Logic** | Cannot reason about combination regimens, sequencing of targeted therapies, or optimal treatment order across lines of therapy. |
+| **No Resistance Trajectory Modeling** | Does not predict which resistance mechanisms may emerge on a given therapy or how to anticipate next‑line options. |
+| **Limited Structural Variant Support** | Tiering is designed around SNPs and small indels. Fusions, amplifications, large deletions, copy‑number changes, splice variants, and complex structural variants are not currently tiered and many standard‑of‑care biomarkers fall into these categories. |
+
+### Guideline & Validation Scope
+
+- **Partial AMP/ASCO/CAP Implementation**  
+  - The decision logic is a **pragmatic approximation** of the AMP/ASCO/CAP somatic variant interpretation guideline 
+  and does not cover every nuance, edge case, or tumor‑specific rule described in the full guideline.[3]
+  - Internal sub‑tiers (I‑A/B, II‑A/B/C/D, III‑A/B/C/D) are used for confidence and reasoning but are collapsed to 
+the public 4‑tier output, which hides some distinctions in evidence strength/type.
+
+- **Limited and Non‑Representative Validation**  
+  - Reported metrics (e.g., 91% accuracy, 94% Tier I F1) are based on small curated datasets with limited tumor‑type 
+  and gene diversity and are not representative of all real‑world variants.
+  - A 47‑case comprehensive benchmark includes fusions, CNVs, and complex biomarkers and yields lower accuracy 
+  (~74–75%), reflecting the difficulty of full MTB coverage.
+  - Generalization to rare variants, unusual tumor types, noisy clinical notes, or non‑canonical inputs 
+  is unknown and has not been clinically validated.
+
+### Technical Limitations
+
+- **LLM Hallucinations & Model Drift**  
+  - LLMs may fabricate evidence, misinterpret database results, or overstate the strength of associations, despite guardrails.[7]
+  - Behavior is **not stable across models or versions**: GPT‑4o, Claude, Gemini, and other models can generate different rationales and occasionally different tiers for the same case.[4]
+  - Prompt or model updates can change outputs over time, even if the code and inputs remain constant.  
+
+- **Evidence Coverage & API Failures**  
+  - Evidence quality depends on what is curated in CIViC, ClinVar, COSMIC, MetaKB, CGI, and other upstream sources; gaps or biases in those resources propagate directly into the tool’s recommendations.
+  - Network issues, rate limits, or upstream API/schema changes (VEP, MyVariant.info, openFDA, ClinicalTrials.gov, Semantic Scholar, MetaKB, CGI) can result in missing or incomplete annotations.
+  - The system currently does **not reliably distinguish “no evidence exists” from “evidence temporarily unavailable,”** which may under‑ or over‑estimate a tier.  
+
+- **Variant Normalization & Class Rules**  
+  - The variant normalizer focuses on protein‑level SNPs and small indels and uses pattern‑based rules; unusual notations or exon‑level descriptions may be rejected or mis‑normalized.
+  - Variant‑class rules (e.g., BRAF V600‑only approvals, EGFR extracellular domain exclusions, KIT exon‑specific behavior) are hand‑maintained in configuration files and cover only a subset of genes.
+  - Exon‑level and domain‑level literature is only partially surfaced; foundational studies that speak to mutation classes (e.g., KIT exon 11) may be missed by variant‑token‑only searches.
+
+- **Tumor Type Matching**  
+  - Tumor type names must be mapped correctly to database conventions (e.g., “NSCLC” vs “Non‑Small Cell Lung Cancer” vs “Lung Adenocarcinoma”); mismatches can hide relevant evidence.
+
+- **Context Windows & Truncation**  
+  - Long evidence summaries and multi‑paper literature digests may be truncated before LLM processing due to context window limits, potentially dropping important details.[7]
+
+### Regulatory, Privacy, and Governance
+
+- **Not a Medical Device / CDS**  
+  - This software has **not** undergone regulatory review and is **not** an FDA‑cleared clinical decision support system or medical device.[2][4]
+  - Any use with real patient data should be confined to research, sandbox, or educational settings under appropriate institutional oversight.  
+
+- **Logging & PHI**  
+  - By default, LLM decisions and requests are logged to `./logs/llm_decisions_YYYYMMDD.jsonl`, including variant details, tumor types, and rationales.
+  - When real patient data are used, this log content may qualify as Protected Health Information (PHI); users are responsible for de‑identification, secure storage, access control, and compliance with HIPAA/GDPR or local regulations.[8]
+
+### When Expert Review is Essential
+
+Expert molecular tumor board review is **mandatory** (not optional) in at least the following situations:[6]
+
+- Variants with conflicting or sparse evidence across databases  
+- Resistance mutations where treatment sequencing decisions are being considered  
+- Cases requiring integration of patient‑specific factors (co‑mutations, prior therapies, comorbidities, trial eligibility)  
+- **Any variant whose assessment will influence actual clinical decision‑making**  
+
+This tool is for **research purposes only**. Clinical decisions must always be made by qualified healthcare professionals with access to the full clinical picture.
+
+***
+
 
 ## Contributing
 
