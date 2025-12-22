@@ -4,17 +4,19 @@ AMP/ASCO/CAP tiering. Includes with a validation framework to benchmark against 
 
 **Current Validation Performance: 91% accuracy | 94% Tier I F1 score**
 
-**TL;DR**:  
-Precision oncology depends on expert molecular tumor boards to determine whether genetic variants found in 
-tumors are clinically 'actionable'—that is, whether they have associated FDA-approved therapies or clinical 
+**TL;DR**:
+Precision oncology depends on expert molecular tumor boards to determine whether genetic variants found in
+tumors are clinically 'actionable'—that is, whether they have associated FDA-approved therapies or clinical
 guidelines. This is a complex, manual process involving synthesis of evidence from multiple databases.
 
-TumorBoardLite automates and mimics this expert workflow by aggregating evidence from key genomic and drug-labeling 
-databases (e.g. CIViC, ClinVar, COSMIC, FDA). It applies an explicit AMP/ASCO/CAP decision tree (including Tier II 
-scenarios and Tier III sub‑levels), and produces standardized tier assignments with confidence scores and 
-human‑readable rationales. There is an LLM wrapper that explains decision making and provides detailed evidence. 
+TumorBoardLite automates and mimics this expert workflow by aggregating evidence from key genomic and drug-labeling
+databases (e.g. CIViC, ClinVar, COSMIC, FDA). It applies an explicit AMP/ASCO/CAP decision tree (including Tier II
+scenarios and Tier III sub‑levels), and produces standardized tier assignments with confidence scores and
+human‑readable rationales. There is an LLM wrapper that explains decision making and provides detailed evidence.
 
-A built-in validation framework benchmarks predictions against expert-labeled “gold-standard” variant classifications.
+A built-in validation framework benchmarks predictions against expert-labeled "gold-standard" variant classifications.
+
+**Important**: This tool provides guidelines for individual variants, not comprehensive clinical recommendations. It assesses variants in isolation and does not account for patient context, co-occurring mutations, prior treatments, or the full clinical picture that informs real tumor board decisions. See [Limitations & Shortcomings](#limitations--shortcomings) for details.
 
 Note: Currently, this tool supports only single nucleotide polymorphisms (SNPs) and small insertions/deletions (indels).  
 It is a research prototype and is not intended for clinical use.  
@@ -85,18 +87,39 @@ TumorBoard tackles these challenges by automating evidence synthesis and triagin
 AI, aiming to improve speed, coverage, and transparency.
 
 
-## Disclaimer
+## Limitations & Shortcomings
 
-**Limitations:**
-- LLMs may hallucinate or misinterpret evidence 
-- Pattern matching ≠ expert clinical judgment  
-- Requires validation against gold standards (hence the built-in framework)
-- Evidence quality: Depends on database coverage
-- Novel variants: Limited data for rare variants
-- Context windows: Very long evidence may be truncated
+**This tool provides guidelines, not definitive clinical recommendations.** It is a research prototype intended to assist—not replace—expert molecular tumor board review.
 
-**This tool is for research purposes only.** Clinical decisions should always
-be made by qualified healthcare professionals.
+### What This Tool Does NOT Do
+
+| Limitation | Description |
+|------------|-------------|
+| **No Big Picture Analysis** | Assesses variants in isolation. Does not consider the patient's full mutational profile, co-occurring mutations, tumor mutation burden (TMB), or how multiple variants interact. |
+| **No Patient Context** | Ignores prior treatments, treatment history, disease stage, performance status, comorbidities, and patient preferences that influence real-world therapy selection. |
+| **No Clonal Architecture** | Does not distinguish primary driver mutations from subclonal or resistance mutations that emerge during treatment. |
+| **No Germline vs Somatic** | Does not differentiate inherited germline variants from acquired somatic mutations—critical for hereditary cancer syndromes. |
+| **No Combination Therapy Logic** | Cannot reason about drug combinations, sequencing of therapies, or optimal treatment order. |
+| **No Resistance Trajectory** | Does not predict which resistance mechanisms may emerge on a given therapy. |
+| **Limited Structural Variants** | Only supports SNPs and small indels. Fusions, amplifications, large deletions, and copy number changes are not supported. |
+
+### Technical Limitations
+
+- **LLM Hallucination**: LLMs may fabricate evidence or misinterpret database results
+- **Database Coverage**: Evidence quality depends on what's curated in CIViC, ClinVar, COSMIC, etc.
+- **Novel Variants**: Rare or newly discovered variants may have minimal or no database coverage
+- **Tumor Type Matching**: Tumor type names must match database conventions (e.g., "NSCLC" vs "Non-Small Cell Lung Cancer")
+- **Context Windows**: Very long evidence summaries may be truncated before LLM processing
+- **Real-Time Data**: Evidence reflects database snapshots; new FDA approvals or guideline changes may not be immediately reflected
+
+### When Expert Review is Essential
+
+- Variants with conflicting evidence across databases
+- Resistance mutations requiring treatment sequencing decisions
+- Cases requiring consideration of patient-specific factors
+- Any variant that will inform actual clinical decision-making
+
+**This tool is for research purposes only.** Clinical decisions should always be made by qualified healthcare professionals with access to the full clinical picture.
 
 ## Summary Roadmap
 
