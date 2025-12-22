@@ -351,12 +351,12 @@ If you use TumorBoardLite in your research, please cite:
 
 ## References
 
-- AMP/ASCO/CAP Standards and Guidelines for Somatic Variant Interpretation and Reporting.[3]
+- AMP/ASCO/CAP Standards and Guidelines for Somatic Variant Interpretation and Reporting.
 - MyVariant.info, CIViC, ClinVar, COSMIC, VICC MetaKB, CGI Biomarkers.
 - FDA openFDA, Drugs@FDA for drug and label data.
 - Semantic Scholar API, ClinicalTrials.gov API for literature and trial evidence.
 
-[1]: https://www.fda.gov/drugs/informationondrugs/ucm142438.htm
+[1] https://www.fda.gov/drugs/informationondrugs/ucm142438.htm
 [2](https://www.hardianhealth.com/insights/regulatory-approval-for-medical-llms)
 [3](https://pmc.ncbi.nlm.nih.gov/articles/PMC5707196/)
 [4](https://www.nature.com/articles/s41746-025-01544-y)
