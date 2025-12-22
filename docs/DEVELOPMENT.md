@@ -373,7 +373,7 @@ Current performance: **80%+ accuracy**, **~95% Tier I recall**
 ## Resources
 
 - [DECISIONS.md](DECISIONS.md) - Tier classification decisions and rationale
-- [architecture.md](architecture.md) - System architecture documentation
+- [ARCHITECTURE.md](ARCHITECTURE.md) - System architecture documentation
 - [FEATURES.md](FEATURES.md) - Feature documentation
 - [AMP/ASCO/CAP 2017 Guidelines](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5707196/)
 - [Pydantic Documentation](https://docs.pydantic.dev/)

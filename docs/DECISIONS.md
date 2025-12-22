@@ -480,7 +480,7 @@ Filters resistance entries describing secondary/acquired mutations:
 ## Guidelines Reference
 
 Detailed tier classification rules are documented in:
-- [guidelines/tier1.md](guidelines/tier1.md) - Tier I criteria
-- [guidelines/tier2.md](guidelines/tier2.md) - Tier II criteria
-- [guidelines/tier3.md](guidelines/tier3.md) - Tier III criteria
-- [guidelines/tier4.md](guidelines/tier4.md) - Tier IV criteria
+- [guidelines/tier1.md](../guidelines/tier1.md) - Tier I criteria
+- [guidelines/tier2.md](../guidelines/tier2.md) - Tier II criteria
+- [guidelines/tier3.md](../guidelines/tier3.md) - Tier III criteria
+- [guidelines/tier4.md](../guidelines/tier4.md) - Tier IV criteria

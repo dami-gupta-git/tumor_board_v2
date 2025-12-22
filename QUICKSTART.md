@@ -28,7 +28,7 @@ docker compose up
 open http://localhost:4200
 ```
 
-Done! See [DOCKER_SIMPLE.md](DOCKER_SIMPLE.md) for simple guide or [DOCKER.md](DOCKER.md) for advanced setup.
+Done! See [DOCKER.md](DOCKER.md) for advanced setup.
 
 ---
 
@@ -64,7 +64,7 @@ chmod +x start-dev.sh
 
 4. **Open in browser**: http://localhost:4200
 
-That's it! See [README_WEBAPP.md](README_WEBAPP.md) for detailed web app documentation.
+That's it! See the [streamlit README](streamlit/README.md) for detailed web app documentation.
 
 ---
 
