@@ -1,6 +1,5 @@
 # TumorBoardLite
-An tool for assessing cancer variant actionability with integrated validation. Performs evidence‑driven 
-AMP/ASCO/CAP tiering. Includes with a validation framework to benchmark against gold standard datasets.
+Evidence‑driven AMP/ASCO/CAP tiering with integrated validation. Includes a validation framework to benchmark against gold standard datasets.
 
 **Current Validation Performance: 91% accuracy | 94% Tier I F1 score**
 
