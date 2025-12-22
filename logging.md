@@ -382,7 +382,7 @@ Compare LLM decisions against gold standards:
 import json
 
 # Load gold standard
-with open('benchmarks/gold_standard.json', 'r') as f:
+with open('benchmarks/bak/gold_standard.json', 'r') as f:
     gold_standard = {f"{entry['gene']}_{entry['variant']}": entry for entry in json.load(f)}
 
 # Load LLM decisions
@@ -401,7 +401,7 @@ for response in responses:
         if response['output']['tier'] == gold_standard[key]['expected_tier']:
             matches += 1
 
-print(f"Accuracy: {matches}/{total} ({matches/total*100:.1f}%)")
+print(f"Accuracy: {matches}/{total} ({matches / total * 100:.1f}%)")
 ```
 
 ## Best Practices

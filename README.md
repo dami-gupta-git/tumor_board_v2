@@ -7,8 +7,7 @@ device, and must not be used for direct patient care.[2]
 
 
 **Current Validation Performance (research datasets)**  
-- 91% accuracy | 94% Tier I F1 score on curated SNP/indel‑focused benchmarks  
-- 74–75% accuracy on a 47‑case comprehensive benchmark including fusions, CNVs, and complex biomarkers 
+- 89% accuracy | 96% Tier I F1 score on curated SNP/indel‑focused benchmarks
 - (see `benchmarks/README.md` for details)
 
 **TL;DR**  

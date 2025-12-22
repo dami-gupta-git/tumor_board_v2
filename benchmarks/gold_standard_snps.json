@@ -1,7 +1,7 @@
 {
-  "description": "Gold standard dataset for SNP/indel variants - curated with 2024 FDA approvals",
-  "version": "2.1-snp-2024-corrected",
-  "last_updated": "2024-12",
+  "description": "Comprehensive SNP/indel validation dataset",
+  "version": "1.0",
+  "scope": "SNVs and small indels only (no fusions, amplifications, or structural variants)",
   "entries": [
     {
       "gene": "BRAF",
@@ -141,8 +141,7 @@
       "tumor_type": "Colorectal Cancer",
       "expected_tier": "Tier I",
       "notes": "The KRAS G12D variant is classified as Tier I due to its clinical significance in colorectal cancer",
-      "references": [
-      ]
+      "references": []
     },
     {
       "gene": "KRAS",
@@ -183,8 +182,7 @@
       "tumor_type": "Melanoma",
       "expected_tier": "Tier II",
       "notes": "Currently no approved therapies specifically targeting this variant in melanoma",
-      "references": [
-      ]
+      "references": []
     },
     {
       "gene": "NRAS",
@@ -205,7 +203,7 @@
       "notes": "FDA-approved: alpelisib + fulvestrant for PIK3CA-mutated HR+/HER2- breast cancer (2019). PIK3CA mutation IS the companion diagnostic.",
       "references": [
         "FDA approval May 2019",
-        "André F et al. N Engl J Med 2019 (SOLAR-1)"
+        "Andr\u00e9 F et al. N Engl J Med 2019 (SOLAR-1)"
       ]
     },
     {
@@ -216,7 +214,7 @@
       "notes": "FDA-approved: alpelisib label includes E545K as actionable PIK3CA mutation",
       "references": [
         "FDA-approved companion diagnostic includes E545K",
-        "André F et al. N Engl J Med 2019"
+        "Andr\u00e9 F et al. N Engl J Med 2019"
       ]
     },
     {
@@ -227,7 +225,7 @@
       "notes": "FDA-approved: alpelisib label includes E542K as actionable PIK3CA mutation",
       "references": [
         "FDA-approved companion diagnostic includes E542K",
-        "André F et al. N Engl J Med 2019"
+        "Andr\u00e9 F et al. N Engl J Med 2019"
       ]
     },
     {
@@ -484,10 +482,224 @@
       ]
     },
     {
-        "gene": "TP53",
-        "variant": "R273H",
-        "tumor_type": "Lung cancer",
-        "expected_tier": "Tier II"
+      "gene": "TP53",
+      "variant": "R273H",
+      "tumor_type": "Lung cancer",
+      "expected_tier": "Tier II"
+    },
+    {
+      "gene": "ERBB2",
+      "variant": "L755S",
+      "tumor_type": "Breast Cancer",
+      "expected_tier": "Tier III"
+    },
+    {
+      "gene": "KIT",
+      "variant": "D816V",
+      "tumor_type": "Gastrointestinal Stromal Tumor (GIST)",
+      "expected_tier": "Tier I"
+    },
+    {
+      "gene": "SMO",
+      "variant": "W535L",
+      "tumor_type": "Basal cell carcinoma",
+      "expected_tier": "Tier I"
+    },
+    {
+      "gene": "BRAF",
+      "variant": "G469A",
+      "tumor_type": "Non-Small Cell Lung Cancer",
+      "expected_tier": "Tier II",
+      "notes": "Class II BRAF mutation; MEK inhibitors show activity in trials; not FDA-approved"
+    },
+    {
+      "gene": "EGFR",
+      "variant": "L858R",
+      "tumor_type": "Lung Adenocarcinoma",
+      "expected_tier": "Tier I",
+      "notes": "FDA-approved EGFR TKIs (erlotinib, gefitinib, afatinib, osimertinib)"
+    },
+    {
+      "gene": "EGFR",
+      "variant": "G719A",
+      "tumor_type": "Non-Small Cell Lung Cancer",
+      "expected_tier": "Tier I",
+      "notes": "Uncommon EGFR mutation, FDA-approved afatinib"
+    },
+    {
+      "gene": "EGFR",
+      "variant": "L861Q",
+      "tumor_type": "Non-Small Cell Lung Cancer",
+      "expected_tier": "Tier I",
+      "notes": "Uncommon EGFR mutation, FDA-approved afatinib"
+    },
+    {
+      "gene": "EGFR",
+      "variant": "S768I",
+      "tumor_type": "Non-Small Cell Lung Cancer",
+      "expected_tier": "Tier I",
+      "notes": "Uncommon EGFR mutation, FDA-approved afatinib"
+    },
+    {
+      "gene": "KRAS",
+      "variant": "G12V",
+      "tumor_type": "Pancreatic Cancer",
+      "expected_tier": "Tier III",
+      "notes": "Common driver but no approved targeted therapy for pancreatic KRAS"
+    },
+    {
+      "gene": "NRAS",
+      "variant": "Q61R",
+      "tumor_type": "Colorectal Cancer",
+      "expected_tier": "Tier I",
+      "notes": "Predicts resistance to anti-EGFR therapy"
+    },
+    {
+      "gene": "PIK3CA",
+      "variant": "H1047R",
+      "tumor_type": "Endometrial Cancer",
+      "expected_tier": "Tier II",
+      "notes": "PI3K pathway activation, off-label alpelisib consideration"
+    },
+    {
+      "gene": "IDH1",
+      "variant": "R132C",
+      "tumor_type": "Acute Myeloid Leukemia",
+      "expected_tier": "Tier I",
+      "notes": "FDA-approved ivosidenib for IDH1-mutant AML"
+    },
+    {
+      "gene": "IDH1",
+      "variant": "R132H",
+      "tumor_type": "Cholangiocarcinoma",
+      "expected_tier": "Tier I",
+      "notes": "FDA-approved ivosidenib for IDH1-mutant cholangiocarcinoma (2021)"
+    },
+    {
+      "gene": "IDH1",
+      "variant": "R132H",
+      "tumor_type": "Glioma",
+      "expected_tier": "Tier I",
+      "notes": "FDA-approved vorasidenib for grade 2 IDH-mutant glioma (2024)"
+    },
+    {
+      "gene": "IDH2",
+      "variant": "R172K",
+      "tumor_type": "Acute Myeloid Leukemia",
+      "expected_tier": "Tier I",
+      "notes": "FDA-approved enasidenib for IDH2-mutant AML"
+    },
+    {
+      "gene": "FLT3",
+      "variant": "D835Y",
+      "tumor_type": "Acute Myeloid Leukemia",
+      "expected_tier": "Tier I",
+      "notes": "FDA-approved FLT3 inhibitors (midostaurin, gilteritinib)"
+    },
+    {
+      "gene": "FLT3",
+      "variant": "D835H",
+      "tumor_type": "Acute Myeloid Leukemia",
+      "expected_tier": "Tier I",
+      "notes": "FDA-approved FLT3 inhibitors (midostaurin, gilteritinib)"
+    },
+    {
+      "gene": "KIT",
+      "variant": "D816V",
+      "tumor_type": "Mastocytosis",
+      "expected_tier": "Tier I",
+      "notes": "FDA-approved avapritinib for advanced systemic mastocytosis"
+    },
+    {
+      "gene": "RET",
+      "variant": "C634R",
+      "tumor_type": "Medullary Thyroid Cancer",
+      "expected_tier": "Tier I",
+      "notes": "FDA-approved selpercatinib and pralsetinib for RET-mutant MTC"
+    },
+    {
+      "gene": "ABL1",
+      "variant": "T315I",
+      "tumor_type": "Chronic Myeloid Leukemia",
+      "expected_tier": "Tier I",
+      "notes": "FDA-approved ponatinib for T315I-mutant CML (TKI resistance)"
+    },
+    {
+      "gene": "FGFR3",
+      "variant": "S249C",
+      "tumor_type": "Urothelial Carcinoma",
+      "expected_tier": "Tier I",
+      "notes": "FDA-approved erdafitinib for FGFR-altered urothelial cancer"
+    },
+    {
+      "gene": "FGFR3",
+      "variant": "R248C",
+      "tumor_type": "Urothelial Carcinoma",
+      "expected_tier": "Tier I",
+      "notes": "FDA-approved erdafitinib for FGFR-altered urothelial cancer"
+    },
+    {
+      "gene": "FGFR2",
+      "variant": "S252W",
+      "tumor_type": "Endometrial Cancer",
+      "expected_tier": "Tier II",
+      "notes": "FGFR inhibitors show activity but not FDA-approved for this indication"
+    },
+    {
+      "gene": "AKT1",
+      "variant": "E17K",
+      "tumor_type": "Breast Cancer",
+      "expected_tier": "Tier I",
+      "notes": "FDA-approved capivasertib for AKT1-mutant HR+/HER2- breast cancer (2023)"
+    },
+    {
+      "gene": "TP53",
+      "variant": "R175H",
+      "tumor_type": "Breast Cancer",
+      "expected_tier": "Tier IV",
+      "notes": "No approved targeted therapies; no established clinical utility"
+    },
+    {
+      "gene": "TP53",
+      "variant": "R248W",
+      "tumor_type": "Colorectal Cancer",
+      "expected_tier": "Tier IV",
+      "notes": "Hotspot mutation but no actionable therapeutic implications"
+    },
+    {
+      "gene": "TP53",
+      "variant": "R273H",
+      "tumor_type": "Ovarian Cancer",
+      "expected_tier": "Tier IV",
+      "notes": "Common mutation but no targeted therapy"
+    },
+    {
+      "gene": "GNAQ",
+      "variant": "Q209L",
+      "tumor_type": "Uveal Melanoma",
+      "expected_tier": "Tier II",
+      "notes": "Driver mutation; tebentafusp approved but not GNAQ-specific"
+    },
+    {
+      "gene": "GNA11",
+      "variant": "Q209L",
+      "tumor_type": "Uveal Melanoma",
+      "expected_tier": "Tier II",
+      "notes": "Driver mutation; clinical trials for MEK/PKC inhibitors"
+    },
+    {
+      "gene": "HRAS",
+      "variant": "G12V",
+      "tumor_type": "Head and Neck Squamous Cell Carcinoma",
+      "expected_tier": "Tier II",
+      "notes": "Tipifarnib shows activity in HRAS-mutant HNSCC (accelerated approval pending)"
+    },
+    {
+      "gene": "CTNNB1",
+      "variant": "S45F",
+      "tumor_type": "Hepatocellular Carcinoma",
+      "expected_tier": "Tier III",
+      "notes": "Common mutation but no approved targeted therapy"
     }
   ]
 }

@@ -156,7 +156,7 @@ The validation framework reports:
 ```
 Validation Results (n=50)
 ─────────────────────────
-Overall Accuracy: 91.0%
+Overall Accuracy: 90%
 
 Per-Tier Metrics:
   Tier I:   Precision=0.94  Recall=0.95  F1=0.94

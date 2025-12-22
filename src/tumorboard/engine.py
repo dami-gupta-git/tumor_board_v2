@@ -217,7 +217,7 @@ class AssessmentEngine:
                 except SemanticScholarRateLimitError:
                     # Fall back to PubMed with retry on rate limit
                     if self.pubmed_client:
-                        for attempt in range(3):  # Max 3 retries
+                        for attempt in range(2,4):  #  retries
                             try:
                                 resistance_articles, variant_articles = await asyncio.gather(
                                     self.pubmed_client.search_resistance_literature(
