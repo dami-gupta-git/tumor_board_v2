@@ -1,6 +1,9 @@
 
 # TumorBoardLite
 
+A research-centric tool for LLM-augmented cancer variant actionability assessment.
+***
+
 TumorBoardLite aggregates evidence from genomic databases to classify individual cancer variants using AMP/ASCO/CAP 
 tiers. It is a research‑only variant‑centric tool, not an FDA‑cleared clinical decision support system or medical 
 device, and must not be used for direct patient care.[2]
